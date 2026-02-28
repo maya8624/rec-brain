@@ -1,0 +1,24 @@
+# Web Framework
+fastapi==0.112.2
+uvicorn==0.30.6
+python-dotenv==1.0.1
+pydantic-settings==2.4.0
+
+# AI & Vector DB
+langchain==0.2.14
+langchain-community==0.2.12
+langchain-ollama==0.1.3
+langchain-chroma==0.1.3
+langchain-groq==1.1.2
+chromadb==0.5.3
+ollama  # For interacting with Llama 3.2
+
+# Database
+sqlalchemy==2.0.32
+psycopg2-binary==2.9.9  # PostgreSQL driver
+
+tabulate==0.9.0
+
+# Testing
+pytest==8.3.2
+httpx==0.27.0
