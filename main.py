@@ -13,7 +13,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.routes import router as ai_router
-from src.config import settings
+from src.core.config import settings
 
 # Defines the logging level (INFO and above) and sets a specific format that
 # includes the timestamp, level name, logger name, and the actual message

@@ -2,7 +2,7 @@ from functools import lru_cache
 import logging
 from langchain_community.utilities import SQLDatabase
 from sqlalchemy import create_engine
-from src.config import settings
+from src.core.config import settings
 
 logger = logging.getLogger(__name__)
 

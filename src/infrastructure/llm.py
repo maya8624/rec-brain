@@ -4,7 +4,7 @@
 import logging
 from functools import lru_cache
 from langchain_groq import ChatGroq
-from src.config import settings
+from src.api.core.config import settings
 
 logger = logging.getLogger(__name__)
 

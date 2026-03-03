@@ -22,10 +22,14 @@ class Settings(BaseSettings):
     OLLAMA_BASE_URL: str
     CHROMA_PATH: str
     MODEL_NAME: str
+    LLM_TEMPERATURE: float
     SIMILARITY_THRESHOLD: float
     PRODUCTION: bool
     EMBEDDING_MODEL: str
     GROQ_API_KEY: str
+    OPENAI_API_KEY: str
+    LLM_MAX_TOKENS: int
+    AGENT_TOOL_CALL_MODEL: str
 
     # Use SettingsConfigDict for better structure
     model_config = SettingsConfigDict(

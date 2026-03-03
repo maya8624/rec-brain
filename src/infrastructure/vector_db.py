@@ -10,7 +10,7 @@ from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 
 # Imports the settings object which holds configuration details like paths and URLs.
-from src.config import settings
+from src.core.config import settings
 
 # Initializes a logger for this module, using the module name to trace where logs originate.
 logger = logging.getLogger(__name__)
