@@ -52,7 +52,7 @@ async def search_query(query: str, k: int = 3) -> list[str]:
     """Performs semantic search on ChromaDB."""
     try:
         # Retrieves the vector store instance.
-        store = get_vector_store()
+        vector_store = get_vector_store()
 
         # Performs a similarity search, returning both document contents and scores.
         # Wrapped in asyncio.to_thread because the underlying chroma library is synchronous.
@@ -64,8 +64,7 @@ async def search_query(query: str, k: int = 3) -> list[str]:
         #     if score <= settings.SIMILARITY_THRESHOLD
         # ]
 
-        docs = await asyncio.to_thread(
-            store.max_marginal_relevance_search,
+        docs = await vector_store.amax_marginal_relevance_search(
             query,
             k,   # top k
             5,  # fetch_k
