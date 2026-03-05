@@ -6,15 +6,15 @@ Each tool is a single responsibility class — no business logic, only:
   3. Handle errors gracefully (never expose raw exceptions to the LLM)
 """
 
-from datetime import date, time
+from datetime import datetime
 from typing import Optional, Type
 
 import structlog
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel
 
-from services.backend_client import backend_client
-from tools.scheduler.models import (
+from src.services.mock import backend_client
+from src.tools.scheduler.models import (
     CheckAvailabilityInput,
     ScheduleViewingInput,
     CancelViewingInput,
@@ -56,8 +56,9 @@ class CheckAvailabilityTool(BaseTool):
     async def _arun(
         self,
         property_id: str,
-        preferred_date: date,
-        preferred_time: time,
+        preferred_date: str,
+        preferred_time: str,
+        **kwargs,
     ) -> str:
         """
         Execute the availability check.
@@ -66,6 +67,7 @@ class CheckAvailabilityTool(BaseTool):
             property_id:    Unique identifier of the property (e.g. "PROP-001")
             preferred_date: The date the customer wants to view (must be future)
             preferred_time: The time the customer wants to view (9AM–6PM only)
+            **kwargs:       Absorbs any extra args passed by LangChain internally
 
         Returns:
             Human-readable string for the LLM describing availability
@@ -82,8 +84,8 @@ class CheckAvailabilityTool(BaseTool):
                 path="/api/appointments/availability",
                 params={
                     "propertyId": property_id,
-                    "date": preferred_date.isoformat(),
-                    "time": preferred_time.strftime("%H:%M"),
+                    "date": preferred_date,
+                    "time": preferred_time,
                 },
             )
 
@@ -91,9 +93,14 @@ class CheckAvailabilityTool(BaseTool):
                 agent = data.get("agent", {})
                 log.info("Slot available", agent=agent.get("name"))
 
+                # Format date/time for display
+                display_date = datetime.strptime(
+                    preferred_date, "%Y-%m-%d").strftime("%A, %d %B %Y")
+                display_time = datetime.strptime(
+                    preferred_time, "%H:%M").strftime("%I:%M %p")
                 return (
-                    f"✅ Available! {preferred_date.strftime('%A, %d %B %Y')} at "
-                    f"{preferred_time.strftime('%I:%M %p')} is open. "
+                    f"✅ Available! {display_date} at "
+                    f"{display_time} is open. "
                     f"Assigned agent: {agent.get('name', 'TBD')}. "
                     f"Proceed with schedule_viewing."
                 )
@@ -158,12 +165,13 @@ class ScheduleViewingTool(BaseTool):
     async def _arun(
         self,
         property_id: str,
-        date: date,
-        time: time,
+        date: str,
+        time: str,
         customer_name: str,
         customer_email: Optional[str] = None,
         customer_phone: Optional[str] = None,
         notes: Optional[str] = None,
+        **kwargs,
     ) -> str:
         """
         Execute the appointment booking.
@@ -192,8 +200,8 @@ class ScheduleViewingTool(BaseTool):
                 path="/api/appointments",
                 body={
                     "propertyId": property_id,
-                    "date": date.isoformat(),
-                    "time": time.strftime("%H:%M"),
+                    "date": date,
+                    "time": time,
                     "customerName": customer_name,
                     "customerEmail": customer_email,
                     "customerPhone": customer_phone,
@@ -210,8 +218,8 @@ class ScheduleViewingTool(BaseTool):
             return (
                 f"✅ Appointment confirmed!\n"
                 f"- 📍 Property: {appt.get('propertyAddress', property_id)}\n"
-                f"- 📅 Date: {date.strftime('%A, %d %B %Y')}\n"
-                f"- 🕐 Time: {time.strftime('%I:%M %p')}\n"
+                f"- 📅 Date: {datetime.strptime(date, '%Y-%m-%d').strftime('%A, %d %B %Y')}\n"
+                f"- 🕐 Time: {datetime.strptime(time, '%H:%M').strftime('%I:%M %p')}\n"
                 f"- 👤 Agent: {appt.get('agentName', 'TBD')}\n"
                 f"- 🔖 Reference: {appt_id}\n\n"
                 f"Confirmation sent to {contact}."
@@ -268,6 +276,7 @@ class CancelViewingTool(BaseTool):
         appointment_id: str,
         reason: Optional[str] = None,
         reschedule: bool = False,
+        **kwargs,
     ) -> str:
         """
         Execute the cancellation or reschedule flag.

@@ -3,8 +3,9 @@ import logging
 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import HumanMessage, SystemMessage
+from api.schemas.chat import ChatResponse
 
-from src.domain.models import ChatResponse
+# from src.domain.models import ChatResponse
 
 from src.infrastructure.sql_agent import create_real_estate_sql_agent
 from src.infrastructure.llm import get_llm
@@ -138,9 +139,13 @@ async def handle_user_query(question: str) -> ChatResponse:
     # else:
     # 2. SQL Fallback
     sql_result = await _perform_sql_search(question)
+    return ChatResponse(
+        reply=sql_result["answer"],
+        session_id="",  # You can generate or pass a session ID as needed
+    )
 
-    if sql_result and sql_result.get("answer"):
-        return ChatResponse(
-            answer=sql_result["answer"],
-            source="sql_db"
-        )
+    # if sql_result and sql_result.get("answer"):
+    #     return ChatResponse(
+    #         answer=sql_result["answer"],
+    #         source="sql_db"
+    #     )

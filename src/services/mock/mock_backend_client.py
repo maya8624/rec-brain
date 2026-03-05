@@ -7,7 +7,7 @@ Reads from mock_data.py instead of calling the .NET API.
 import structlog
 from typing import Any
 
-from services.mock.mock_data import (
+from src.services.mock.mock_data import (
     get_availability_response,
     get_create_appointment_response,
     get_cancel_appointment_response,

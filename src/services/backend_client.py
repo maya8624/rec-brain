@@ -18,8 +18,8 @@ from tenacity import (
     before_sleep_log,
 )
 
-from core.config import settings
-from core.exceptions import BackendClientError
+from src.core.config import settings
+from src.core.exceptions import BackendClientError
 
 logger = structlog.get_logger(__name__)
 

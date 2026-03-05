@@ -1,6 +1,6 @@
 import logging
 import structlog
-from core.config import settings
+from src.core.config import settings
 
 
 def setup_logging() -> None:
@@ -8,7 +8,9 @@ def setup_logging() -> None:
     Configure structlog for structured JSON logging.
     Call once at app startup in main.py.
     """
-    log_level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
+    log_level_str: str = str(settings.LOG_LEVEL)
+    log_level = getattr(logging, log_level_str.upper(), logging.INFO)
+    environment: str = str(settings.ENVIRONMENT)
 
     logging.basicConfig(
         format="%(message)s",
@@ -25,10 +27,10 @@ def setup_logging() -> None:
             structlog.processors.format_exc_info,
             # JSON in production, colored in dev
             structlog.dev.ConsoleRenderer()
-            if settings.ENVIRONMENT == "development"
+            if environment == "development"
             else structlog.processors.JSONRenderer(),
         ],
         wrapper_class=structlog.make_filtering_bound_logger(log_level),
         context_class=dict,
-        logger_factory=structlog.PrintLoggerFactory(),
+        logger_factory=structlog.stdlib.LoggerFactory(),
     )

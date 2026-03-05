@@ -69,11 +69,11 @@ class Settings(BaseSettings):
         "http://localhost:3000",
         description="Comma-separated list of allowed CORS origins"
     )
-    PRODUCTION: bool = Field(
-        False,
-        description="Set to True in production — affects logging, CORS, etc."
-    )
     APP_VERSION: str = Field("1.0.0")
+    ENVIRONMENT: str = Field(
+        "development",
+        description="Environment name: development, staging, production"
+    )
 
     # ------------------------------------
     # Database
@@ -171,7 +171,7 @@ class Settings(BaseSettings):
 try:
     settings = Settings()
     print(
-        f"✅ Settings loaded — env: {'production' if settings.PRODUCTION else 'development'}, mock: {settings.MOCK_MODE}")
+        f"✅ Settings loaded — env: {settings.ENVIRONMENT}, mock: {settings.MOCK_MODE}")
 except ValidationError as e:
     print(f"❌ Configuration validation error:\n{e}")
     raise SystemExit(1)  # exit cleanly instead of traceback

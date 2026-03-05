@@ -9,15 +9,16 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import create_react_agent
 
-from agent.prompt import MASTER_SYSTEM_PROMPT
-from core.config import settings
-from tools import all_tools
+from src.agent.prompt import MASTER_SYSTEM_PROMPT
+from src.core.config import settings
+from src.tools import all_tools
+
 logger = structlog.get_logger(__name__)
 
 
 def build_llm() -> ChatGroq:
     return ChatGroq(
-        model=settings.LLM_MODEL,
+        model=settings.MODEL_NAME,
         temperature=settings.LLM_TEMPERATURE,
         api_key=settings.GROQ_API_KEY,
         streaming=True,
@@ -48,7 +49,7 @@ def build_agent() -> CompiledStateGraph:
 
     logger.info(
         "Agent built",
-        model=settings.LLM_MODEL,
+        model=settings.MODEL_NAME,
         tools=[t.name for t in all_tools],
     )
     return agent

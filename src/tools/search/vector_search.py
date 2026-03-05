@@ -18,8 +18,7 @@ logger = logging.getLogger(__name__)
 
 # Initializes the embedding function, using the same model as the LLM for consistency.
 embeddings = HuggingFaceEmbeddings(
-    # The name of the embedding model to use from settings.
-    model=settings.EMBEDDING_MODEL,  # sentence-transformers/all-MiniLM-l6-v2
+    model_name=settings.EMBEDDING_MODEL,  # sentence-transformers/all-MiniLM-l6-v2
 )
 
 logger = logging.getLogger(__name__)
