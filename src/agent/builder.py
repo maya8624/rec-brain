@@ -5,13 +5,13 @@ Separated from runner.py so the agent can be built once and reused.
 
 import structlog
 from langchain_groq import ChatGroq
-from langgraph.prebuilt import create_react_agent
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph.state import CompiledStateGraph
+from langgraph.prebuilt import create_react_agent
 
-from src.core.config import settings
 from agent.prompt import MASTER_SYSTEM_PROMPT
+from core.config import settings
 from tools import all_tools
-
 logger = structlog.get_logger(__name__)
 
 
@@ -25,7 +25,7 @@ def build_llm() -> ChatGroq:
     )
 
 
-def build_agent():
+def build_agent() -> CompiledStateGraph:
     """
     Build and return the LangGraph ReAct agent.
     Call once at app startup and store on app.state.
