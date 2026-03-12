@@ -3,8 +3,6 @@ Chat routes — POST /chat (standard) and POST /chat/stream (SSE).
 No AI logic here — only HTTP concerns: parsing, response formatting, error handling.
 """
 
-# Imports Python's built-in logging module to record application events.
-import logging
 import structlog
 from pydantic import ValidationError
 
@@ -13,10 +11,8 @@ from pydantic import ValidationError
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 
-# Imports the exception type raised when request data doesn't match the expected Pydantic model.
-
-from src.api.schemas.chat import ChatRequest, ChatResponse
-# Imports the Pydantic models that define the structure of the incoming request and outgoing response.
+from src.models.state_models import OrchestrationState
+from src.models.chat_models import ChatRequest, ChatResponse
 from src.agent.runner import run_agent, stream_agent
 from src.api.dependencies import get_agent
 
@@ -26,9 +22,9 @@ from src.tools.search.vector_search import perform_vector_search
 # Initializes a logger for this module, using the module name to trace where logs originate.
 # logger = logging.getLogger(__name__)
 
-# Creates a router instance. All routes defined here will start with /api/ai and
+# Creates a router instance. All routes defined here will start with /api/chat and
 # be grouped under "ai-chat" in the auto-generated documentation.
-router = APIRouter(prefix="/api/ai/chat", tags=["ai-chat"])
+router = APIRouter(prefix="/api/chat", tags=["chat"])
 logger = structlog.get_logger(__name__)
 
 # TODO: validate inputs on .net backend
@@ -37,27 +33,38 @@ logger = structlog.get_logger(__name__)
 
 
 @router.post("", response_model=ChatResponse)
-async def chat(request: ChatRequest, agent=Depends(get_agent)):
+async def chat(chat_request: ChatRequest, agent=Depends(get_agent)) -> ChatResponse:
     """
-    Standard chat endpoint — returns the full response at once.
-    Suitable for simple integrations.
+    Main chat endpoint for the .NET backend.
     """
-    # attaches session_id to every log line from here, so you can filter logs by session in production.
-    log = logger.bind(session_id=request.session_id)
-    #  logs only the first 80 characters of the message. Avoids logging sensitive full messages.
-    log.info("Chat request", message_preview=request.message[:80])
+    log = logger.bind(session_id=chat_request.session_id)
+    log.info("Chat request", message_preview=chat_request.message[:80])
 
     try:
-        # agent/runner.py contains the logic to invoke the agent and get a response.
-        reply = await run_agent(agent, request.message, request.session_id)
-        result = ChatResponse(reply=reply, session_id=request.session_id)
+        state = OrchestrationState(
+            session_id=chat_request.session_id,
+            user_id=chat_request.user_id,
+            user_message=chat_request.message
+        )
+
+        final_state = await run_agent(agent, state)
+
+        result = ChatResponse(
+            answer=final_state.answer or "sorry, I could not generate a response.",
+            session_id=final_state.session_id,
+            success=len(final_state.errors) == 0,
+            route=final_state.routing_decision.route.value if final_state.routing_decision else None,
+            metadata=final_state.metadata
+        )
+
         return result
 
-    except Exception as e:
-        log.error("Chat failed", error=str(e))
-
+    except Exception as ex:
+        logger.exception("Chat failed", error=str(ex))
         raise HTTPException(
-            status_code=500, detail="AI service error. Please try again.") from e
+            status_code=500,
+            detail="AI service error. Please try again."
+        ) from ex
 
 
 @router.post("/stream")
@@ -105,10 +112,11 @@ async def ask_question(request: ChatRequest):
         logger.warning("Validation error: %s", e)
         # Returns a 422 Unprocessable Entity error to the client with the validation details.
         raise HTTPException(status_code=422, detail=str(e))
-    except Exception:
+    except Exception as ex:
         logger.exception(
             "Unexpected error processing question: %s", request.question)
-        raise HTTPException(status_code=500, detail="Internal server error")
+        raise HTTPException(
+            status_code=500, detail="Internal server error") from ex
 
 
 # Defines a POST endpoint at POST /api/ai/ask.

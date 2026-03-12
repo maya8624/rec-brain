@@ -7,20 +7,22 @@ from typing import AsyncGenerator
 import structlog
 from langgraph.graph.state import CompiledStateGraph
 
+from models.state_models import OrchestrationState
+
 logger = structlog.get_logger(__name__)
 
 
-async def run_agent(agent: CompiledStateGraph, user_message: str, session_id: str) -> str:
+async def run_agent(agent: CompiledStateGraph, state: OrchestrationState) -> OrchestrationState:
     """
     Invoke the agent for a single turn and return the final text response.
     session_id maps to a conversation thread — same ID = shared memory/history.
     """
-    log = logger.bind(session_id=session_id)
-    config = {"configurable": {"thread_id": session_id}}
+    log = logger.bind(session_id=state.session_id)
+    config = {"configurable": {"thread_id": state.session_id}}
 
     try:
         result = await agent.ainvoke(
-            {"messages": [("user", user_message)]},
+            {"messages": [("user", state.user_message)]},
             config=config,
         )
 
@@ -38,7 +40,12 @@ async def run_agent(agent: CompiledStateGraph, user_message: str, session_id: st
         response = result["messages"][-1].content
         log.info("Agent responded", response_length=len(response))
 
-        return response
+        return OrchestrationState(
+            session_id=state.session_id,
+            user_id=state.user_id,
+            user_message=state.user_message,
+            answer=response
+        )
 
     except Exception as e:
         log.error("Agent invocation failed", error=str(e))
