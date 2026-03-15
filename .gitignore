@@ -19,6 +19,7 @@ __pycache__/
 .env.development
 .env.local
 .env.production
+.env.*
 
 # --- IDE/Editor Settings ---
 # Local settings specific to your machine or editor.

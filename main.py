@@ -11,10 +11,7 @@ import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.infrastructure.database import get_db_wrapper
-from app.infrastructure.llm import get_llm
 from app.agents.graph import build_graph
-
 from app.core.middleware import RequestLoggingMiddleware
 from app.api.routes import chat, health
 from app.core.config import settings
