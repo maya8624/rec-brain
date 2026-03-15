@@ -1,7 +1,22 @@
+"""
+app/services/booking_service.py
+
+HTTP client for the .NET backend booking API.
+Handles availability checking, booking creation, and cancellation.
+
+All booking state is owned by .NET — this service is a clean
+HTTP client with validation and structured errors.
+
+Usage:
+    service = BookingService()
+    slots = await service.get_availability("prop_123", "2025-04-12")
+    result = await service.book("prop_123", "2025-04-12 10:00", ...)
+"""
 import logging
+from datetime import datetime
+
 import httpx
-from typing import Optional
-from datetime import datetime, timedelta
+
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -12,20 +27,12 @@ DATETIME_FORMAT = "%Y-%m-%d %H:%M"
 
 class BookingService:
     """
-    Handles property inspection availability and booking.
-    Communicates with the .NET backend via HTTP.
-
-    All booking state is owned by .NET — this service is a clean
-    HTTP client with retry logic, validation, and structured errors.
-
-    Usage:
-        service = BookingService()
-        slots = service.get_availability("prop_123", "2025-04-12")
-        result = service.book("prop_123", "2025-04-12 10:00", ...)
+    Communicates with the .NET backend via HTTP for all booking operations.
+    All booking state is owned by .NET — Python never stores booking records.
     """
 
     def __init__(self):
-        self._client: Optional[httpx.AsyncClient] = None
+        self._client: httpx.AsyncClient | None = None
 
     def _get_client(self) -> httpx.AsyncClient:
         """Lazy init HTTP client with shared configuration."""
@@ -45,24 +52,21 @@ class BookingService:
             )
         return self._client
 
+    # ── Public API ─────────────────────────────────────────────────────────────
+
     async def get_availability(
         self,
         property_id: str,
-        preferred_date: Optional[str] = None,
+        preferred_date: str | None = None,
     ) -> list[dict]:
         """
         Fetch available inspection slots from .NET backend.
-
-        Args:
-            property_id:    Property to check availability for
-            preferred_date: Optional ISO date string 'YYYY-MM-DD'
-                            Defaults to next 7 days if not provided
 
         Returns:
             List of slot dicts: [{"datetime": "2025-04-12 10:00", "available": True}, ...]
 
         Raises:
-            BookingServiceError on HTTP or parsing failures
+            BookingServiceError on HTTP or connectivity failures
         """
         self._validate_property_id(property_id)
 
@@ -71,30 +75,29 @@ class BookingService:
             self._validate_date_string(preferred_date)
             params["preferredDate"] = preferred_date
 
-        logger.info("Fetching availability | property: %s | date: %s",
-                    property_id, preferred_date)
+        logger.info(
+            "get_availability | property=%s | date=%s",
+            property_id, preferred_date,
+        )
 
         try:
-            client = self._get_client()
-            response = await client.get(
+            response = await self._get_client().get(
                 "/api/inspections/availability",
                 params=params,
             )
             response.raise_for_status()
-            data = response.json()
-
-            slots = self._parse_availability(data)
-            logger.info("Availability retrieved — %d slots", len(slots))
+            slots = self._parse_availability(response.json())
+            logger.info("get_availability | found %d slots", len(slots))
             return slots
 
         except httpx.HTTPStatusError as e:
-            logger.error("Availability HTTP error %d: %s",
-                         e.response.status_code, e)
+            logger.error("get_availability | HTTP %d", e.response.status_code)
             raise BookingServiceError(
                 f"Could not retrieve availability (HTTP {e.response.status_code})"
             ) from e
+
         except httpx.RequestError as e:
-            logger.error("Availability request error: %s", e)
+            logger.error("get_availability | request error: %s", e)
             raise BookingServiceError(
                 "Could not connect to booking service") from e
 
@@ -109,13 +112,6 @@ class BookingService:
         """
         Create a confirmed inspection booking via .NET backend.
 
-        Args:
-            property_id:    Property to book inspection for
-            datetime_slot:  'YYYY-MM-DD HH:MM' format
-            contact_name:   Full name of the contact
-            contact_email:  Valid email address
-            contact_phone:  Australian mobile or landline
-
         Returns:
             dict with confirmation_id, property_address, confirmed_datetime
 
@@ -123,7 +119,6 @@ class BookingService:
             BookingValidationError for invalid input
             BookingServiceError for backend failures
         """
-        # Validate all fields before hitting the backend
         self._validate_booking_inputs(
             property_id=property_id,
             datetime_slot=datetime_slot,
@@ -143,55 +138,54 @@ class BookingService:
         }
 
         logger.info(
-            "Creating booking | property: %s | slot: %s | contact: %s",
+            "book | property=%s | slot=%s | contact=%s",
             property_id, datetime_slot, contact_email,
         )
 
         try:
-            client = self._get_client()
-            response = await client.post(
+            response = await self._get_client().post(
                 "/api/inspections/book",
                 json=payload,
             )
             response.raise_for_status()
-            data = response.json()
-
-            confirmation = self._parse_booking_response(data)
-            logger.info("Booking confirmed — id: %s",
+            confirmation = self._parse_booking_response(response.json())
+            logger.info("book | confirmed | id=%s",
                         confirmation["confirmation_id"])
             return confirmation
 
         except httpx.HTTPStatusError as e:
             status = e.response.status_code
 
-            # 409 = slot no longer available
             if status == 409:
                 raise BookingServiceError(
                     "That time slot is no longer available. Please choose another."
                 ) from e
 
-            # 422 = validation rejection from .NET
             if status == 422:
                 detail = e.response.json().get("detail", "Invalid booking details")
                 raise BookingValidationError(detail) from e
 
-            logger.error("Booking HTTP error %d: %s", status, e)
+            logger.error("book | HTTP %d", status)
             raise BookingServiceError(
                 f"Booking failed (HTTP {status}). Please try again."
             ) from e
 
         except httpx.RequestError as e:
-            logger.error("Booking request error: %s", e)
+            logger.error("book | request error: %s", e)
             raise BookingServiceError(
                 "Could not connect to booking service") from e
 
     async def cancel(
         self,
         confirmation_id: str,
-        reason=None,
+        reason: str | None = None,
     ) -> dict:
         """
         Cancel an existing inspection booking via .NET backend.
+
+        Raises:
+            BookingValidationError for invalid input
+            BookingServiceError for backend failures
         """
         if not confirmation_id or not confirmation_id.strip():
             raise BookingValidationError("confirmation_id is required")
@@ -200,34 +194,36 @@ class BookingService:
         if reason:
             payload["reason"] = reason
 
-        logger.info("Cancelling booking | id: %s", confirmation_id)
+        logger.info("cancel | id=%s", confirmation_id)
 
         try:
-            client = self._get_client()
-            response = await client.post(
+            response = await self._get_client().post(
                 "/api/inspections/cancel",
                 json=payload,
             )
             response.raise_for_status()
-            logger.info("Booking cancelled | id: %s", confirmation_id)
+            logger.info("cancel | cancelled | id=%s", confirmation_id)
             return {"success": True, "confirmation_id": confirmation_id}
 
         except httpx.HTTPStatusError as e:
             status = e.response.status_code
+
             if status == 404:
                 raise BookingServiceError(
                     f"Booking {confirmation_id} not found. Please check the reference."
                 ) from e
+
             if status == 409:
                 raise BookingServiceError(
                     f"Booking {confirmation_id} cannot be cancelled — already cancelled or completed."
                 ) from e
-            logger.error("Cancel HTTP error %d: %s", status, e)
+
+            logger.error("cancel | HTTP %d", status)
             raise BookingServiceError(
                 f"Cancellation failed (HTTP {status}).") from e
 
         except httpx.RequestError as e:
-            logger.error("Cancel request error: %s", e)
+            logger.error("cancel | request error: %s", e)
             raise BookingServiceError(
                 "Could not connect to booking service") from e
 
@@ -237,7 +233,7 @@ class BookingService:
             await self._client.aclose()
             logger.info("BookingService HTTP client closed")
 
-    # ── Validation helpers ────────────────────────────────────────────────────
+    # ── Validation helpers ─────────────────────────────────────────────────────
 
     def _validate_property_id(self, property_id: str):
         if not property_id or not property_id.strip():
@@ -249,7 +245,7 @@ class BookingService:
         except ValueError:
             raise BookingValidationError(
                 f"Invalid date format: '{date_str}'. Expected YYYY-MM-DD"
-            )
+            ) from None
 
     def _validate_booking_inputs(
         self,
@@ -264,10 +260,8 @@ class BookingService:
         if not property_id or not property_id.strip():
             errors.append("property_id is required")
 
-        # Validate datetime format
         try:
             slot_dt = datetime.strptime(datetime_slot, DATETIME_FORMAT)
-            # Must be in the future
             if slot_dt <= datetime.now():
                 errors.append("Inspection datetime must be in the future")
         except ValueError:
@@ -281,15 +275,13 @@ class BookingService:
         if not contact_email or "@" not in contact_email:
             errors.append("contact_email must be a valid email address")
 
-        # Basic Australian phone validation (mobile or landline)
-        phone_digits = "".join(filter(str.isdigit, contact_phone))
-        if len(phone_digits) < 8:
+        if len("".join(filter(str.isdigit, contact_phone))) < 8:
             errors.append("contact_phone must be a valid phone number")
 
         if errors:
             raise BookingValidationError("; ".join(errors))
 
-    # ── Response parsers ──────────────────────────────────────────────────────
+    # ── Response parsers ───────────────────────────────────────────────────────
 
     def _parse_availability(self, data: dict) -> list[dict]:
         """Normalise .NET availability response to a clean list of slots."""
@@ -315,13 +307,11 @@ class BookingService:
         }
 
 
-# ── Custom exceptions ─────────────────────────────────────────────────────────
+# ── Custom exceptions ──────────────────────────────────────────────────────────
 
 class BookingServiceError(Exception):
     """Backend or connectivity failure — show user-friendly message."""
-    pass
 
 
 class BookingValidationError(BookingServiceError):
     """Invalid input data — message is safe to surface to the user."""
-    pass

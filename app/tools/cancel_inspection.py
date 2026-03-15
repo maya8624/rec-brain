@@ -9,7 +9,7 @@ import logging
 
 from langchain_core.tools import tool
 
-from app.services.booking_services import (
+from app.services.booking_service import (
     BookingService,
     BookingServiceError,
     BookingValidationError,

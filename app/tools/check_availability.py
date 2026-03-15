@@ -9,7 +9,7 @@ import logging
 
 from langchain_core.tools import tool
 
-from app.services.booking_services import BookingService, BookingServiceError
+from app.services.booking_service import BookingService, BookingServiceError
 
 logger = logging.getLogger(__name__)
 
