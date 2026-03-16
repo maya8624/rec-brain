@@ -9,12 +9,9 @@ Priority order:
     2. .env file                   (local development)
     3. Field(default=...)          (fallback)
 """
-from __future__ import annotations
-
 from pathlib import Path
-from pydantic import Field
+from pydantic import Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import ValidationError
 
 
 # ── Guard — fail fast if .env is missing ──────────────────────────────────────
@@ -224,7 +221,7 @@ class Settings(BaseSettings):
         """ALLOWED_ORIGINS parsed as a Python list."""
         return [
             origin.strip()
-            for origin in self.ALLOWED_ORIGINS.split(",")
+            for origin in str(self.ALLOWED_ORIGINS).split(",")
             if origin.strip()
         ]
 

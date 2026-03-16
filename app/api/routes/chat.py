@@ -1,6 +1,6 @@
 """
 All traffic arrives from .NET backend — never directly from React.
-session_id from .NET maps to LangGraph thread_id for state persistence.
+thread_id(session_id) from .NET maps to LangGraph thread_id for state persistence.
 
 No AI logic here — only HTTP concerns:
     parsing, routing to agent, formatting response, error handling.
@@ -28,11 +28,11 @@ async def chat(request: ChatRequest, agent=Depends(get_agent)) -> ChatResponse:
     Main chat endpoint — called by .NET backend for every user message.
     """
 
-    logger.info("chat | session_id=%s | user=%s | new=%s",
-                request.session_id, request.user_id, request.is_new_conversation)
+    logger.info("chat | thread_id=%s | user=%s | new=%s",
+                request.thread_id, request.user_id, request.is_new_conversation)
 
     try:
-        config = {"configurable": {"thread_id": request.session_id}}
+        config = {"configurable": {"thread_id": request.thread_id}}
 
         if request.is_new_conversation:
             input_state = initial_state()
@@ -44,11 +44,11 @@ async def chat(request: ChatRequest, agent=Depends(get_agent)) -> ChatResponse:
 
         result = await agent.ainvoke(input_state, config=config)
 
-        return _build_response(request.session_id, result)
+        return _build_response(request.thread_id, result)
 
     except Exception as e:
-        logger.exception("chat | error | session_id=%s | %s",
-                         request.session_id, e)
+        logger.exception("chat | error | thread_id=%s | %s",
+                         request.thread_id, e)
 
         raise HTTPException(
             status_code=500,
@@ -151,7 +151,7 @@ def _to_sse_event(event: dict) -> dict | None:
 
 # ── Response builder ───────────────────────────────────────────────────────────
 
-def _build_response(session_id: str, result: dict) -> ChatResponse:
+def _build_response(thread_id: str, result: dict) -> ChatResponse:
     """
     Builds a ChatResponse from the final LangGraph state dict.
     Extracts reply text, tools used, booking state, RAG sources.
@@ -169,7 +169,7 @@ def _build_response(session_id: str, result: dict) -> ChatResponse:
 
     return ChatResponse(
         reply=reply,
-        session_id=session_id,
+        thread_id=thread_id,
         tools_used=_extract_tools_used(result.get("messages", [])),
         intent=result.get("user_intent", "unknown"),
         booking_confirmed=booking_status.get("confirmed", False),

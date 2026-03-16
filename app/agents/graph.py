@@ -66,9 +66,9 @@ def build_graph():
 
     # ── After agent — fan out to 3 paths ───────────────────────────────────────
     graph.add_conditional_edges(
-        "agent",
-        route_agent_output,
-        {
+        source="agent",
+        path=route_agent_output,
+        path_map={
             "vector_search": "vector_search",
             "sql_search":    "sql_search",
             "tools":         "tools",

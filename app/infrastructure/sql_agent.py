@@ -35,7 +35,7 @@ def create_real_estate_sql_agent():
         llm=agent_llm,
         toolkit=toolkit,
         verbose=True,
-        agent_type="openai-tools",  # Groq supports this architecture well
+        agent_type="tool-calling",
         system_message=_SYSTEM_MESSAGE,
         max_iterations=5,  # Prevents infinite loops if the model gets confused
         # capture the SQL for your frontend!

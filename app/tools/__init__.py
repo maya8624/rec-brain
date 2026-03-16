@@ -11,14 +11,14 @@ Keep them precise, example-rich, and updated when behaviour changes.
 from app.tools.book_inspection import book_inspection
 from app.tools.cancel_inspection import cancel_inspection
 from app.tools.check_availability import check_availability
-from app.tools.search_documents import search_documents
+# from app.tools.search_documents import search_documents
 from app.tools.search_listings import search_listings
 
 # Ordered by expected call frequency — most common first.
 # Order does not affect LLM tool selection, but aids readability.
 _ALL_TOOLS = [
     search_listings,
-    search_documents,
+    # search_documents,
     check_availability,
     book_inspection,
     cancel_inspection,

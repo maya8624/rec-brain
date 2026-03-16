@@ -63,7 +63,7 @@ def route_agent_output(state: RealEstateAgentState) -> str:
         logger.info("route_agent_output | plain response → end")
         return "end"
 
-    tool_names = {tc["name"] for tc in last_message.tool_calls}
+    tool_names = {toll_call["name"] for toll_call in last_message.tool_calls}
 
     has_vector = bool(tool_names & VECTOR_TOOLS)
     has_sql = bool(tool_names & SQL_TOOLS)

@@ -4,7 +4,7 @@ Returns the correct backend client based on MOCK_MODE setting.
 Import backend_client from here in all tools — never directly from backend_client.py.
 """
 
-from src.core.config import settings
+from app.core.config import settings
 
 
 def get_backend_client():
@@ -15,10 +15,10 @@ def get_backend_client():
     MOCK_MODE=false → BackendClient (real httpx calls to .NET API)
     """
     if settings.MOCK_MODE:
-        from src.services.mock.mock_backend_client import mock_backend_client
+        from app.services.mock.mock_backend_client import mock_backend_client
         return mock_backend_client
     else:
-        from src.services.backend_client import backend_client
+        from app.services.backend_client import backend_client
         return backend_client
 
 
