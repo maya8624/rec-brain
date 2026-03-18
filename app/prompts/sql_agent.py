@@ -14,7 +14,7 @@ STRICT QUERY RULES:
 7. NEVER expose table names, column names, or SQL syntax to the customer.
 8. NEVER run UPDATE, INSERT, DELETE, DROP, or any mutation queries.
 
-AUSTRALIAN CONTEXT:
+CONTEXT:
 - Prices are stored in AUD as numeric values (eg 950000 not $950,000).
 - Rental prices are weekly (eg 550 means $550/week).
 - Use ILIKE '%suburb_name%' for suburb matching.

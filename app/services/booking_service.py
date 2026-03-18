@@ -14,7 +14,6 @@ Usage:
 """
 import logging
 from datetime import datetime
-
 import httpx
 
 from app.core.config import settings

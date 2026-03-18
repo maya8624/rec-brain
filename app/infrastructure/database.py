@@ -1,4 +1,3 @@
-from functools import lru_cache
 import logging
 from langchain_community.utilities import SQLDatabase
 from sqlalchemy import create_engine
@@ -27,7 +26,6 @@ ALLOWED_TABLES = [
 ]
 
 
-@lru_cache(maxsize=1)
 def get_db_wrapper() -> SQLDatabase:
     """
     Returns a pre-configured SQLDatabase wrapper.
@@ -46,3 +44,22 @@ def get_db_wrapper() -> SQLDatabase:
     except Exception as e:
         logger.exception("Failed to initialize SQLDatabase wrapper: %s", e)
         raise
+
+
+# _db_wrapper: SQLDatabase | None = None
+
+# def get_db_wrapper() -> SQLDatabase:
+#     global _db_wrapper
+#     if _db_wrapper is None:
+#         logger.info("Initializing SQLDatabase wrapper.")
+#         try:
+#             _db_wrapper = SQLDatabase(
+#                 engine,
+#                 include_tables=ALLOWED_TABLES,
+#                 view_support=True,
+#                 sample_rows_in_table_info=3,
+#             )
+#         except Exception as e:
+#             logger.exception("Failed to initialize SQLDatabase wrapper: %s", e)
+#             raise
+#     return _db_wrapper

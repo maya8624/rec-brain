@@ -1,90 +1,68 @@
+"""
+Translates natural language queries into SQL and returns structured results.
+"""
 import logging
 import re
-import os
-from typing import Optional
+
 from langchain_community.agent_toolkits import create_sql_agent
 from langchain_community.agent_toolkits.sql.toolkit import SQLDatabaseToolkit
-from langchain_core.messages import SystemMessage
-from app.infrastructure.database import get_db_wrapper
-from app.infrastructure.llm import get_llm
-from app.prompts.sql_agent import SQL_AGENT_SYSTEM_MESSAGE
+
 from app.core.config import settings
+from app.prompts.sql_agent import SQL_AGENT_SYSTEM_MESSAGE
 
 logger = logging.getLogger(__name__)
 
 
+class SqlAgentError(Exception):
+    """Raised when the SQL agent fails unrecoverably."""
+
+
 class SqlAgentService:
-    """
-    Wraps LangChain SQL agent with real-estate-specific configuration.
-    Responsible for translating natural language queries into SQL
-    and returning structured results.
+    """ Wraps LangChain SQL agent for natural language property search."""
 
-    Usage:
-        service = SqlAgentService()
-        result = service.search("5 properties under $1M in Castle Hill")
-    """
-
-    def __init__(self):
+    def __init__(self, llm, db) -> None:
+        self._llm = llm
+        self._db = db
         self._agent = None
 
-    def _get_agent(self):
-        """Lazy initialisation — agent built on first use."""
-        if self._agent is None:
-            self._agent = self._build_agent()
-        return self._agent
+    async def _build_agent(self):
+        logger.info("SqlAgentService | building SQL agent")
 
-    def _build_agent(self):
-        logger.info("Building SQL agent")
-
-        raw_llm = get_llm()
-        db = get_db_wrapper()
-        is_verbose = settings.is_development
-
-        toolkit = SQLDatabaseToolkit(db=db, llm=raw_llm)
-        agent_llm = raw_llm.with_retry(stop_after_attempt=3)
+        toolkit = SQLDatabaseToolkit(db=self._db, llm=self._llm)
 
         return create_sql_agent(
-            llm=agent_llm,
+            llm=self._llm,
             toolkit=toolkit,
-            verbose=is_verbose,
-            agent_type="openai-tools",
+            verbose=settings.is_development,
+            agent_type="tool-calling",
             system_message=SQL_AGENT_SYSTEM_MESSAGE,
-            max_iterations=6,
+            max_iterations=5,
             agent_executor_kwargs={
                 "return_intermediate_steps": True,
                 "handle_parsing_errors": True,
-            }
+            },
         )
 
-    def search(self, natural_language_query: str) -> dict:
-        """
-        Execute a natural language property search.
+    async def search(self, question: str) -> dict:
+        """Execute a natural language property search."""
 
-        Args:
-            natural_language_query: Plain English query from the user
-                eg: "5 houses under $1M in Castle Hill with 4 bedrooms"
-
-        Returns:
-            dict with keys:
-                output       - formatted string result for the LLM
-                sql_used     - the generated SQL (for logging/debugging)
-                result_count - number of properties found
-                success      - bool
-
-        Raises:
-            SqlAgentError on unrecoverable failures
-        """
-        logger.info("SQL search: %s", natural_language_query)
+        logger.info("SqlAgentService | search | question=%s", question)
 
         try:
-            agent = self._get_agent()
-            raw = agent.invoke({"input": natural_language_query})
+            agent = self._build_agent()
 
+            if agent is None:
+                agent = await self._build_agent()
+
+            raw = await self._agent.ainvoke({"input": question})
             sql_used = self._extract_sql(raw.get("intermediate_steps", []))
             result_count = self._extract_count(raw.get("output", ""))
 
-            logger.info("SQL search complete — sql: %s | count: %d",
-                        sql_used, result_count)
+            logger.info(
+                "SqlAgentService | complete | sql=%s | count=%s",
+                sql_used,
+                result_count,
+            )
 
             return {
                 "success": True,
@@ -93,37 +71,42 @@ class SqlAgentService:
                 "result_count": result_count,
             }
 
+        except SqlAgentError:
+            raise
         except Exception as e:
-            logger.exception("SQL agent search failed: %s", e)
-            # Reset agent so next call gets a fresh instance
-            self._agent = None
+            logger.exception("SqlAgentService | failed | %s", e)
             raise SqlAgentError(f"Property search failed: {e}") from e
 
-    def _extract_sql(self, intermediate_steps: list) -> str:
-        """Pull the generated SQL from LangChain intermediate steps."""
+    async def _reset_agent(self) -> None:
+        """Invalidate the cached agent so the next call rebuilds it."""
+        self._agent = None
+
+    @staticmethod
+    def _extract_sql(intermediate_steps: list) -> str:
+        """
+        Pull the last generated SQL from LangChain intermediate steps.
+        Last sql_db_query call is the most meaningful one to surface.
+        """
+        sql = ""
+
         for action, _ in intermediate_steps:
             if hasattr(action, "tool") and action.tool == "sql_db_query":
-                return getattr(action, "tool_input", "")
-        return ""
+                sql = getattr(action, "tool_input", "")
 
-    def _extract_count(self, output: str) -> int:
+        return sql
+
+    @staticmethod
+    def _extract_count(output: str) -> int | None:
         """
-        Best-effort extraction of result count from agent output string.
-        Looks for patterns like 'found 5 properties', '3 results', etc.
+        Best-effort extraction of result count from agent output.
         """
-        patterns = [
+
+        for pattern in [
             r"found (\d+)",
             r"(\d+) propert",
             r"(\d+) result",
             r"(\d+) listing",
-        ]
-        for pattern in patterns:
-            match = re.search(pattern, output, re.IGNORECASE)
-            if match:
+        ]:
+            if match := re.search(pattern, output, re.IGNORECASE):
                 return int(match.group(1))
-        return 0
-
-
-class SqlAgentError(Exception):
-    """Raised when the SQL agent fails unrecoverably."""
-    pass
+        return None

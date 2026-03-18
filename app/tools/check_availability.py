@@ -1,31 +1,22 @@
 """
-app/tools/check_availability.py
-
 LangGraph @tool wrapper that calls the .NET backend availability API
 via BookingService. Always call this BEFORE book_inspection
 so the user can choose from real available slots.
 """
 import logging
+from typing import Annotated
 
-from langchain_core.tools import tool
+from langchain_core.tools import InjectedToolArg, tool
 
 from app.services.booking_service import BookingService, BookingServiceError
 
 logger = logging.getLogger(__name__)
 
-_service: BookingService | None = None
-
-
-def _get_service() -> BookingService:
-    global _service
-    if _service is None:
-        _service = BookingService()
-    return _service
-
 
 @tool
 async def check_availability(
     property_id: str,
+    booking_service: Annotated[BookingService, InjectedToolArg],
     preferred_date: str | None = None,
 ) -> dict:
     """
@@ -55,7 +46,7 @@ async def check_availability(
     )
 
     try:
-        slots = await _get_service().get_availability(
+        slots = await booking_service.get_availability(
             property_id=property_id,
             preferred_date=preferred_date,
         )

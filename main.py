@@ -16,6 +16,9 @@ from app.core.middleware import RequestLoggingMiddleware
 from app.api.routes import chat, health
 from app.core.config import settings
 from app.core.logging import setup_logging
+from app.infrastructure.database import get_db_wrapper
+from app.infrastructure.llm import get_llm
+from app.services.sql_service import SqlAgentService
 
 if settings.MOCK_MODE:
     from app.services.mock import backend_client
@@ -67,6 +70,12 @@ async def lifespan(_app: FastAPI):
         _app.state.ai_agent = build_graph()
 
         logger.info("AI agent ready")
+
+        _app.state.sql_service = SqlAgentService(
+            llm=get_llm(),
+            db=get_db_wrapper(),
+        )
+
         logger.info("AI service ready — accepting requests")
 
         yield  # ← server is live while paused here

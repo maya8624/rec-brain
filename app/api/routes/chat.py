@@ -18,12 +18,14 @@ from app.api.dependencies import get_agent
 from app.schemas.chat import ChatErrorResponse, ChatRequest, ChatResponse, SourceDocument
 
 logger = logging.getLogger(__name__)
-
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 
 @router.post("", response_model=ChatResponse)
-async def chat(request: ChatRequest, agent=Depends(get_agent)) -> ChatResponse:
+async def chat(
+        request: ChatRequest,
+        http_request: Request,
+        agent=Depends(get_agent)) -> ChatResponse:
     """
     Main chat endpoint — called by .NET backend for every user message.
     """
@@ -32,7 +34,12 @@ async def chat(request: ChatRequest, agent=Depends(get_agent)) -> ChatResponse:
                 request.thread_id, request.user_id, request.is_new_conversation)
 
     try:
-        config = {"configurable": {"thread_id": request.thread_id}}
+        config = {
+            "configurable": {
+                "thread_id": request.thread_id,
+                "request": http_request,
+            }
+        }
 
         if request.is_new_conversation:
             input_state = initial_state()

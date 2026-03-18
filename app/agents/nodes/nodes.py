@@ -113,7 +113,7 @@ def _get_last_human_message(state: RealEstateAgentState) -> str:
 # ------------------------------------
 # Node: agent
 # ------------------------------------
-def agent_node(state: RealEstateAgentState) -> dict:
+async def agent_node(state: RealEstateAgentState) -> dict:
     """
     Primary decision node — the LLM brain of the agent.
 
@@ -146,7 +146,7 @@ def agent_node(state: RealEstateAgentState) -> dict:
         state.get("error_count", 0)
     )
 
-    response = llm_with_tools.invoke(messages)
+    response = await llm_with_tools.ainvoke(messages)
 
     # Log which tools the LLM decided to call (if any)
     if hasattr(response, "tool_calls") and response.tool_calls:

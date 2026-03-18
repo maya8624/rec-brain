@@ -12,14 +12,15 @@ from app.core.config import settings
 
 def get_agent(request: Request) -> CompiledStateGraph:
     """Inject the LangGraph agent built at startup."""
-
     return request.app.state.ai_agent
 
 
 # ------------------------------------
 # Internal API key guard
 # ------------------------------------
-async def verify_internal_key(x_api_key: Annotated[str, Header(alias="X-API-Key")]):
+
+
+async def verify_internal_key(x_api_key: Annotated[str, Header(alias="X-API-Key")]) -> str:
     """
     Dependency — verifies the internal service API key.
     Attach to any route that should only be called by .NET backend.
