@@ -5,9 +5,9 @@ Pydantic models for inspection booking data.
 These mirror the .NET backend contract for availability,
 booking, and cancellation endpoints.
 """
+from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from app.core.config import DATETIME_FORMAT
-from datetime import datetime
 
 
 class ContactInfo(BaseModel):
@@ -93,4 +93,12 @@ class CancellationResult(BaseModel):
     success: bool
     confirmation_id: str = ""
     message: str = ""
+    error: str | None = None
+
+
+class SearchListingResult(BaseModel):
+    """Tool return for search_listings."""
+    success: bool
+    output: str | None = None
+    result_count: int = 0
     error: str | None = None
