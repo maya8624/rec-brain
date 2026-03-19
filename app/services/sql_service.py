@@ -109,4 +109,5 @@ class SqlAgentService:
         ]:
             if match := re.search(pattern, output, re.IGNORECASE):
                 return int(match.group(1))
+
         return None

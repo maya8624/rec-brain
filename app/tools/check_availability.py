@@ -5,9 +5,8 @@ so the user can choose from real available slots.
 """
 import logging
 from typing import Annotated
-
 from langchain_core.tools import InjectedToolArg, tool
-
+from app.schemas.booking import AvailabilityResult, AvailableSlot
 from app.services.booking_service import BookingService, BookingServiceError
 
 logger = logging.getLogger(__name__)
@@ -20,67 +19,52 @@ async def check_availability(
     preferred_date: str | None = None,
 ) -> dict:
     """
-    Check available inspection time slots for a property.
-
-    ALWAYS call this before book_inspection so the user can choose
-    from real available slots returned by the agency system.
-    Never invent or assume time slots — only book slots from this list.
-
+     Check available inspection time slots for a property.
     preferred_date format: YYYY-MM-DD (eg "2025-06-14")
-    If preferred_date is not provided, returns next 7 days of availability.
-
-    Examples:
-        property_id="prop_123"
-        property_id="prop_456", preferred_date="2025-06-14"
-
-    Returns:
-        success         — bool
-        property_id     — echoed back for context_update_node
-        available_slots — list of datetime strings eg ["2025-06-14 10:00", "2025-06-14 14:00"]
-        slot_count      — number of available slots
-        error           — user-friendly error if success is False
     """
+
     logger.info(
         "check_availability | property_id=%s | preferred_date=%s",
         property_id, preferred_date,
     )
 
     try:
-        slots = await booking_service.get_availability(
-            property_id=property_id,
-            preferred_date=preferred_date,
-        )
-
-        slot_datetimes = [s["datetime"] for s in slots if s.get("datetime")]
+        slots = await booking_service.get_availability(property_id, preferred_date)
+        avaliable_slots = [
+            AvailableSlot(
+                datetime=slot["datetime"],
+                agent_name=slot.get("agent_name", ""),
+                available=slot.get("available", True),
+            )
+            for slot in slots if slot.get("datetime")
+        ]
 
         logger.info(
             "check_availability | found %d slots for %s",
-            len(slot_datetimes), property_id,
+            len(avaliable_slots), property_id,
         )
 
-        return {
-            "success": True,
-            "property_id": property_id,
-            "available_slots": slot_datetimes,
-            "slot_count": len(slot_datetimes),
-        }
+        return AvailabilityResult(
+            success=True,
+            property_id=property_id,
+            available_slots=avaliable_slots,
+            slot_count=len(avaliable_slots),
+        ).model_dump()
 
     except BookingServiceError as e:
         logger.error("check_availability | BookingServiceError: %s", e)
-        return {
-            "success": False,
-            "property_id": property_id,
-            "available_slots": [],
-            "slot_count": 0,
-            "error": str(e),
-        }
+
+        return AvailabilityResult(
+            success=False,
+            property_id=property_id,
+            error=str(e),
+        ).model_dump()
 
     except Exception as e:
         logger.exception("check_availability | unexpected error: %s", e)
-        return {
-            "success": False,
-            "property_id": property_id,
-            "available_slots": [],
-            "slot_count": 0,
-            "error": "Could not retrieve availability. Please try again.",
-        }
+
+        return AvailabilityResult(
+            success=False,
+            property_id=property_id,
+            error="Could not retrieve availability. Please try again.",
+        ).model_dump()

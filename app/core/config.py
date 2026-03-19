@@ -115,7 +115,10 @@ class Settings(BaseSettings):
         description="HuggingFace embedding model — used if OPENAI_API_KEY not set",
     )
 
-    # ── .NET Backend ──────────────────────────────────────────────────────────
+    # ------------------------------------
+    # .NET Backend
+    # ------------------------------------
+
     BACKEND_BASE_URL: str = Field(
         "http://localhost:5000",
         description="Base URL of the .NET API",
@@ -125,7 +128,9 @@ class Settings(BaseSettings):
         description="API key for authenticating with .NET API",
     )
 
-    # ── Groq (cloud LLM) ──────────────────────────────────────────────────────
+    # ------------------------------------
+    # Groq and LLM settings
+    # ------------------------------------
     GROQ_API_KEY: str = Field(
         ...,
         description="Groq API key — get from console.groq.com",
@@ -135,7 +140,9 @@ class Settings(BaseSettings):
         description="Default Groq model",
     )
 
+    # ------------------------------------
     # Per-use-case models — swap independently via .env without code changes
+    # ------------------------------------
     SQL_AGENT_MODEL: str = Field(
         "llama-3.3-70b-versatile",
         description="Model for SQL agent — needs strong reasoning",
@@ -230,6 +237,9 @@ class Settings(BaseSettings):
 
 try:
     settings = Settings()
+
+    DATETIME_FORMAT = "%Y-%m-%d %H:%M"
+
     print(
         f"Settings loaded | env={settings.ENVIRONMENT} "
         f"mock={settings.MOCK_MODE} "

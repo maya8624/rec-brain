@@ -24,7 +24,7 @@ Note:
 import logging
 import os
 
-from langgraph.checkpoint.memory import MemorySaver
+from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, StateGraph
 from langgraph.prebuilt import ToolNode
 
@@ -133,8 +133,8 @@ def _get_checkpointer():
     if env == "production":
         return _build_postgres_checkpointer()
 
-    logger.info("Using MemorySaver (development)")
-    return MemorySaver()
+    logger.info("Using InMemorySaver (development)")
+    return InMemorySaver()
 
 
 def _build_postgres_checkpointer():
@@ -150,9 +150,9 @@ def _build_postgres_checkpointer():
     except ImportError:
         logger.error(
             "PostgresSaver not available — falling back to MemorySaver")
-        return MemorySaver()
+        return InMemorySaver()
 
     except Exception as e:
         logger.error(
             "PostgresSaver failed: %s — falling back to MemorySaver", e)
-        return MemorySaver()
+        return InMemorySaver()

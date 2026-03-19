@@ -19,8 +19,8 @@ async def search_listings(
     sql_service: Annotated[SqlAgentService, InjectedToolArg]
 ) -> dict:
     """
-      Search property listings by location, price, bedrooms, or property type.
-      """
+    Search property listings by location, price, bedrooms, or property type.
+    """
 
     try:
         result = await sql_service.search(question)
