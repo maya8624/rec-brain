@@ -65,6 +65,18 @@ class BookingConfirmation(BaseModel):
     agent_phone: str = ""
 
 
+class BookingResult(BaseModel):
+    """Tool return for book_inspection."""
+    success: bool
+    confirmation_id: str = ""
+    property_address: str = ""
+    confirmed_datetime: str = ""
+    agent_name: str = ""
+    agent_phone: str = ""
+    message: str = ""
+    error: str | None = None
+
+
 class CancellationRequest(BaseModel):
     confirmation_id: str = Field(min_length=1)
     reason: str | None = None
@@ -74,3 +86,11 @@ class CancellationConfirmation(BaseModel):
     """Confirmation returned after a successful cancellation."""
     confirmation_id: str
     message: str = "Booking successfully cancelled"
+
+
+class CancellationResult(BaseModel):
+    """Tool return for cancel_inspection."""
+    success: bool
+    confirmation_id: str = ""
+    message: str = ""
+    error: str | None = None
