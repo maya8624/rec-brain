@@ -15,13 +15,6 @@ class ContactInfo(BaseModel):
     email: EmailStr
     phone: str
 
-    @field_validator("phone")
-    @classmethod
-    def phone_has_enough_digits(cls, v: str) -> str:
-        if len([c for c in v if c.isdigit()]) < 8:
-            raise ValueError("contact_phone must be a valid phone number")
-        return v
-
 
 class BookingRequest(BaseModel):
     property_id: str = Field(min_length=1)
@@ -30,14 +23,14 @@ class BookingRequest(BaseModel):
 
     @field_validator("datetime_slot")
     @classmethod
-    def slot_must_be_future(cls, v: str) -> str:
+    def slot_must_be_future(cls, value: str) -> str:
         try:
-            dt = datetime.strptime(v, DATETIME_FORMAT)
+            dt = datetime.strptime(value, DATETIME_FORMAT)
         except ValueError:
-            raise ValueError(f"Expected YYYY-MM-DD HH:MM, got '{v}'")
+            raise ValueError(f"Expected YYYY-MM-DD HH:MM, got '{value}'")
         if dt <= datetime.now():
             raise ValueError("Inspection datetime must be in the future")
-        return v
+        return value
 
 
 class AvailableSlot(BaseModel):

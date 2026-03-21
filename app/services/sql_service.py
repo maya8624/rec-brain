@@ -8,7 +8,7 @@ from langchain_community.agent_toolkits import create_sql_agent
 from langchain_community.agent_toolkits.sql.toolkit import SQLDatabaseToolkit
 
 from app.core.config import settings
-from app.prompts.sql_agent import SQL_AGENT_SYSTEM_MESSAGE
+from app.prompts.sql import SQL_AGENT_SYSTEM_MESSAGE
 
 logger = logging.getLogger(__name__)
 

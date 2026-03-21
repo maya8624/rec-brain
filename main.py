@@ -18,6 +18,7 @@ from app.core.config import settings
 from app.core.logging import setup_logging
 from app.infrastructure.database import get_db_wrapper
 from app.infrastructure.llm import get_llm
+from app.services.booking_service import BookingService
 from app.services.sql_service import SqlAgentService
 
 if settings.MOCK_MODE:
@@ -64,6 +65,7 @@ async def lifespan(_app: FastAPI):
     try:
         await backend_client.initialize()
         _app.state.backend_client = backend_client
+        _app.state.booking_service = BookingService(app.state.backend_client)
 
         # Agent — compiled once, stored on app.state, reused every request
         # Compilation is expensive — never do this inside a request handler

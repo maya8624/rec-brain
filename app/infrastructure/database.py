@@ -2,6 +2,7 @@ import logging
 from langchain_community.utilities import SQLDatabase
 from sqlalchemy import create_engine
 from app.core.config import settings
+from app.core.constants import TableNames
 
 logger = logging.getLogger(__name__)
 
@@ -17,12 +18,13 @@ engine = create_engine(
 
 # Define the tables  Real Estate agent is allowed to 'see'
 ALLOWED_TABLES = [
-    'properties',
-    'inspections',
-    'market_listings',
-    'open_houses',
-    'agents',
-    'auctions'
+    TableNames.AGENCIES,
+    TableNames.AGENTS,
+    TableNames.INSPECTION_BOOKINGS,
+    TableNames.LISTINGS,
+    TableNames.PROPERTIES,
+    TableNames.PROPERTY_ADDRESSES,
+    TableNames.PROPERTY_TYPES,
 ]
 
 
@@ -38,28 +40,10 @@ def get_db_wrapper() -> SQLDatabase:
         return SQLDatabase(
             engine,
             include_tables=ALLOWED_TABLES,
-            view_support=True,  # Critical for real estate views/reporting
-            sample_rows_in_table_info=3  # Helps LLM understand data types
+            view_support=True,
+            # e.g. that status is 'active' not 'Active' or 1). Reduces token usage in schema description.
+            sample_rows_in_table_info=3
         )
     except Exception as e:
         logger.exception("Failed to initialize SQLDatabase wrapper: %s", e)
         raise
-
-
-# _db_wrapper: SQLDatabase | None = None
-
-# def get_db_wrapper() -> SQLDatabase:
-#     global _db_wrapper
-#     if _db_wrapper is None:
-#         logger.info("Initializing SQLDatabase wrapper.")
-#         try:
-#             _db_wrapper = SQLDatabase(
-#                 engine,
-#                 include_tables=ALLOWED_TABLES,
-#                 view_support=True,
-#                 sample_rows_in_table_info=3,
-#             )
-#         except Exception as e:
-#             logger.exception("Failed to initialize SQLDatabase wrapper: %s", e)
-#             raise
-#     return _db_wrapper

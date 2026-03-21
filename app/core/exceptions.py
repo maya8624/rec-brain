@@ -1,20 +1,21 @@
-import httpx
+"""
+Shared exceptions for the AI service.
+"""
 
 
 class AIServiceError(Exception):
     """Base exception for all AI service errors."""
-    pass
 
 
 class BackendClientError(AIServiceError):
-    """Raised when the .NET backend returns an error or is unreachable."""
+    """Low-level HTTP failure from BackendClient — carries status_code."""
 
     def __init__(self, message: str, status_code: int | None = None):
         super().__init__(message)
         self.status_code = status_code
 
 
-class BookingServiceError(Exception):
+class BookingServiceError(AIServiceError):
     """Backend or connectivity failure — show user-friendly message."""
 
 
@@ -33,15 +34,13 @@ class ToolExecutionError(AIServiceError):
 
 class AgentError(AIServiceError):
     """Raised when the LangGraph agent fails to produce a response."""
-    pass
 
 
 class ValidationError(AIServiceError):
     """Raised when tool input validation fails."""
-    pass
 
 
-def raise_for_booking_status(e: httpx.HTTPStatusError, confirmation_id: str | None = None) -> None:
+def raise_for_booking_status(e: BackendClientError, confirmation_id: str | None = None) -> None:
     """Map common .NET HTTP error codes to BookingServiceError."""
     status = e.response.status_code
 

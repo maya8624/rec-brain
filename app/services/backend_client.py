@@ -2,20 +2,18 @@
 Async HTTP client for the .NET backend API.
 Handles auth headers, retries, and error logging.
 """
-
 import logging
 from functools import wraps
 from typing import Any
+
 import httpx
 import structlog
-
-# retry on these exceptions with exponential backoff
 from tenacity import (
+    before_sleep_log,
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
-    before_sleep_log,
 )
 
 from app.core.config import settings
@@ -56,13 +54,12 @@ class BackendClient:
         self._client = httpx.AsyncClient(
             base_url=settings.BACKEND_BASE_URL,
             headers={
-                "Authorization": f"Bearer {settings.BACKEND_API_KEY}",
+                "X-Api-Key": settings.BACKEND_API_KEY,
                 "Content-Type": "application/json",
                 "X-Service": "python-ai-service",
             },
             timeout=httpx.Timeout(10.0, connect=5.0),
         )
-
         logger.info("BackendClient initialized",
                     base_url=settings.BACKEND_BASE_URL)
 
@@ -74,59 +71,35 @@ class BackendClient:
     def _ensure_ready(self) -> None:
         if not self._client:
             raise RuntimeError(
-                "BackendClient not initialized. Call initialize() first.")
+                "BackendClient not initialized. Call initialize() first."
+            )
 
     @async_retry
+    async def _request(self, method: str, path: str, **kwargs) -> Any:
+        self._ensure_ready()
+        try:
+            response = await self._client.request(method, path, **kwargs)
+            response.raise_for_status()
+            return response.json()
+
+        except httpx.HTTPStatusError as e:
+            logger.error(
+                "request failed",
+                method=method,
+                path=path,
+                status=e.response.status_code,
+            )
+            raise BackendClientError(
+                str(e), status_code=e.response.status_code)
+
     async def get(self, path: str, params: dict | None = None) -> Any:
-        self._ensure_ready()
+        return await self._request("GET", path, params=params)
 
-        try:
-            resp = await self._client.get(path, params=params)
-            resp.raise_for_status()
-            return resp.json()
-
-        except httpx.HTTPStatusError as e:
-            logger.error("GET failed",
-                         path=path,
-                         status=e.response.status_code)
-
-            raise BackendClientError(
-                str(e), status_code=e.response.status_code)
-
-    @async_retry
     async def post(self, path: str, body: dict) -> Any:
-        self._ensure_ready()
+        return await self._request("POST", path, json=body)
 
-        try:
-            resp = await self._client.post(path, json=body)
-            resp.raise_for_status()
-            return resp.json()
-
-        except httpx.HTTPStatusError as e:
-            logger.error(
-                "POST failed",
-                path=path,
-                status=e.response.status_code)
-
-            raise BackendClientError(
-                str(e), status_code=e.response.status_code)
-
-    @async_retry
     async def patch(self, path: str, body: dict) -> Any:
-        self._ensure_ready()
-        try:
-            resp = await self._client.patch(path, json=body)
-            resp.raise_for_status()
-            return resp.json()
-
-        except httpx.HTTPStatusError as e:
-            logger.error(
-                "PATCH failed",
-                path=path,
-                status=e.response.status_code)
-
-            raise BackendClientError(
-                str(e), status_code=e.response.status_code)
+        return await self._request("PATCH", path, json=body)
 
 
 # Singleton — initialized at app startup via lifespan

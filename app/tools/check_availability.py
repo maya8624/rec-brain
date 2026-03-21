@@ -6,8 +6,9 @@ so the user can choose from real available slots.
 import logging
 from typing import Annotated
 from langchain_core.tools import InjectedToolArg, tool
+from app.core.exceptions import BookingServiceError
 from app.schemas.booking import AvailabilityResult, AvailableSlot
-from app.services.booking_service import BookingService, BookingServiceError
+from app.services.booking_service import BookingService
 
 logger = logging.getLogger(__name__)
 
