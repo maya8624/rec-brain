@@ -11,6 +11,11 @@ import json
 import os
 import sys
 
+from app.tools.search_listings import search_listings
+from app.tools.check_availability import check_availability
+from app.tools.book_inspection import book_inspection
+from app.tools.cancel_inspection import cancel_inspection
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
@@ -21,7 +26,6 @@ def pretty(result):
 # ── Tests ──────────────────────────────────────────────────────────────────────
 
 async def test_search_listings():
-    from app.tools.search_listings import search_listings
     pretty(await search_listings.ainvoke({
         "question": "3 bedroom houses in Castle Hill under $800k"
     }))
@@ -35,7 +39,6 @@ async def test_search_listings():
 
 
 async def test_check_availability():
-    from app.tools.check_availability import check_availability
     pretty(await check_availability.ainvoke({
         "property_id": "prop_123",
         "preferred_date": "2026-04-12",
@@ -43,7 +46,6 @@ async def test_check_availability():
 
 
 async def test_book_inspection():
-    from app.tools.book_inspection import book_inspection
     pretty(await book_inspection.ainvoke({
         "property_id": "prop_123",
         "datetime_slot": "2026-04-12 10:00",
@@ -54,7 +56,6 @@ async def test_book_inspection():
 
 
 async def test_cancel_inspection():
-    from app.tools.cancel_inspection import cancel_inspection
     pretty(await cancel_inspection.ainvoke({
         "confirmation_id": "CONF-12345",
         "reason": "Change of plans",

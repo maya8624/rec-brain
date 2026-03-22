@@ -172,6 +172,10 @@ class Settings(BaseSettings):
         30,
         description="Max seconds before agent call times out",
     )
+    MAX_ERRORS_BEFORE_ESCALATION: int = Field(
+        3,
+        description="Max consecutive tool errors before escalating to a human agent",
+    )
 
     # ── Ollama (local LLM — optional) ─────────────────────────────────────────
     OLLAMA_BASE_URL: str = Field(

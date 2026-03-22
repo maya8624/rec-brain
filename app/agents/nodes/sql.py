@@ -16,7 +16,6 @@ Never calls the LLM — agent_node handles synthesis.
 """
 
 import logging
-
 from langchain_core.runnables import RunnableConfig
 
 from app.agents.nodes._base import build_tool_message, error_content, last_ai_message

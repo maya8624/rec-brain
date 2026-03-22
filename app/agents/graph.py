@@ -1,4 +1,3 @@
-# app/agents/graph.py
 """
 Compiles the LangGraph StateGraph.
 
@@ -28,8 +27,12 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, StateGraph
 from langgraph.prebuilt import ToolNode
 
-from app.agents.nodes.nodes import agent_node, context_update_node, safety_node
-from app.agents.nodes.search import sql_search_node, vector_search_node
+from app.core.constants import Node
+from app.agents.nodes.agent import agent_node
+from app.agents.nodes.context import context_update_node
+from app.agents.nodes.safety import safety_node
+from app.agents.nodes.sql import sql_search_node
+from app.agents.nodes.vector import vector_search_node
 from app.agents.router import (
     route_after_context,
     route_after_safety,
@@ -50,72 +53,81 @@ def build_graph():
     """
     tools = get_all_tools()
     tool_node = ToolNode(tools)
-
     graph = StateGraph(RealEstateAgentState)
 
-    # ── Nodes ──────────────────────────────────────────────────────────────────
-    graph.add_node("agent",          agent_node)
-    graph.add_node("vector_search",  vector_search_node)
-    graph.add_node("sql_search",     sql_search_node)
-    graph.add_node("tools",          tool_node)
-    graph.add_node("context_update", context_update_node)
-    graph.add_node("safety",         safety_node)
+    # ------------------------
+    # Nodes
+    # ------------------------
+    graph.add_node(Node.AGENT,          agent_node)
+    graph.add_node(Node.VECTOR_SEARCH,  vector_search_node)
+    graph.add_node(Node.SQL_SEARCH,     sql_search_node)
+    graph.add_node(Node.TOOLS,          tool_node)
+    graph.add_node(Node.CONTEXT_UPDATE, context_update_node)
+    graph.add_node(Node.SAFETY,         safety_node)
 
-    # ── Entry ───────────────────────────────────────────────────────────────────
-    graph.set_entry_point("agent")
+    graph.set_entry_point(Node.AGENT)
 
-    # ── After agent — fan out to 3 paths ───────────────────────────────────────
+    # ------------------------
+    # Agent output routing — fan out to 3 paths
+    # ------------------------
     graph.add_conditional_edges(
-        source="agent",
+        source=Node.AGENT,
         path=route_agent_output,
         path_map={
-            "vector_search": "vector_search",
-            "sql_search":    "sql_search",
-            "tools":         "tools",
-            "end":           END,
+            Node.VECTOR_SEARCH: Node.VECTOR_SEARCH,
+            Node.SQL_SEARCH:    Node.SQL_SEARCH,
+            Node.TOOLS:         Node.TOOLS,
+            Node.END:           END,
         },
     )
 
-    # ── Search paths — both go back to agent ───────────────────────────────────
+    # ------------------------
+    # Search paths — both go back to agent
+    # ------------------------
     graph.add_conditional_edges(
-        "vector_search",
-        route_after_search,
-        {"agent": "agent", "end": END},
+        source=Node.VECTOR_SEARCH,
+        path=route_after_search,
+        path_map={Node.AGENT: Node.AGENT, Node.END: END},
     )
 
     graph.add_conditional_edges(
-        "sql_search",
-        route_after_search,
-        {"agent": "agent", "end": END},
+        source=Node.SQL_SEARCH,
+        path=route_after_search,
+        path_map={Node.AGENT: Node.AGENT, Node.END: END},
     )
 
-    # ── Action tools ────────────────────────────────────────────────────────────
+    # ------------------------
+    # Action tools
+    # ------------------------
     graph.add_conditional_edges(
-        "tools",
-        route_after_tools,
-        {
-            "context_update": "context_update",
-            "safety":         "safety",
-            "end":            END,
+        source=Node.TOOLS,
+        path=route_after_tools,
+        path_map={
+            Node.CONTEXT_UPDATE: Node.CONTEXT_UPDATE,
+            Node.SAFETY:         Node.SAFETY,
+            Node.END:            END,
         },
     )
 
-    # ── Context update → agent ──────────────────────────────────────────────────
+    # ------------------------
+    # Context update → agent
+    # ------------------------
     graph.add_conditional_edges(
-        "context_update",
-        route_after_context,
-        {"agent": "agent", "end": END},
+        source=Node.CONTEXT_UPDATE,
+        path=route_after_context,
+        path_map={Node.AGENT: Node.AGENT, Node.END: END},
     )
 
-    # ── Safety → agent or end ───────────────────────────────────────────────────
+    # ------------------------
+    # Safety → agent or end
+    # ------------------------
     graph.add_conditional_edges(
-        "safety",
-        route_after_safety,
-        {"agent": "agent", "end": END},
+        source=Node.SAFETY,
+        path=route_after_safety,
+        path_map={Node.AGENT: Node.AGENT, Node.END: END},
     )
 
     checkpointer = _get_checkpointer()
-
     compiled = graph.compile(checkpointer=checkpointer)
 
     logger.info(
