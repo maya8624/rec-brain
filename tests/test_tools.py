@@ -15,6 +15,9 @@ from app.tools.search_listings import search_listings
 from app.tools.check_availability import check_availability
 from app.tools.book_inspection import book_inspection
 from app.tools.cancel_inspection import cancel_inspection
+from app.services.sql_service import SqlAgentService
+from app.infrastructure.database import get_db_wrapper
+from app.infrastructure.llm import get_llm
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -26,8 +29,14 @@ def pretty(result):
 # ── Tests ──────────────────────────────────────────────────────────────────────
 
 async def test_search_listings():
+    sql_service = SqlAgentService(llm=get_llm(), db=get_db_wrapper())
+
+    # db = get_db_wrapper()
+    # print(db.get_usable_table_names())
+
     pretty(await search_listings.ainvoke({
-        "question": "3 bedroom houses in Castle Hill under $800k"
+        "question": "show 3 bedroom houses in Shepparton, Queensland under $800k",
+        "sql_service": sql_service,
     }))
 
 

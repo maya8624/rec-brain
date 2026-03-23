@@ -57,5 +57,5 @@ class Node:
     SQL_SEARCH = "sql_search"
     TOOLS = "tools"
     CONTEXT_UPDATE = "context_update"
-    SAFETY = "safety",
+    SAFETY = "safety"
     END = END
