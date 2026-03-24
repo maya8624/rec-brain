@@ -19,8 +19,6 @@ class ToolNames:
     """
     Constants for tool names used in the AI agent.
     """
-    SEARCH_LISTINGS = "search_listings"
-    SEARCH_DOCUMENTS = "search_documents"
     CHECK_AVAILABILITY = "check_availability"
     BOOK_INSPECTION = "book_inspection"
     CANCEL_INSPECTION = "cancel_inspection"
@@ -37,6 +35,7 @@ class TableNames:
     PROPERTIES = "properties"
     PROPERTY_ADDRESSES = "property_addresses"
     PROPERTY_TYPES = "property_types"
+    V_LISTINGS = "v_listings"
 
 
 class StateKeys:
@@ -52,7 +51,9 @@ class Node:
     """
     Constants for graph node names.
     """
+    INTENT = "intent"
     AGENT = "agent"
+    LISTING_SEARCH = "listing_search"
     VECTOR_SEARCH = "vector_search"
     SQL_SEARCH = "sql_search"
     TOOLS = "tools"

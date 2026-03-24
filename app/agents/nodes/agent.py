@@ -1,14 +1,28 @@
 """
-agent_node              — the primary LLM decision node.
-_classify_intent        — zero-cost keyword intent heuristic
-_get_last_human_message — extracts latest user message from state
+agent_node — the LLM brain of the agent.
+
+Three roles depending on intent:
+
+    1. "booking" / "cancellation"  — first call
+       — uses _LLM_WITH_TOOLS
+       — LLM decides which action tool to call (check_availability,
+         book_inspection, cancel_inspection)
+
+    2. Any intent — second call (ToolMessage in state)
+       — uses _LLM_PLAIN
+       — formats tool results into human-readable response
+
+    3. "general" / formatting pass
+       — uses _LLM_PLAIN
+       — responds directly, no tools needed
 """
 
 import logging
 from typing import Any
+
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from app.agents.state import RealEstateAgentState, UserIntent
+from app.agents.state import RealEstateAgentState
 from app.infrastructure.llm import get_llm
 from app.prompts.agent import REAL_ESTATE_AGENT_SYSTEM
 from app.tools import get_all_tools
@@ -16,104 +30,63 @@ from app.tools import get_all_tools
 logger = logging.getLogger(__name__)
 
 _LLM_WITH_TOOLS = get_llm().bind_tools(get_all_tools())
+_LLM_PLAIN = get_llm()
 
-# ---------------------------------------------------------------------------
-# Intent keyword table
-# Order matters — more specific intents listed first.
-# "cancellation" before "booking" because "cancel my booking" contains
-# booking keywords too; most-specific wins.
-# ---------------------------------------------------------------------------
-_INTENT_KEYWORDS: list[tuple[UserIntent, frozenset[str]]] = [
-    ("cancellation", frozenset([
-        "cancel", "cancellation", "cancelled", "withdraw",
-        "no longer", "don't want", "remove booking",
-    ])),
-    ("booking", frozenset([
-        "book", "inspect", "inspection", "viewing", "view",
-        "schedule", "arrange", "available", "availability",
-        "when can i", "open for inspection", "open home",
-    ])),
-    ("document_query", frozenset([
-        "lease", "contract", "strata", "terms", "clause",
-        "bond", "deposit", "condition", "by-law", "bylaw",
-        "pet policy", "break lease", "notice period",
-        "landlord", "tenant", "agreement",
-    ])),
-    ("search", frozenset([
-        "find", "search", "show", "list", "looking for",
-        "properties", "house", "apartment", "unit", "townhouse",
-        "bedroom", "bathroom", "suburb", "price", "budget",
-        "under", "rent", "buy", "purchase",
-    ])),
-]
+# Only these intents need tool calling
+_TOOL_INTENTS = frozenset(["booking", "cancellation"])
 
 
 async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
     """
-    Primary decision node — the LLM brain of the agent.
+    Primary LLM node.
 
-    Receives the full conversation history and decides one of:
-        A) Call one or more tools  -> LangGraph routes to tool node
-        B) Respond directly        -> LangGraph routes to END
+    Uses _LLM_WITH_TOOLS only when:
+        - intent is "booking" or "cancellation"
+        - last message is HumanMessage (first call, no results yet)
 
-    The system prompt is prepended each turn rather than stored in state
-    to avoid bloating the checkpointer database.
+    Uses _LLM_PLAIN for everything else:
+        - "general", "search", "document_query"
+        - any second call after tool results are back
     """
-
-    last_human_msg = _get_last_human_message(state)
-    intent = _classify_intent(last_human_msg)
+    needs_tools = _needs_tools(state)
+    llm = _LLM_WITH_TOOLS if needs_tools else _LLM_PLAIN
 
     messages = [
-        SystemMessage(content=REAL_ESTATE_AGENT_SYSTEM), *
-        state["messages"]  # Unpacking the list of messages from state
+        SystemMessage(content=REAL_ESTATE_AGENT_SYSTEM),
+        *state["messages"],
     ]
 
     logger.info(
-        "agent_node | intent=%s | messages=%d | errors=%d",
-        intent,
+        "agent_node | intent=%s | needs_tools=%s | messages=%d | errors=%d",
+        state.get("user_intent", "general"),
+        needs_tools,
         len(state["messages"]),
         state.get("error_count", 0),
     )
 
-    response = await _LLM_WITH_TOOLS.ainvoke(messages)
+    response = await llm.ainvoke(messages)
 
     if hasattr(response, "tool_calls") and response.tool_calls:
-        logger.info("agent_node | tool_calls=%s", [
-                    tc["name"] for tc in response.tool_calls])
+        logger.info(
+            "agent_node | tool_calls=%s",
+            [tc["name"] for tc in response.tool_calls],
+        )
 
-    return {
-        "messages": [response],
-        "user_intent": intent,
-    }
+    return {"messages": [response]}
 
 
-def _classify_intent(message: str) -> UserIntent:
+def _needs_tools(state: RealEstateAgentState) -> bool:
     """
-    Fast keyword-based intent classification. Zero LLM cost.
-    Returns the first matching intent in priority order, or "general"
-    for greetings, small talk, or anything unrecognised.
-
-    Note: uses substring matching — "view" matches "overview".
-    Acceptable for this domain; use word-boundary matching if false
-    positives become a problem.
+    Returns True only when:
+        - intent is "booking" or "cancellation"
+        - last message is HumanMessage (first call, not formatting pass)
     """
-    if not message:
-        return "general"
+    intent = state.get("user_intent", "general")
+    if intent not in _TOOL_INTENTS:
+        return False
 
-    msg_lower = message.lower()
+    # Check we're on the first call — last message should be HumanMessage
+    for msg in reversed(state["messages"]):
+        return isinstance(msg, HumanMessage)
 
-    for intent, keywords in _INTENT_KEYWORDS:
-        if any(keyword in msg_lower for keyword in keywords):
-            logger.debug("_classify_intent | '%.40s' -> %s", message, intent)
-            return intent
-
-    return "general"
-
-
-def _get_last_human_message(state: RealEstateAgentState) -> str:
-    """Return the content of the most recent HumanMessage in state."""
-    for message in reversed(state["messages"]):
-        if isinstance(message, HumanMessage):
-            return message.content if isinstance(message.content, str) else ""
-
-    return ""
+    return False

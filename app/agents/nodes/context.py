@@ -14,7 +14,6 @@ from app.agents.state import (
     BookingContext,
     BookingStatus,
     RealEstateAgentState,
-    SearchContext,
 )
 from app.core.constants import ToolNames, StateKeys
 
@@ -52,25 +51,6 @@ def context_update_node(state: RealEstateAgentState) -> dict[str, Any]:
         context_result["error_count"] = 0
 
     return context_result
-
-
-# ---------------------------------------------------------------------------
-# Dispatch table — add new tools here, context_update_node never changes
-# ---------------------------------------------------------------------------
-
-def _handle_search_listings(state: RealEstateAgentState, result: dict) -> dict[str, Any]:
-    """Merge result_count into existing SearchContext."""
-
-    if not result.get("success"):
-        return {}
-
-    merged = _merge_context(
-        state,
-        StateKeys.SEARCH_CONTEXT,
-        {"last_result_count": result.get("result_count", 0)}
-    )
-
-    return {StateKeys.SEARCH_CONTEXT: SearchContext(**merged)}
 
 
 def _handle_check_availability(state: RealEstateAgentState, result: dict) -> dict[str, Any]:
@@ -134,14 +114,10 @@ def _handle_cancel_inspection(state: RealEstateAgentState, result: dict) -> dict
     }
 
 
-# Keys must match the tool's .name attribute exactly — verify with:
-#   from app.tools import <tool>; print(<tool>.name)
 _TOOL_HANDLERS: dict[str, Any] = {
-    ToolNames.SEARCH_LISTINGS:    _handle_search_listings,
     ToolNames.CHECK_AVAILABILITY: _handle_check_availability,
     ToolNames.BOOK_INSPECTION:    _handle_book_inspection,
     ToolNames.CANCEL_INSPECTION:  _handle_cancel_inspection,
-    # ToolNames.SEARCH_DOCUMENTS: _handle_search_documents,  # uncomment when enabled
 }
 
 

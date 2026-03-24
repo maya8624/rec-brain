@@ -2,11 +2,12 @@
 Conditional edge functions for the LangGraph graph.
 
 Router map:
-    route_agent_output    → after agent_node → vector_search | sql_search | tools | end
-    route_after_search    → after vector_search_node or sql_search_node → agent | end
-    route_after_tools     → after tool_node → context_update | safety | end
-    route_after_context   → after context_update_node → agent | end
-    route_after_safety    → after safety_node → agent | end
+    route_intent_output  → after intent_node → listing_search | vector_search | agent | end
+    route_agent_output   → after agent_node → tools | end
+    route_after_search   → after listing_search_node or vector_search_node → agent | end
+    route_after_tools    → after tool_node → context_update | safety | end
+    route_after_context  → after context_update_node → agent | end
+    route_after_safety   → after safety_node → agent | end
 """
 
 import json
@@ -18,21 +19,48 @@ from app.core.constants import ToolNames, Node
 logger = logging.getLogger(__name__)
 
 TOOL_ROUTES: dict[str, str] = {
-    ToolNames.SEARCH_DOCUMENTS: Node.VECTOR_SEARCH,
-    ToolNames.SEARCH_LISTINGS:   Node.SQL_SEARCH,
-    ToolNames.CHECK_AVAILABILITY: Node.SQL_SEARCH,
-    ToolNames.BOOK_INSPECTION:   Node.TOOLS,
-    ToolNames.CANCEL_INSPECTION: Node.TOOLS,
+    ToolNames.CHECK_AVAILABILITY: Node.TOOLS,
+    ToolNames.BOOK_INSPECTION:    Node.TOOLS,
+    ToolNames.CANCEL_INSPECTION:  Node.TOOLS,
 }
+
+
+def route_intent_output(state: RealEstateAgentState) -> str:
+    """
+    Routes after intent_node based on user_intent in state.
+
+    Checks early_response first — compound intents bypass everything.
+
+        "search"          → listing_search_node  (direct v_listings query)
+        "booking"         → agent_node           (LLM calls action tool)
+        "cancellation"    → agent_node           (LLM calls action tool)
+        "document_query"  → vector_search_node
+        "general"         → agent_node           (LLM plain response)
+        compound intent   → END                  (early_response set by intent_node, bypasses LLM)
+    """
+    if state.get("early_response"):
+        logger.info("route_intent_output | early_response set → end")
+        return Node.END
+
+    intent = state.get("user_intent", "general")
+
+    route = {
+        "search":         Node.LISTING_SEARCH,
+        "booking":        Node.AGENT,
+        "cancellation":   Node.AGENT,
+        "document_query": Node.VECTOR_SEARCH,
+        "general":        Node.AGENT,
+    }.get(intent, Node.AGENT)
+
+    logger.info("route_intent_output | intent=%s → %s", intent, route)
+    return route
 
 
 def route_agent_output(state: RealEstateAgentState) -> str:
     """
     Reads tool_calls from the last AIMessage and routes to:
-        "vector_search" — LLM called search_documents
-        "sql_search"    — LLM called search_listings / check_availability
-        "tools"         — LLM called book_inspection / cancel_inspection
-        "end"           — plain text response or escalation
+        "tools" — LLM called check_availability / book_inspection / cancel_inspection
+        "end"   — plain text response or escalation
     """
     if _requires_human(state, "route_agent_output"):
         return Node.END
@@ -48,26 +76,22 @@ def route_agent_output(state: RealEstateAgentState) -> str:
 
     for tool_call in message.tool_calls:
         if destination := TOOL_ROUTES.get(tool_call["name"]):
-
             logger.info(
                 "route_agent_output | tool=%s → %s",
                 tool_call["name"],
-                destination
+                destination,
             )
             return destination
 
     logger.warning(
         "route_agent_output | unrecognised tools=%s → end",
-        message.tool_calls
+        message.tool_calls,
     )
-
     return Node.END
 
 
 def route_after_search(state: RealEstateAgentState) -> str:
-    """
-    Always returns to agent so LLM can formulate a response from the search results.
-    """
+    """Returns to agent so LLM can format search results into a response."""
     if _requires_human(state, "route_after_search"):
         return Node.END
 
@@ -79,7 +103,7 @@ def route_after_tools(state: RealEstateAgentState) -> str:
     """
     Inspects ToolMessage results from the current turn and routes to:
         "context_update" — at least one tool succeeded
-        "safety"         — no results found, or all tools failed
+        "safety"         — no results or all tools failed
     """
     if _requires_human(state, "route_after_tools"):
         return Node.END
@@ -95,21 +119,20 @@ def route_after_tools(state: RealEstateAgentState) -> str:
     if succeeded == 0:
         logger.warning(
             "route_after_tools | all %d tool(s) failed → safety",
-            len(results)
+            len(results),
         )
         return Node.SAFETY
 
     logger.info(
         "route_after_tools | %d/%d succeeded → context_update",
         succeeded,
-        len(results)
+        len(results),
     )
-
     return Node.CONTEXT_UPDATE
 
 
 def route_after_context(state: RealEstateAgentState) -> str:
-    """Returns to agent so the LLM can respond using the updated context."""
+    """Returns to agent so LLM can respond using updated context."""
     if _requires_human(state, "route_after_context"):
         return Node.END
 
@@ -118,7 +141,7 @@ def route_after_context(state: RealEstateAgentState) -> str:
 
 
 def route_after_safety(state: RealEstateAgentState) -> str:
-    """Returns to agent if the safety threshold has not been reached."""
+    """Returns to agent if safety threshold has not been reached."""
     if _requires_human(state, "route_after_safety"):
         return Node.END
 
@@ -126,11 +149,11 @@ def route_after_safety(state: RealEstateAgentState) -> str:
     return Node.AGENT
 
 
-# ------------------------
+# ---------------------------------------------------------------------------
 # Private helpers
-# ------------------------
+# ---------------------------------------------------------------------------
+
 def _requires_human(state: RealEstateAgentState, caller: str) -> bool:
-    """Return True and log if the escalation flag is set."""
     if state.get("requires_human"):
         logger.warning("%s | requires_human=True → end", caller)
         return True
@@ -139,7 +162,6 @@ def _requires_human(state: RealEstateAgentState, caller: str) -> bool:
 
 
 def _last_ai_message(state: RealEstateAgentState) -> AIMessage | None:
-    """Return the most recent AIMessage in state, or None if absent."""
     for msg in reversed(state["messages"]):
         if isinstance(msg, AIMessage):
             return msg
@@ -147,10 +169,6 @@ def _last_ai_message(state: RealEstateAgentState) -> AIMessage | None:
 
 
 def _extract_tool_results(messages: list) -> list[dict]:
-    """
-    Parse the most recent batch of ToolMessages.
-    Stops at the first AIMessage — only reads the latest batch.
-    """
     results: list[dict] = []
 
     for msg in reversed(messages):
@@ -166,7 +184,6 @@ def _extract_tool_results(messages: list) -> list[dict]:
                 if isinstance(msg.content, str)
                 else msg.content
             )
-
             if isinstance(content, dict):
                 content.setdefault("success", False)
                 results.append(content)
@@ -175,8 +192,7 @@ def _extract_tool_results(messages: list) -> list[dict]:
 
         except (json.JSONDecodeError, TypeError) as exc:
             logger.error(
-                "_extract_tool_results | failed to parse ToolMessage: %s",
-                exc
+                "_extract_tool_results | failed to parse ToolMessage: %s", exc
             )
             results.append({"success": False, "error": str(msg.content)})
 

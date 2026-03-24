@@ -17,6 +17,7 @@ engine = create_engine(
 )
 
 # Define the tables  Real Estate agent is allowed to 'see'
+# TODO: change to views for better security and to simplify schema for LLM
 ALLOWED_TABLES = [
     TableNames.AGENCIES,
     TableNames.AGENTS,
@@ -25,10 +26,11 @@ ALLOWED_TABLES = [
     TableNames.PROPERTIES,
     TableNames.PROPERTY_ADDRESSES,
     TableNames.PROPERTY_TYPES,
+    TableNames.V_LISTINGS,
 ]
 
 
-def get_db_wrapper() -> SQLDatabase:
+def get_db() -> SQLDatabase:
     """
     Returns a pre-configured SQLDatabase wrapper.
     Best Practice: Explicitly whitelist tables to reduce token usage and 

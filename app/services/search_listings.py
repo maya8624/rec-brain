@@ -9,7 +9,7 @@ from typing import Annotated
 from langchain_core.tools import tool, InjectedToolArg
 
 from app.schemas.booking import SearchListingResult
-from app.services.sql_service import SqlAgentError, SqlAgentService
+from app.services.sql_service import SqlAgentError, SqlViewService
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 @tool
 async def search_listings(
     question: str,
-    sql_service: Annotated[SqlAgentService, InjectedToolArg],
+    sql_service: Annotated[SqlViewService, InjectedToolArg],
 ) -> dict:
     """
     Search property listings by location, price, bedrooms, or property type.

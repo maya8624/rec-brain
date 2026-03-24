@@ -1,6 +1,4 @@
 """
-app.agents.nodes.sql
-~~~~~~~~~~~~~~~~~~~~
 sql_search_node — handles search_listings and check_availability tool
 calls via the SQL agent service.
 
@@ -20,8 +18,8 @@ from langchain_core.runnables import RunnableConfig
 
 from app.agents.nodes._base import build_tool_message, error_content, last_ai_message
 from app.agents.state import RealEstateAgentState
-from app.services.sql_service import SqlAgentService
-from app.tools.search_listings import search_listings
+from app.services.sql_service import SqlViewService
+from app.services.search_listings import search_listings
 
 logger = logging.getLogger(__name__)
 
@@ -99,9 +97,9 @@ async def sql_search_node(
 # Private helpers
 # ---------------------------------------------------------------------------
 
-def _resolve_sql_service(config: RunnableConfig) -> SqlAgentService | None:
+def _resolve_sql_service(config: RunnableConfig) -> SqlViewService | None:
     """
-    Extract SqlAgentService from the FastAPI request stored in RunnableConfig.
+    Extract SqlViewService from the FastAPI request stored in RunnableConfig.
 
     Returns None and logs an error rather than raising, so the caller can
     decide how to handle the missing service.

@@ -148,6 +148,9 @@ class RealEstateAgentState(TypedDict):
     booking_status: BookingStatus       # where we are in the booking flow
     search_context: SearchContext       # accumulated search filters
 
+    # set by intent_node for compound intents, bypasses LLM
+    early_response: str | None
+
     # ── Flow control ──────────────────────────────────────────────────────────
     requires_human: bool                # True → escalate to human agent
     error_count: int                    # consecutive tool failures this session

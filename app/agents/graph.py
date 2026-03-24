@@ -6,19 +6,30 @@ Graph topology:
     START
       │
       ▼
-    agent_node
+    intent_node
       │
-      ├──► vector_search_node ──┐
-      ├──► sql_search_node ─────┤──► agent_node ──► END
-      │                         │
-      └──► tool_node ────────────┤
-                │                │
-          context_update ────────┘
-                │
-            safety ──► agent_node or END
+      ├──► listing_search_node ──┐
+      ├──► vector_search_node ───┼──► agent_node (format) ──► END
+      │                          │
+      ├──► agent_node ───────────┘
+      │    (booking/cancellation)
+      │         │
+      │    tools_node
+      │         │
+      │    context_update ──► agent_node (format) ──► END
+      │         │
+      │       safety ──► agent_node or END
+      │
+      └──► END (early_response — compound intent)
 
-Note:
-    hybrid_node excluded for now — add once core flow is stable.
+TODO:
+    - human_escalation_node: add AIMessage before END when requires_human=True
+    - multi-step tool calling for compound intents
+TODO:
+- [ ] human_escalation_node — add AIMessage before END when requires_human=True
+- [ ] Agency info storage — office hours, processes, policies
+      Options: vector store (document_query intent) or dedicated DB node
+      Leaning towards vector store — add keywords to document_query intent
 """
 import logging
 import os
@@ -30,15 +41,17 @@ from langgraph.prebuilt import ToolNode
 from app.core.constants import Node
 from app.agents.nodes.agent import agent_node
 from app.agents.nodes.context import context_update_node
+from app.agents.nodes.intent import intent_node
+from app.agents.nodes.listing_search import listing_search_node
 from app.agents.nodes.safety import safety_node
-from app.agents.nodes.sql import sql_search_node
 from app.agents.nodes.vector import vector_search_node
 from app.agents.router import (
+    route_intent_output,
+    route_agent_output,
     route_after_context,
     route_after_safety,
     route_after_search,
     route_after_tools,
-    route_agent_output,
 )
 from app.agents.state import RealEstateAgentState
 from app.tools import get_all_tools
@@ -47,10 +60,6 @@ logger = logging.getLogger(__name__)
 
 
 def build_graph():
-    """
-    Builds and compiles the LangGraph agent.
-    Called once at startup via get_agent().
-    """
     tools = get_all_tools()
     tool_node = ToolNode(tools)
     graph = StateGraph(RealEstateAgentState)
@@ -58,42 +67,61 @@ def build_graph():
     # ------------------------
     # Nodes
     # ------------------------
-    graph.add_node(Node.AGENT,          agent_node)
-    graph.add_node(Node.VECTOR_SEARCH,  vector_search_node)
-    graph.add_node(Node.SQL_SEARCH,     sql_search_node)
-    graph.add_node(Node.TOOLS,          tool_node)
-    graph.add_node(Node.CONTEXT_UPDATE, context_update_node)
-    graph.add_node(Node.SAFETY,         safety_node)
-
-    graph.set_entry_point(Node.AGENT)
+    graph.add_node(Node.INTENT,          intent_node)
+    graph.add_node(Node.LISTING_SEARCH,  listing_search_node)
+    graph.add_node(Node.VECTOR_SEARCH,   vector_search_node)
+    graph.add_node(Node.AGENT,           agent_node)
+    graph.add_node(Node.TOOLS,           tool_node)
+    graph.add_node(Node.CONTEXT_UPDATE,  context_update_node)
+    graph.add_node(Node.SAFETY,          safety_node)
 
     # ------------------------
-    # Agent output routing — fan out to 3 paths
+    # Entry point
+    # ------------------------
+    graph.set_entry_point(Node.INTENT)
+
+    # ------------------------
+    # Intent routing
     # ------------------------
     graph.add_conditional_edges(
-        source=Node.AGENT,
-        path=route_agent_output,
+        source=Node.INTENT,
+        path=route_intent_output,
         path_map={
-            Node.VECTOR_SEARCH: Node.VECTOR_SEARCH,
-            Node.SQL_SEARCH:    Node.SQL_SEARCH,
-            Node.TOOLS:         Node.TOOLS,
-            Node.END:           END,
+            Node.LISTING_SEARCH: Node.LISTING_SEARCH,
+            Node.VECTOR_SEARCH:  Node.VECTOR_SEARCH,
+            Node.AGENT:          Node.AGENT,
+            Node.END:            END,
         },
     )
 
     # ------------------------
-    # Search paths — both go back to agent
+    # listing_search → agent (format)
+    # vector_search  → agent (format)
     # ------------------------
+    graph.add_conditional_edges(
+        source=Node.LISTING_SEARCH,
+        path=route_after_search,
+        path_map={Node.AGENT: Node.AGENT, Node.END: END},
+    )
+
     graph.add_conditional_edges(
         source=Node.VECTOR_SEARCH,
         path=route_after_search,
         path_map={Node.AGENT: Node.AGENT, Node.END: END},
     )
 
+    # ------------------------
+    # Agent output routing
+    # booking/cancellation → tools
+    # general/format pass  → END
+    # ------------------------
     graph.add_conditional_edges(
-        source=Node.SQL_SEARCH,
-        path=route_after_search,
-        path_map={Node.AGENT: Node.AGENT, Node.END: END},
+        source=Node.AGENT,
+        path=route_agent_output,
+        path_map={
+            Node.TOOLS: Node.TOOLS,
+            Node.END:   END,
+        },
     )
 
     # ------------------------
@@ -110,7 +138,7 @@ def build_graph():
     )
 
     # ------------------------
-    # Context update → agent
+    # Context update → agent (format)
     # ------------------------
     graph.add_conditional_edges(
         source=Node.CONTEXT_UPDATE,
@@ -141,7 +169,6 @@ def build_graph():
 
 def _get_checkpointer():
     env = os.getenv("ENVIRONMENT", "development")
-
     if env == "production":
         return _build_postgres_checkpointer()
 
