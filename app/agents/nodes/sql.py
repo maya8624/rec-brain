@@ -1,12 +1,11 @@
 """
 sql_search_node — handles search_listings and check_availability tool
-calls via the SQL agent service.
+calls via SqlViewService.
 
 Responsibility:
-    - Resolve SqlAgentService from the FastAPI app state via RunnableConfig
+    - Resolve SqlViewService from the FastAPI app state via RunnableConfig
     - Find every matching tool call on the latest AIMessage
-    - Call search_listings.ainvoke for each one (sql_service injected,
-      never exposed to the LLM)
+    - Call SqlViewService.search_listings for each one
     - Wrap each result as a ToolMessage (JSON-serialised)
     - Return {"messages": [ToolMessage, ...]}
 
@@ -18,8 +17,7 @@ from langchain_core.runnables import RunnableConfig
 
 from app.agents.nodes._base import build_tool_message, error_content, last_ai_message
 from app.agents.state import RealEstateAgentState
-from app.services.sql_service import SqlViewService
-from app.services.search_listings import search_listings
+from app.services.sql_search import SqlViewService
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +32,8 @@ async def sql_search_node(
     Process all search_listings / check_availability tool calls on the
     latest AIMessage.
 
-    Expects SqlAgentService to be available at:
-        runnable_config["configurable"]["request"].app.state.sql_service
+    Expects SqlViewService to be available at:
+        runnable_config["configurable"]["request"].app.state.sql_view_service
 
     Returns partial state: { messages: [ToolMessage, ...] }
     Returns {} if there is no AIMessage, no matching tool calls, or the
@@ -67,18 +65,8 @@ async def sql_search_node(
                     tool_name, question)
 
         try:
-            # .ainvoke() takes a single input dict; sql_service is an
-            # InjectedToolArg — pass it as a separate keyword so it is
-            # never visible to the LLM.
-            result = await search_listings.ainvoke(
-                {"question": question},
-                sql_service=sql_service,
-            )
-            content = (
-                result
-                if isinstance(result, dict)
-                else {"success": True, "answer": str(result)}
-            )
+            result = await sql_service.search_listings(question)
+            content = result
         except Exception as exc:
             logger.exception(
                 "sql_search_node | failed | tool=%s | question=%.80s",
@@ -108,7 +96,7 @@ def _resolve_sql_service(config: RunnableConfig) -> SqlViewService | None:
         request = config.get("configurable", {}).get("request")
         if request is None:
             raise ValueError("no 'request' key in configurable")
-        return request.app.state.sql_service
+        return request.app.state.sql_view_service
     except Exception as exc:
         logger.error(
             "sql_search_node | could not resolve sql_service: %s", exc)

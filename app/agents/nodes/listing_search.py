@@ -18,7 +18,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 
 from app.agents.state import RealEstateAgentState
-from app.services.sql_service import SqlViewService
+from app.services.sql_search import SqlViewService
 
 logger = logging.getLogger(__name__)
 

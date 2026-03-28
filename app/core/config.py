@@ -53,10 +53,6 @@ class Settings(BaseSettings):
         "development",
         description="development | staging | production",
     )
-    MOCK_MODE: bool = Field(
-        False,
-        description="True = use mock backend client, skip real .NET API calls",
-    )
 
     # ── CORS ──────────────────────────────────────────────────────────────────
     ALLOWED_ORIGINS: str = Field(
@@ -246,7 +242,6 @@ try:
 
     print(
         f"Settings loaded | env={settings.ENVIRONMENT} "
-        f"mock={settings.MOCK_MODE} "
         f"model={settings.MODEL_NAME}"
     )
 except ValidationError as e:

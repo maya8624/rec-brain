@@ -17,14 +17,13 @@ from app.api.routes import chat, health
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.infrastructure.database import get_db
+from app.infrastructure.embedding_service import EmbeddingService
 from app.infrastructure.llm import get_llm
+from app.infrastructure.pgvector_store import PgVectorStoreService
 from app.services.booking_service import BookingService
-from app.services.sql_service import SqlViewService
-
-if settings.MOCK_MODE:
-    from app.services.mock import backend_client
-else:
-    from app.services.backend_client import backend_client
+from app.services.sql_search import SqlViewService
+from app.services.vector_search import RagRetriever
+from app.services.backend_client import backend_client
 
 logger = structlog.get_logger(__name__)
 
@@ -59,7 +58,6 @@ async def lifespan(_app: FastAPI):
         "Starting AI service",
         version=APP_VERSION,
         env=ENVIRONMENT,
-        mock_mode=str(settings.MOCK_MODE),
     )
 
     try:
@@ -70,6 +68,11 @@ async def lifespan(_app: FastAPI):
         _app.state.sql_view_service = SqlViewService(
             llm=get_llm(),
             db=get_db(),
+        )
+
+        _app.state.rag_retriever = RagRetriever(
+            vector_store_service=PgVectorStoreService(),
+            embedding_service=EmbeddingService(),
         )
 
         # Agent — compiled once, stored on app.state, reused every request

@@ -11,7 +11,7 @@ Usage:
 """
 from app.infrastructure.llm import get_llm
 from app.infrastructure.database import get_db
-from app.services.sql_service import SqlViewService
+from app.services.sql_search import SqlViewService
 from app.agents.graph import build_graph
 from langchain_core.messages import HumanMessage
 import asyncio
