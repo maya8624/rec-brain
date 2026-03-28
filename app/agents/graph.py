@@ -42,7 +42,7 @@ from langgraph.prebuilt import ToolNode
 from app.core.constants import Node
 from app.agents.nodes.agent import agent_node
 from app.agents.nodes.context import context_update_node
-from app.agents.nodes.hybrid_search import hybrid_search_node
+from app.agents.nodes.hybrid import hybrid_search_node
 from app.agents.nodes.intent import intent_node
 from app.agents.nodes.listing import listing_search_node
 from app.agents.nodes.safety import safety_node
