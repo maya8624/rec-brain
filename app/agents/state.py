@@ -27,6 +27,7 @@ from langchain_core.messages import BaseMessage
 UserIntent = Literal[
     "search",           # user wants to find properties
     "document_query",   # user asking about leases, contracts, strata
+    "hybrid_search",    # user wants property listings + document context together
     "booking",          # user wants to inspect a property
     "cancellation",     # user wants to cancel an existing inspection
     "general",          # general question about the agency / process

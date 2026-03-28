@@ -46,9 +46,10 @@ def route_intent_output(state: RealEstateAgentState) -> str:
 
     route = {
         "search":         Node.LISTING_SEARCH,
+        "document_query": Node.VECTOR_SEARCH,
+        "hybrid_search":  Node.HYBRID_SEARCH,
         "booking":        Node.AGENT,
         "cancellation":   Node.AGENT,
-        "document_query": Node.VECTOR_SEARCH,
         "general":        Node.AGENT,
     }.get(intent, Node.AGENT)
 

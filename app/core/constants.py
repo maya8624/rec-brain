@@ -55,6 +55,7 @@ class Node:
     AGENT = "agent"
     LISTING_SEARCH = "listing_search"
     VECTOR_SEARCH = "vector_search"
+    HYBRID_SEARCH = "hybrid_search"
     SQL_SEARCH = "sql_search"
     TOOLS = "tools"
     CONTEXT_UPDATE = "context_update"

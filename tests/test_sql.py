@@ -6,7 +6,7 @@ Usage:
     pytest scripts/test_sql.py -v        # verbose
     pytest scripts/test_sql.py -k price  # single group or test
 """
-from app.services.sql_search import SqlViewService
+from app.services.sql_service import SqlViewService
 from app.infrastructure.database import get_db
 from app.infrastructure.llm import get_llm
 import json

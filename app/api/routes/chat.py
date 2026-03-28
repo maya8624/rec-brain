@@ -53,9 +53,9 @@ async def chat(
 
         return _build_response(request.thread_id, result)
 
-    except Exception as e:
+    except Exception as exc:
         logger.exception("chat | error | thread_id=%s | %s",
-                         request.thread_id, e)
+                         request.thread_id, exc)
 
         raise HTTPException(
             status_code=500,
@@ -63,7 +63,7 @@ async def chat(
                 error="AI service error. Please try again.",
                 thread_id=request.thread_id,
             ).model_dump(),  # convert Pydantic model to dict for JSON response
-        ) from e
+        ) from exc
 
 
 # ── POST /api/chat/stream ──────────────────────────────────────────────────────
@@ -123,10 +123,10 @@ async def _event_generator(request: ChatRequest, agent):
 
         yield "data: [DONE]\n\n"
 
-    except Exception as e:
+    except Exception as exc:
         logger.exception(
             "chat/stream | error | session=%s | %s",
-            request.session_id, e,
+            request.session_id, exc,
         )
         yield f"data: {json.dumps({'type': 'error', 'message': 'An unexpected error occurred.'})}\n\n"
 

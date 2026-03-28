@@ -6,9 +6,10 @@ writes user_intent into state — no LLM cost.
 
 Intent values:
     "search"          → listing_search_node  (v_listings direct query)
+    "document_query"  → vector_search_node
+    "hybrid_search"   → hybrid_search_node   (search + document_query together)
     "booking"         → agent_node           (LLM calls check_availability/book_inspection)
     "cancellation"    → agent_node           (LLM calls cancel_inspection)
-    "document_query"  → vector_search_node
     "general"         → agent_node           (LLM plain response)
 
 Compound intents (e.g. search + booking) → "general"
@@ -18,7 +19,7 @@ Compound intents (e.g. search + booking) → "general"
 import logging
 import re
 from typing import Any
-from langchain_core.messages import HumanMessage
+from app.agents.nodes._base import last_human_message
 from app.agents.state import RealEstateAgentState, UserIntent
 
 logger = logging.getLogger(__name__)
@@ -56,7 +57,7 @@ async def intent_node(state: RealEstateAgentState) -> dict[str, Any]:
     Classifies intent from the latest HumanMessage.
     Writes user_intent into state — no LLM call.
     """
-    message = _get_last_human_message(state)
+    message = last_human_message(state)
     intent = _classify_intent(message)
 
     logger.info(
@@ -92,6 +93,11 @@ def _classify_intent(message: str) -> UserIntent:
         if _matches_keywords(msg_lower, keywords)
     ]
 
+    # Hybrid: search + document_query together → use both sources
+    if "search" in matched_intents and "document_query" in matched_intents:
+        logger.debug("_classify_intent | search+document_query → hybrid_search")
+        return "hybrid_search"
+
     compound_matches = [i for i in matched_intents if i in _COMPOUND_INTENTS]
     if len(compound_matches) > 1:
         logger.debug(
@@ -105,15 +111,6 @@ def _classify_intent(message: str) -> UserIntent:
         return intent  # ← plain string
 
     return "general"  # ← plain string
-
-
-def _get_last_human_message(state: RealEstateAgentState) -> str:
-    """Return the content of the most recent HumanMessage in state."""
-    for message in reversed(state["messages"]):
-        if isinstance(message, HumanMessage):
-            return message.content if isinstance(message.content, str) else ""
-
-    return ""
 
 
 def _is_compound(message: str) -> bool:

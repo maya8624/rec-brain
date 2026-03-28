@@ -21,8 +21,8 @@ from app.infrastructure.embedding_service import EmbeddingService
 from app.infrastructure.llm import get_llm
 from app.infrastructure.pgvector_store import PgVectorStoreService
 from app.services.booking_service import BookingService
-from app.services.sql_search import SqlViewService
-from app.services.vector_search import RagRetriever
+from app.services.sql_service import SqlViewService
+from app.services.vector_service import RagRetriever
 from app.services.backend_client import backend_client
 
 logger = structlog.get_logger(__name__)

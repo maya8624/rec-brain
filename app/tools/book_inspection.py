@@ -66,16 +66,16 @@ async def book_inspection(
             ),
         ).model_dump()
 
-    except BookingValidationError as e:
-        logger.warning("book_inspection | validation error: %s", e)
-        return BookingResult(success=False, error=str(e)).model_dump()
+    except BookingValidationError as exc:
+        logger.warning("book_inspection | validation error: %s", exc)
+        return BookingResult(success=False, error=str(exc)).model_dump()
 
-    except BookingServiceError as e:
-        logger.error("book_inspection | service error: %s", e)
-        return BookingResult(success=False, error=str(e)).model_dump()
+    except BookingServiceError as exc:
+        logger.error("book_inspection | service error: %s", exc)
+        return BookingResult(success=False, error=str(exc)).model_dump()
 
-    except Exception as e:
-        logger.exception("book_inspection | unexpected error: %s", e)
+    except Exception as exc:
+        logger.exception("book_inspection | unexpected error: %s", exc)
         return BookingResult(
             success=False,
             error="Booking failed unexpectedly. Please try again or contact the agency directly."

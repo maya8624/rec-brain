@@ -52,17 +52,17 @@ async def check_availability(
             slot_count=len(avaliable_slots),
         ).model_dump()
 
-    except BookingServiceError as e:
-        logger.error("check_availability | BookingServiceError: %s", e)
+    except BookingServiceError as exc:
+        logger.error("check_availability | BookingServiceError: %s", exc)
 
         return AvailabilityResult(
             success=False,
             property_id=property_id,
-            error=str(e),
+            error=str(exc),
         ).model_dump()
 
-    except Exception as e:
-        logger.exception("check_availability | unexpected error: %s", e)
+    except Exception as exc:
+        logger.exception("check_availability | unexpected error: %s", exc)
 
         return AvailabilityResult(
             success=False,

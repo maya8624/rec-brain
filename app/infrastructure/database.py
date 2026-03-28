@@ -46,6 +46,6 @@ def get_db() -> SQLDatabase:
             # e.g. that status is 'active' not 'Active' or 1). Reduces token usage in schema description.
             sample_rows_in_table_info=3
         )
-    except Exception as e:
-        logger.exception("Failed to initialize SQLDatabase wrapper: %s", e)
+    except Exception as exc:
+        logger.exception("Failed to initialize SQLDatabase wrapper: %s", exc)
         raise

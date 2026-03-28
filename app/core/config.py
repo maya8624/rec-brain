@@ -244,6 +244,6 @@ try:
         f"Settings loaded | env={settings.ENVIRONMENT} "
         f"model={settings.MODEL_NAME}"
     )
-except ValidationError as e:
-    print(f"Configuration error:\n{e}")
+except ValidationError as exc:
+    print(f"Configuration error:\n{exc}")
     raise SystemExit(1)   # clean exit — no ugly traceback

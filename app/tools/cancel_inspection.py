@@ -47,20 +47,20 @@ async def cancel_inspection(
             ),
         ).model_dump()
 
-    except BookingValidationError as e:
-        logger.warning("cancel_inspection | validation error: %s", e)
+    except BookingValidationError as exc:
+        logger.warning("cancel_inspection | validation error: %s", exc)
         return CancellationResult(
-            success=False, confirmation_id=confirmation_id, error=str(e)
+            success=False, confirmation_id=confirmation_id, error=str(exc)
         ).model_dump()
 
-    except BookingServiceError as e:
-        logger.error("cancel_inspection | service error: %s", e)
+    except BookingServiceError as exc:
+        logger.error("cancel_inspection | service error: %s", exc)
         return CancellationResult(
-            success=False, confirmation_id=confirmation_id, error=str(e)
+            success=False, confirmation_id=confirmation_id, error=str(exc)
         ).model_dump()
 
-    except Exception as e:
-        logger.exception("cancel_inspection | unexpected error: %s", e)
+    except Exception as exc:
+        logger.exception("cancel_inspection | unexpected error: %s", exc)
         return CancellationResult(
             success=False,
             confirmation_id=confirmation_id,

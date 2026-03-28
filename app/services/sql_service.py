@@ -60,8 +60,8 @@ class SqlViewService:
                 "sql_used": sql,
             }
 
-        except SqlValidationError as e:
-            logger.error("SqlViewService | validation failed | %s", e)
+        except SqlValidationError as exc:
+            logger.error("SqlViewService | validation failed | %s", exc)
             return {
                 "success": False,
                 "output": None,
@@ -69,8 +69,8 @@ class SqlViewService:
                 "error": "Property search is temporarily unavailable.",
             }
 
-        except Exception as e:
-            logger.exception("SqlViewService | failed | %s", e)
+        except Exception as exc:
+            logger.exception("SqlViewService | failed | %s", exc)
             return {
                 "success": False,
                 "output": None,

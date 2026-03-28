@@ -77,7 +77,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             response.headers["X-Request-ID"] = request_id
             return response
 
-        except Exception as e:
+        except Exception as exc:
             elapsed = (time.perf_counter() - start) * 1000
             logger.exception(
                 "request_error",
@@ -85,6 +85,6 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
                 path=request.url.path,
                 elapsed_ms=round(elapsed, 1),
                 request_id=request_id,
-                error=str(e),
+                error=str(exc),
             )
             raise  # never swallow — FastAPI error handling must still run

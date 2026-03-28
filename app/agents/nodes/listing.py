@@ -14,11 +14,11 @@ import json
 import logging
 from typing import Any
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import SystemMessage
 from langchain_core.runnables import RunnableConfig
 
+from app.agents.nodes._base import last_human_message, resolve_app_service
 from app.agents.state import RealEstateAgentState
-from app.services.sql_search import SqlViewService
 
 logger = logging.getLogger(__name__)
 
@@ -34,17 +34,19 @@ async def listing_search_node(
     and executes SQL against v_listings, stores raw results in
     state for agent_node to format into a human-readable response.
     """
-    question = _get_last_human_message(state)
+    question = last_human_message(state)
     if not question:
         logger.warning("listing_search_node | no human message found")
         return {}
 
-    sql_view_service = _resolve_sql_view_service(runnable_config)
-    if sql_view_service is None:
+    sql_service = resolve_app_service(
+        runnable_config, "sql_view_service", "listing_search_node"
+    )
+    if sql_service is None:
         return {}
 
     try:
-        result = await sql_view_service.search_listings(question)
+        result = await sql_service.search_listings(question)
 
         logger.info(
             "listing_search_node | success=%s | count=%d",
@@ -52,8 +54,6 @@ async def listing_search_node(
             result.get("result_count", 0),
         )
 
-        # Store as SystemMessage so agent_node can read and format it
-        # SystemMessage distinguishes it from user HumanMessages in state
         result_message = SystemMessage(content=json.dumps({
             "search_results": result.get("output"),
             "result_count": result.get("result_count", 0),
@@ -66,28 +66,3 @@ async def listing_search_node(
     except Exception as exc:
         logger.exception("listing_search_node | failed | %s", exc)
         return {}
-
-
-def _get_last_human_message(state: RealEstateAgentState) -> str:
-    """Return the content of the most recent HumanMessage in state."""
-    for message in reversed(state["messages"]):
-        if isinstance(message, HumanMessage):
-            return message.content if isinstance(message.content, str) else ""
-    return ""
-
-
-def _resolve_sql_view_service(config: RunnableConfig) -> SqlViewService | None:
-    """
-    Extract SqlViewService from FastAPI request in RunnableConfig.
-    Returns None and logs error rather than raising.
-    """
-    try:
-        request = config.get("configurable", {}).get("request")
-        if request is None:
-            raise ValueError("no 'request' key in configurable")
-        return request.app.state.sql_view_service
-    except Exception as exc:
-        logger.error(
-            "listing_search_node | could not resolve sql_view_service: %s", exc
-        )
-        return None

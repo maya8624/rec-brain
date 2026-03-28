@@ -110,12 +110,12 @@ async def ingest_document(
             message=f"Ingested {filename} — {result['chunk_count']} chunks stored",
         )
 
-    except DocumentLoaderError as e:
-        logger.warning("ingest_loader_error", error=str(e))
+    except DocumentLoaderError as exc:
+        logger.warning("ingest_loader_error", error=str(exc))
         raise HTTPException(status_code=400, detail=str(e))
 
-    except Exception as e:
-        logger.exception("ingest_unexpected_error", error=str(e))
+    except Exception as exc:
+        logger.exception("ingest_unexpected_error", error=str(exc))
         raise HTTPException(
             status_code=500, detail="Document ingestion failed. Please try again.")
 

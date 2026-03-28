@@ -9,7 +9,8 @@ Graph topology:
     intent_node
       │
       ├──► listing_search_node ──┐
-      ├──► vector_search_node ───┼──► agent_node (format) ──► END
+      ├──► vector_search_node ───┤
+      ├──► hybrid_search_node ───┼──► agent_node (format) ──► END
       │                          │
       ├──► agent_node ───────────┘
       │    (booking/cancellation)
@@ -41,8 +42,9 @@ from langgraph.prebuilt import ToolNode
 from app.core.constants import Node
 from app.agents.nodes.agent import agent_node
 from app.agents.nodes.context import context_update_node
+from app.agents.nodes.hybrid_search import hybrid_search_node
 from app.agents.nodes.intent import intent_node
-from app.agents.nodes.listing_search import listing_search_node
+from app.agents.nodes.listing import listing_search_node
 from app.agents.nodes.safety import safety_node
 from app.agents.nodes.vector import vector_search_node
 from app.agents.router import (
@@ -70,6 +72,7 @@ def build_graph():
     graph.add_node(Node.INTENT,          intent_node)
     graph.add_node(Node.LISTING_SEARCH,  listing_search_node)
     graph.add_node(Node.VECTOR_SEARCH,   vector_search_node)
+    graph.add_node(Node.HYBRID_SEARCH,   hybrid_search_node)
     graph.add_node(Node.AGENT,           agent_node)
     graph.add_node(Node.TOOLS,           tool_node)
     graph.add_node(Node.CONTEXT_UPDATE,  context_update_node)
@@ -89,6 +92,7 @@ def build_graph():
         path_map={
             Node.LISTING_SEARCH: Node.LISTING_SEARCH,
             Node.VECTOR_SEARCH:  Node.VECTOR_SEARCH,
+            Node.HYBRID_SEARCH:  Node.HYBRID_SEARCH,
             Node.AGENT:          Node.AGENT,
             Node.END:            END,
         },
@@ -97,6 +101,7 @@ def build_graph():
     # ------------------------
     # listing_search → agent (format)
     # vector_search  → agent (format)
+    # hybrid_search  → agent (format)
     # ------------------------
     graph.add_conditional_edges(
         source=Node.LISTING_SEARCH,
@@ -106,6 +111,12 @@ def build_graph():
 
     graph.add_conditional_edges(
         source=Node.VECTOR_SEARCH,
+        path=route_after_search,
+        path_map={Node.AGENT: Node.AGENT, Node.END: END},
+    )
+
+    graph.add_conditional_edges(
+        source=Node.HYBRID_SEARCH,
         path=route_after_search,
         path_map={Node.AGENT: Node.AGENT, Node.END: END},
     )
@@ -188,10 +199,10 @@ def _build_postgres_checkpointer():
 
     except ImportError:
         logger.error(
-            "PostgresSaver not available — falling back to MemorySaver")
+            "PostgresSaver not available — falling back to MemorySaver")  # no exc ref needed
         return InMemorySaver()
 
-    except Exception as e:
+    except Exception as exc:
         logger.error(
-            "PostgresSaver failed: %s — falling back to MemorySaver", e)
+            "PostgresSaver failed: %s — falling back to MemorySaver", exc)
         return InMemorySaver()

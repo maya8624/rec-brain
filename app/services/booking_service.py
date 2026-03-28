@@ -50,9 +50,9 @@ class BookingService:
 
         try:
             data = await self._client.get(BookingEndpoints.AVAILABILITY, params=params)
-        except BackendClientError as e:
+        except BackendClientError as exc:
             raise BookingServiceError(
-                f"Failed to fetch availability: {e}") from e
+                f"Failed to fetch availability: {exc}") from exc
 
         slots = self._parse_availability(data)
         available_slots = [
@@ -101,8 +101,8 @@ class BookingService:
 
         try:
             data = await self._client.post(BookingEndpoints.BOOK, json=payload)
-        except BackendClientError as e:
-            raise BookingServiceError(f"Booking failed: {e}") from e
+        except BackendClientError as exc:
+            raise BookingServiceError(f"Booking failed: {exc}") from exc
 
         confirmation = self._parse_booking_response(data)
 
@@ -127,8 +127,8 @@ class BookingService:
 
         try:
             await self._client.post(BookingEndpoints.CANCEL, json=payload)
-        except BackendClientError as e:
-            raise BookingServiceError(f"Cancellation failed: {e}") from e
+        except BackendClientError as exc:
+            raise BookingServiceError(f"Cancellation failed: {exc}") from exc
 
         logger.info("cancel | cancelled | id=%s", request.confirmation_id)
 
