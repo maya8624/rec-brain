@@ -3,7 +3,7 @@ import logging
 from llama_index.core import VectorStoreIndex
 from llama_index.core.schema import NodeWithScore
 
-from app.infrastructure.embedding_service import EmbeddingService
+from app.infrastructure.embedding import EmbeddingService
 from app.infrastructure.pgvector_store import PgVectorStoreService
 
 logger = logging.getLogger(__name__)

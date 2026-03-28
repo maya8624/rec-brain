@@ -17,7 +17,7 @@ from app.api.routes import chat, health
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.infrastructure.database import get_db
-from app.infrastructure.embedding_service import EmbeddingService
+from app.infrastructure.embedding import EmbeddingService
 from app.infrastructure.llm import get_llm
 from app.infrastructure.pgvector_store import PgVectorStoreService
 from app.services.booking_service import BookingService
