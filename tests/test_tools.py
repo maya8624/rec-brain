@@ -3,20 +3,21 @@ Tests for action tools — check_availability, book_inspection, cancel_inspectio
 Uses mock BookingService so no .NET backend needed.
 
 Usage:
-    python scripts/test_tools.py                      # run all
-    python scripts/test_tools.py check_availability
-    python scripts/test_tools.py book_inspection
-    python scripts/test_tools.py cancel_inspection
+    pytest tests/test_tools.py         # run all
+    pytest tests/test_tools.py -v      # verbose
+    pytest tests/test_tools.py -k check_availability
 """
-from app.core.exceptions import BookingServiceError, BookingValidationError
-from app.tools.cancel_inspection import cancel_inspection
-from app.tools.book_inspection import book_inspection
 from app.tools.check_availability import check_availability
-import asyncio
+from app.tools.book_inspection import book_inspection
+from app.tools.cancel_inspection import cancel_inspection
+from app.services.booking_service import BookingService
+from app.core.exceptions import BookingServiceError, BookingValidationError
 import json
 import os
 import sys
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
+
+import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -25,20 +26,14 @@ def pretty(result: dict):
     print(json.dumps(result, indent=2, default=str))
 
 
-def print_header(name: str):
-    print(f"\n── {name} {'─' * (50 - len(name))}")
+# ── Factory ────────────────────────────────────────────────────────────────────
 
-
-def make_booking_service(
-    availability=None,
-    booking_result=None,
-    raise_error=None,
-):
+def make_booking_service(availability=None, booking_result=None, raise_error=None):
     """
     Factory for mock BookingService.
     Pass raise_error=BookingServiceError("msg") to simulate failures.
     """
-    mock = AsyncMock()
+    mock = AsyncMock(spec=BookingService)
 
     if raise_error:
         mock.get_availability.side_effect = raise_error
@@ -65,189 +60,145 @@ def make_booking_service(
     return mock
 
 
-# ── check_availability tests ───────────────────────────────────────────────────
+# ── check_availability ─────────────────────────────────────────────────────────
 
-async def test_check_availability_success():
-    print_header("check_availability — success")
-    booking_service = make_booking_service()
-    result = await check_availability.ainvoke({
-        "property_id": "prop_123",
-        "preferred_date": "2026-04-12",
-        "booking_service": booking_service,
-    })
-    pretty(result)
-    assert result["success"], "Expected success"
-    assert result["slot_count"] == 3, f"Expected 3 slots, got {result['slot_count']}"
-    print("  ✓ check_availability success")
+class TestCheckAvailability:
+    async def test_success(self):
+        booking_service = make_booking_service()
+        result = await check_availability.ainvoke({
+            "property_id": "prop_123",
+            "preferred_date": "2026-04-12",
+            "booking_service": booking_service,
+        })
+        pretty(result)
+        assert result["success"]
+        assert result["slot_count"] == 3
+        print("actual call:", booking_service.get_availability.call_args)
+        booking_service.get_availability.assert_called_once()
 
+    async def test_no_slots(self):
+        booking_service = make_booking_service(availability=[])
+        result = await check_availability.ainvoke({
+            "property_id": "prop_123",
+            "booking_service": booking_service,
+        })
+        pretty(result)
+        assert result["success"]
+        assert result["slot_count"] == 0
+        booking_service.get_availability.assert_called_once()
 
-async def test_check_availability_no_slots():
-    print_header("check_availability — no slots")
-    booking_service = make_booking_service(availability=[])
-    result = await check_availability.ainvoke({
-        "property_id": "prop_123",
-        "booking_service": booking_service,
-    })
-    pretty(result)
-    assert result["success"], "Expected success even with 0 slots"
-    assert result["slot_count"] == 0
-    print("  ✓ check_availability no slots")
-
-
-async def test_check_availability_service_error():
-    print_header("check_availability — service error")
-    booking_service = make_booking_service(
-        raise_error=BookingServiceError("Backend unavailable")
-    )
-    result = await check_availability.ainvoke({
-        "property_id": "prop_123",
-        "booking_service": booking_service,
-    })
-    pretty(result)
-    assert not result["success"], "Expected failure"
-    assert result["error"], "Expected error message"
-    print("  ✓ check_availability service error handled")
+    async def test_service_error(self):
+        booking_service = make_booking_service(
+            raise_error=BookingServiceError("Backend unavailable")
+        )
+        result = await check_availability.ainvoke({
+            "property_id": "prop_123",
+            "booking_service": booking_service,
+        })
+        pretty(result)
+        assert not result["success"]
+        assert result["error"]
+        booking_service.get_availability.assert_called_once()
 
 
-# ── book_inspection tests ──────────────────────────────────────────────────────
+# ── book_inspection ────────────────────────────────────────────────────────────
 
-async def test_book_inspection_success():
-    print_header("book_inspection — success")
-    booking_service = make_booking_service()
-    result = await book_inspection.ainvoke({
-        "property_id": "prop_123",
-        "datetime_slot": "2026-04-12 10:00",
-        "contact_name": "John Smith",
-        "contact_email": "john@email.com",
-        "contact_phone": "0412 345 678",
-        "booking_service": booking_service,
-    })
-    pretty(result)
-    assert result["success"], "Expected success"
-    assert result["confirmation_id"] == "CONF-12345"
-    print("  ✓ book_inspection success")
+class TestBookInspection:
+    async def test_success(self):
+        booking_service = make_booking_service()
+        result = await book_inspection.ainvoke({
+            "property_id": "prop_123",
+            "datetime_slot": "2026-04-12 10:00",
+            "contact_name": "John Smith",
+            "contact_email": "john@email.com",
+            "contact_phone": "0412 345 678",
+            "booking_service": booking_service,
+        })
+        pretty(result)
+        assert result["success"]
+        assert result["confirmation_id"] == "CONF-12345"
+        booking_service.book.assert_called_once_with(
+            property_id="prop_123",
+            datetime_slot="2026-04-12 10:00",
+            contact_name="John Smith",
+            contact_email="john@email.com",
+            contact_phone="0412 345 678",
+        )
 
+    async def test_validation_error(self):
+        booking_service = make_booking_service(
+            raise_error=BookingValidationError("Invalid datetime slot")
+        )
+        result = await book_inspection.ainvoke({
+            "property_id": "prop_123",
+            "datetime_slot": "invalid-date",
+            "contact_name": "John Smith",
+            "contact_email": "john@email.com",
+            "contact_phone": "0412 345 678",
+            "booking_service": booking_service,
+        })
+        pretty(result)
+        assert not result["success"]
+        assert "Invalid" in result["error"]
+        booking_service.book.assert_called_once()
 
-async def test_book_inspection_validation_error():
-    print_header("book_inspection — validation error")
-    booking_service = make_booking_service(
-        raise_error=BookingValidationError("Invalid datetime slot")
-    )
-    result = await book_inspection.ainvoke({
-        "property_id": "prop_123",
-        "datetime_slot": "invalid-date",
-        "contact_name": "John Smith",
-        "contact_email": "john@email.com",
-        "contact_phone": "0412 345 678",
-        "booking_service": booking_service,
-    })
-    pretty(result)
-    assert not result["success"], "Expected failure"
-    assert "Invalid" in result["error"]
-    print("  ✓ book_inspection validation error handled")
-
-
-async def test_book_inspection_service_error():
-    print_header("book_inspection — service error")
-    booking_service = make_booking_service(
-        raise_error=BookingServiceError("Backend unavailable")
-    )
-    result = await book_inspection.ainvoke({
-        "property_id": "prop_123",
-        "datetime_slot": "2026-04-12 10:00",
-        "contact_name": "John Smith",
-        "contact_email": "john@email.com",
-        "contact_phone": "0412 345 678",
-        "booking_service": booking_service,
-    })
-    pretty(result)
-    assert not result["success"], "Expected failure"
-    print("  ✓ book_inspection service error handled")
-
-
-# ── cancel_inspection tests ────────────────────────────────────────────────────
-
-async def test_cancel_inspection_success():
-    print_header("cancel_inspection — success")
-    booking_service = make_booking_service()
-    result = await cancel_inspection.ainvoke({
-        "confirmation_id": "CONF-12345",
-        "reason": "Change of plans",
-        "booking_service": booking_service,
-    })
-    pretty(result)
-    assert result["success"], "Expected success"
-    assert result["confirmation_id"] == "CONF-12345"
-    print("  ✓ cancel_inspection success")
+    async def test_service_error(self):
+        booking_service = make_booking_service(
+            raise_error=BookingServiceError("Backend unavailable")
+        )
+        result = await book_inspection.ainvoke({
+            "property_id": "prop_123",
+            "datetime_slot": "2026-04-12 10:00",
+            "contact_name": "John Smith",
+            "contact_email": "john@email.com",
+            "contact_phone": "0412 345 678",
+            "booking_service": booking_service,
+        })
+        pretty(result)
+        assert not result["success"]
+        booking_service.book.assert_called_once()
 
 
-async def test_cancel_inspection_no_reason():
-    print_header("cancel_inspection — no reason")
-    booking_service = make_booking_service()
-    result = await cancel_inspection.ainvoke({
-        "confirmation_id": "CONF-12345",
-        "booking_service": booking_service,
-    })
-    pretty(result)
-    assert result["success"], "Expected success without reason"
-    print("  ✓ cancel_inspection no reason")
+# ── cancel_inspection ──────────────────────────────────────────────────────────
 
+class TestCancelInspection:
+    async def test_success(self):
+        booking_service = make_booking_service()
+        result = await cancel_inspection.ainvoke({
+            "confirmation_id": "CONF-12345",
+            "reason": "Change of plans",
+            "booking_service": booking_service,
+        })
+        pretty(result)
+        assert result["success"]
+        assert result["confirmation_id"] == "CONF-12345"
+        booking_service.cancel.assert_called_once_with(
+            confirmation_id="CONF-12345",
+            reason="Change of plans",
+        )
 
-async def test_cancel_inspection_not_found():
-    print_header("cancel_inspection — not found")
-    booking_service = make_booking_service(
-        raise_error=BookingValidationError("Booking CONF-99999 not found")
-    )
-    result = await cancel_inspection.ainvoke({
-        "confirmation_id": "CONF-99999",
-        "booking_service": booking_service,
-    })
-    pretty(result)
-    assert not result["success"], "Expected failure"
-    print("  ✓ cancel_inspection not found handled")
+    async def test_no_reason(self):
+        booking_service = make_booking_service()
+        result = await cancel_inspection.ainvoke({
+            "confirmation_id": "CONF-12345",
+            "booking_service": booking_service,
+        })
+        pretty(result)
+        assert result["success"]
+        booking_service.cancel.assert_called_once_with(
+            confirmation_id="CONF-12345",
+        )
 
-
-# ── Router ─────────────────────────────────────────────────────────────────────
-
-TESTS = {
-    "check_availability":            test_check_availability_success,
-    "check_availability_no_slots":   test_check_availability_no_slots,
-    "check_availability_error":      test_check_availability_service_error,
-    "book_inspection":               test_book_inspection_success,
-    "book_inspection_validation":    test_book_inspection_validation_error,
-    "book_inspection_error":         test_book_inspection_service_error,
-    "cancel_inspection":             test_cancel_inspection_success,
-    "cancel_inspection_no_reason":   test_cancel_inspection_no_reason,
-    "cancel_inspection_not_found":   test_cancel_inspection_not_found,
-}
-
-
-async def run_all():
-    passed = 0
-    failed = 0
-
-    for name, fn in TESTS.items():
-        try:
-            await fn()
-            passed += 1
-        except Exception as e:
-            print(f"  ✗ {name} FAILED: {e}")
-            failed += 1
-
-    print(f"\n── Results: {passed}/{len(TESTS)} passed", end="")
-    if failed:
-        print(f" | {failed} FAILED ✗")
-    else:
-        print(" ✓")
-
-
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        asyncio.run(run_all())
-    else:
-        name = sys.argv[1]
-        if name not in TESTS:
-            print(f"Unknown test: {name}")
-            print(f"Available: {', '.join(TESTS)}")
-            sys.exit(1)
-        asyncio.run(TESTS[name]())
+    async def test_not_found(self):
+        booking_service = make_booking_service(
+            raise_error=BookingValidationError("Booking CONF-99999 not found")
+        )
+        result = await cancel_inspection.ainvoke({
+            "confirmation_id": "CONF-99999",
+            "booking_service": booking_service,
+        })
+        pretty(result)
+        assert not result["success"]
+        booking_service.cancel.assert_called_once_with(
+            confirmation_id="CONF-99999",
+        )

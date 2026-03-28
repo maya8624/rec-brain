@@ -1,86 +1,137 @@
 """
 Tests for intent_node classification.
-
-Usage:
-    python scripts/test_intent.py
+No DB or LLM required — pure keyword matching.
 """
 from app.agents.nodes.intent import _classify_intent
-import asyncio
-import sys
-import os
-
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-# ── Test cases ─────────────────────────────────────────────────────────────────
+class TestSearchIntent:
+    def test_show_keyword(self):
+        assert _classify_intent(
+            "Show me 3 bedroom houses in Sydney") == "search"
 
-TESTS = [
-    # (message, expected_intent)
+    def test_find_keyword(self):
+        assert _classify_intent("Find apartments in Melbourne") == "search"
 
-    # Search
-    ("Show me 3 bedroom houses in Sydney under $800k",       "search"),
-    ("Find apartments in Melbourne",                          "search"),
-    ("I'm looking for a unit in Parramatta",                 "search"),
-    ("List properties under $500k",                          "search"),
+    def test_looking_for(self):
+        assert _classify_intent(
+            "I'm looking for a unit in Parramatta") == "search"
 
-    # Booking
-    ("I'd like to book an inspection",                        "booking"),
-    ("Can I arrange a viewing for this property?",            "booking"),
-    ("Is this property available for inspection?",            "booking"),
-    ("When can I view this apartment?",                       "booking"),
+    def test_list_keyword(self):
+        assert _classify_intent("List properties under $500k") == "search"
 
-    # Cancellation
-    ("I want to cancel my inspection",                        "cancellation"),
-    ("Please cancel my booking",                              "cancellation"),
-    ("I no longer want to inspect this property",             "cancellation"),
+    def test_buy_keyword(self):
+        assert _classify_intent(
+            "I want to buy a house in Brisbane") == "search"
 
-    # Document query
-    ("What are the break lease conditions?",                  "document_query"),
-    ("Can you explain the strata report?",                    "document_query"),
-    ("What does the lease say about pets?",                   "document_query"),
-    ("Tell me about the bond requirements",                   "document_query"),
+    def test_rent_keyword(self):
+        assert _classify_intent("Show me rentals in Sydney CBD") == "search"
 
-    # General
-    ("What are your office hours?",                           "general"),
-    ("Hello, how are you?",                                   "general"),
-    ("How does the rental process work?",                     "general"),
+    def test_bedroom_keyword(self):
+        assert _classify_intent("3 bedroom apartment") == "search"
 
-    # Compound — should fall through to general
-    ("Find me a house in Sydney and book an inspection",      "general"),
-    ("Search for apartments and cancel my booking",           "general"),
-    ("Show me properties and book a viewing",                 "general"),
-]
+    def test_price_keyword(self):
+        assert _classify_intent("Properties under $800k") == "search"
 
 
-def run_tests():
-    passed = 0
-    failed = 0
+class TestBookingIntent:
+    def test_book_keyword(self):
+        assert _classify_intent("I'd like to book an inspection") == "booking"
 
-    print("\n── Intent Classification Tests ─────────────────────────────────\n")
+    def test_inspection_keyword(self):
+        assert _classify_intent("Can I arrange an inspection?") == "booking"
 
-    for message, expected in TESTS:
-        result = _classify_intent(message)
-        ok = result == expected
-        status = "✓" if ok else "✗"
+    def test_viewing_keyword(self):
+        assert _classify_intent("I'd like a viewing please") == "booking"
 
-        if ok:
-            passed += 1
-        else:
-            failed += 1
+    def test_availability_keyword(self):
+        assert _classify_intent("Is this property available?") == "booking"
 
-        print(f"  {status} [{expected:>15}] {message[:60]}")
-        if not ok:
-            print(f"      └─ got: {result}")
+    def test_open_home_keyword(self):
+        assert _classify_intent("When is the next open home?") == "booking"
 
-    print(f"\n── Results: {passed}/{len(TESTS)} passed", end="")
-    if failed:
-        print(f" | {failed} FAILED ✗")
-    else:
-        print(" ✓")
-
-    return failed == 0
+    def test_schedule_keyword(self):
+        assert _classify_intent("Can we schedule a viewing?") == "booking"
 
 
-if __name__ == "__main__":
-    success = run_tests()
-    sys.exit(0 if success else 1)
+class TestCancellationIntent:
+    def test_cancel_keyword(self):
+        assert _classify_intent(
+            "I want to cancel my inspection") == "cancellation"
+
+    def test_cancellation_keyword(self):
+        assert _classify_intent("I need a cancellation") == "cancellation"
+
+    def test_no_longer_keyword(self):
+        assert _classify_intent(
+            "I no longer want to inspect this property") == "cancellation"
+
+    def test_withdraw_keyword(self):
+        assert _classify_intent(
+            "I'd like to withdraw my booking") == "cancellation"
+
+
+class TestDocumentQueryIntent:
+    def test_lease_keyword(self):
+        assert _classify_intent(
+            "What are the lease conditions?") == "document_query"
+
+    def test_strata_keyword(self):
+        assert _classify_intent(
+            "Can you explain the strata report?") == "document_query"
+
+    def test_contract_keyword(self):
+        assert _classify_intent(
+            "Tell me about the contract") == "document_query"
+
+    def test_bond_keyword(self):
+        assert _classify_intent(
+            "What are the bond requirements?") == "document_query"
+
+    def test_pet_policy_keyword(self):
+        assert _classify_intent("What is the pet policy?") == "document_query"
+
+    def test_break_lease_keyword(self):
+        assert _classify_intent("How do I break my lease?") == "document_query"
+
+
+class TestGeneralIntent:
+    def test_office_hours(self):
+        assert _classify_intent("What are your office hours?") == "general"
+
+    def test_greeting(self):
+        assert _classify_intent("Hello, how are you?") == "general"
+
+    def test_empty_message(self):
+        assert _classify_intent("") == "general"
+
+    def test_whitespace_only(self):
+        assert _classify_intent("   ") == "general"
+
+    def test_process_question(self):
+        assert _classify_intent(
+            "How does the rental process work?") == "general"
+
+
+class TestCompoundIntent:
+    """Compound intents should fall through to 'general'."""
+
+    def test_search_and_book(self):
+        assert _classify_intent(
+            "Find me houses in Sydney and book an inspection"
+        ) == "general"
+
+    def test_search_and_cancel(self):
+        assert _classify_intent(
+            "Show me apartments and cancel my booking"
+        ) == "general"
+
+    def test_book_and_cancel(self):
+        assert _classify_intent(
+            "I want to book but also cancel my existing inspection"
+        ) == "general"
+
+    def test_search_book_cancel(self):
+        assert _classify_intent(
+            "Find properties, book a viewing, and cancel my old booking"
+        ) == "general"

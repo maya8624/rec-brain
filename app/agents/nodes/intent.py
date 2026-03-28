@@ -16,6 +16,7 @@ Compound intents (e.g. search + booking) → "general"
 """
 
 import logging
+import re
 from typing import Any
 from langchain_core.messages import HumanMessage
 from app.agents.state import RealEstateAgentState, UserIntent
@@ -28,7 +29,7 @@ _INTENT_KEYWORDS: dict[UserIntent, frozenset[str]] = {
         "no longer", "don't want", "remove booking",
     ]),
     "booking": frozenset([
-        "book", "inspect", "inspection", "viewing", "view",
+        "book", "viewing", "view the property",
         "schedule", "arrange", "available", "availability",
         "when can i", "open for inspection", "open home",
     ]),
@@ -42,7 +43,7 @@ _INTENT_KEYWORDS: dict[UserIntent, frozenset[str]] = {
         "find", "search", "show", "list", "looking for",
         "properties", "house", "apartment", "unit", "townhouse",
         "bedroom", "bathroom", "suburb", "price", "budget",
-        "under", "rent", "buy", "purchase",
+        "under", "rent for", "for rent", "to rent", "buy", "purchase",
     ]),
 }
 
@@ -64,15 +65,21 @@ async def intent_node(state: RealEstateAgentState) -> dict[str, Any]:
         message,
     )
 
+    # Compound intent — set early_response so router goes straight to END
+    if intent == "general" and _is_compound(message):
+        return {
+            "user_intent": "general",
+            "early_response": "I can only handle one request at a time. "
+                              "Would you like to search for properties, or book an inspection?"
+        }
+
     return {"user_intent": intent}
 
 
 def _classify_intent(message: str) -> UserIntent:
     """
     Keyword-based intent classification. Zero LLM cost.
-
-    If multiple compound intents match (e.g. search + booking),
-    falls through to "general" so LLM can ask user to clarify.
+    Returns a plain string intent — never a dict.
     """
     if not message:
         return "general"
@@ -82,7 +89,7 @@ def _classify_intent(message: str) -> UserIntent:
     matched_intents = [
         intent
         for intent, keywords in _INTENT_KEYWORDS.items()
-        if any(keyword in msg_lower for keyword in keywords)
+        if _matches_keywords(msg_lower, keywords)
     ]
 
     compound_matches = [i for i in matched_intents if i in _COMPOUND_INTENTS]
@@ -90,20 +97,14 @@ def _classify_intent(message: str) -> UserIntent:
         logger.debug(
             "_classify_intent | compound=%s → general", compound_matches
         )
-
-        return {
-            "user_intent": "general",
-            "early_response": "I can only do one thing at a time. "
-                              "Would you like me to check availability first, or search for properties?"
-        }
+        return "general"  # ← plain string, early_response handled in intent_node
 
     if matched_intents:
         intent = matched_intents[0]
         logger.debug("_classify_intent | '%.40s' → %s", message, intent)
+        return intent  # ← plain string
 
-        return {"user_intent": intent}
-
-    return {"user_intent": "general"}
+    return "general"  # ← plain string
 
 
 def _get_last_human_message(state: RealEstateAgentState) -> str:
@@ -113,3 +114,24 @@ def _get_last_human_message(state: RealEstateAgentState) -> str:
             return message.content if isinstance(message.content, str) else ""
 
     return ""
+
+
+def _is_compound(message: str) -> bool:
+    """Returns True if multiple compound intents match the message."""
+    msg_lower = message.lower()
+    compound_matches = [
+        intent for intent in _COMPOUND_INTENTS
+        if _matches_keywords(msg_lower, _INTENT_KEYWORDS[intent])
+    ]
+    return len(compound_matches) > 1
+
+
+def _matches_keywords(msg_lower: str, keywords: frozenset[str]) -> bool:
+    """
+    Match keywords as whole words/phrases using word boundary matching.
+    Prevents substring false positives e.g. "rent" matching "rental".
+    """
+    for keyword in keywords:
+        if re.search(rf'\b{re.escape(keyword)}\b', msg_lower):
+            return True
+    return False

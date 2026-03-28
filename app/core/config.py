@@ -65,7 +65,7 @@ class Settings(BaseSettings):
     )
 
     # ── Database (PostgreSQL + pgvector) ──────────────────────────────────────
-    DATABASE_URL: str = Field(
+    POSTGRES_URL: str = Field(
         ...,
         description="PostgreSQL connection string — used by SQL agent and app",
     )
