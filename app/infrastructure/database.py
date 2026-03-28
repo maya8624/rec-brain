@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 # Engine with optimized pooling for a production-ready AI Service
 engine = create_engine(
-    settings.DATABASE_URL,
+    settings.POSTGRES_URL,
     pool_pre_ping=True,  # Checks connection health before use
     pool_size=10,        # Persistent connections
     max_overflow=20,     # Temporary extra connections

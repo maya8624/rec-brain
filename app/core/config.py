@@ -65,23 +65,6 @@ class Settings(BaseSettings):
         ...,
         description="PostgreSQL connection string — used by SQL agent and app",
     )
-    # Read-only connection for SQL agent — never write access
-    # If not set, falls back to DATABASE_URL via effective_ai_database_url
-    # Production: create a read-only PostgreSQL user and set this
-    AI_DATABASE_URL: str = Field(
-        "",
-        description="Read-only DB URL for SQL agent. Falls back to DATABASE_URL.",
-    )
-
-    # ── Vector search ────────────────────────────────────────────────────────
-    # CURRENT:  ChromaDB (local file-based)
-    # FUTURE:   pgvector (inside your existing PostgreSQL — no extra service)
-    # Migration: swap VECTOR_STORE from chroma -> pgvector in .env
-    #            rag_service.py checks this value to pick the store
-    VECTOR_STORE: str = Field(
-        "chroma",
-        description="Vector store backend: chroma | pgvector",
-    )
 
     # ChromaDB — current
     CHROMA_PATH: str = Field(
@@ -89,23 +72,12 @@ class Settings(BaseSettings):
         description="Local path to ChromaDB storage directory",
     )
 
-    # pgvector — ready for when you migrate
-    # No extra config needed — uses DATABASE_URL + pgvector extension
-    # Enable with: VECTOR_STORE=pgvector in .env
-    PGVECTOR_TABLE: str = Field(
-        "property_embeddings",
-        description="PostgreSQL table name for pgvector embeddings",
-    )
-    PGVECTOR_EMBED_DIM: int = Field(
-        384,
-        description="Embedding dimensions — must match your embedding model",
-    )
-
     # Shared by both Chroma and pgvector
     SIMILARITY_THRESHOLD: float = Field(
         0.7,
         description="Minimum similarity score for RAG retrieval (0.0 - 1.0)",
     )
+
     EMBEDDING_MODEL: str = Field(
         "sentence-transformers/all-MiniLM-L6-v2",
         description="HuggingFace embedding model — used if OPENAI_API_KEY not set",
@@ -114,7 +86,6 @@ class Settings(BaseSettings):
     # ------------------------------------
     # .NET Backend
     # ------------------------------------
-
     BACKEND_BASE_URL: str = Field(
         "http://localhost:5000",
         description="Base URL of the .NET API",
