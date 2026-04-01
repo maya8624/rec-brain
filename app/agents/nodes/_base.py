@@ -44,20 +44,18 @@ def resolve_app_service(
     Looks up ``request.app.state.<attr>`` from the configurable context.
     Returns None and logs an error rather than raising, so callers can
     decide how to handle the missing service.
-
-    Args:
-        config: LangGraph RunnableConfig carrying the FastAPI request.
-        attr:   Name of the attribute on app.state (e.g. "sql_view_service").
-        caller: Node name used in the log message for traceability.
     """
     try:
         request = config.get("configurable", {}).get("request")
         if request is None:
             raise ValueError("no 'request' key in configurable")
+
         service = getattr(request.app.state, attr, None)
         if service is None:
             raise ValueError(f"app.state.{attr} is not set")
+
         return service
+
     except Exception as exc:
         logger.error("%s | could not resolve %s: %s", caller, attr, exc)
         return None

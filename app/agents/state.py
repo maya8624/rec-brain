@@ -125,10 +125,7 @@ class SearchContext(TypedDict, total=False):
 class RealEstateAgentState(TypedDict):
     """
     Complete state for one conversation thread with the real estate agent.
-
     Persisted across turns by LangGraph checkpointer:
-        Development:  MemorySaver (in-memory, lost on restart)
-        Production:   PostgresSaver (persisted to PostgreSQL)
     """
 
     # ── Conversation history ──────────────────────────────────────────────────

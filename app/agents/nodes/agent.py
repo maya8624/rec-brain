@@ -29,11 +29,17 @@ from app.tools import get_all_tools
 
 logger = logging.getLogger(__name__)
 
-_LLM_WITH_TOOLS = get_llm().bind_tools(get_all_tools())
-_LLM_PLAIN = get_llm()
-
 # Only these intents need tool calling
 _TOOL_INTENTS = frozenset(["booking", "cancellation"])
+_MAX_HISTORY = 10
+
+
+def _get_plain_llm():
+    return get_llm()
+
+
+def _get_tool_llm():
+    return get_llm().bind_tools(get_all_tools())
 
 
 async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
@@ -49,11 +55,12 @@ async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
         - any second call after tool results are back
     """
     needs_tools = _needs_tools(state)
-    llm = _LLM_WITH_TOOLS if needs_tools else _LLM_PLAIN
+    llm = _get_tool_llm() if needs_tools else _get_plain_llm()
 
+    # TODO: optimize by sending only relevant subset based on call type
     messages = [
         SystemMessage(content=REAL_ESTATE_AGENT_SYSTEM),
-        *state["messages"],
+        *state["messages"][-_MAX_HISTORY:],
     ]
 
     logger.info(
@@ -85,8 +92,7 @@ def _needs_tools(state: RealEstateAgentState) -> bool:
     if intent not in _TOOL_INTENTS:
         return False
 
-    # Check we're on the first call — last message should be HumanMessage
-    for msg in reversed(state["messages"]):
-        return isinstance(msg, HumanMessage)
+    if not state["messages"]:
+        return False
 
-    return False
+    return isinstance(state["messages"][-1], HumanMessage)

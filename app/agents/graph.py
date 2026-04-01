@@ -24,22 +24,21 @@ Graph topology:
       └──► END (early_response — compound intent)
 
 TODO:
-    - human_escalation_node: add AIMessage before END when requires_human=True
-    - multi-step tool calling for compound intents
-TODO:
 - [ ] human_escalation_node — add AIMessage before END when requires_human=True
+- [ ] multi-step tool calling for compound intents
 - [ ] Agency info storage — office hours, processes, policies
       Options: vector store (document_query intent) or dedicated DB node
       Leaning towards vector store — add keywords to document_query intent
 """
 import logging
-import os
 
+from langgraph.checkpoint.postgres import PostgresSaver
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, StateGraph
+from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode
-
 from app.core.constants import Node
+from app.core.config import settings
 from app.agents.nodes.agent import agent_node
 from app.agents.nodes.context import context_update_node
 from app.agents.nodes.hybrid import hybrid_search_node
@@ -61,9 +60,17 @@ from app.tools import get_all_tools
 logger = logging.getLogger(__name__)
 
 
-def build_graph():
+def build_graph() -> CompiledStateGraph:
+    '''
+    Constructs the StateGraph with nodes and edges.
+    Called once at app startup to create the compiled graph.
+    '''
     tools = get_all_tools()
     tool_node = ToolNode(tools)
+
+    # ------------------------
+    # Create a graph with RealEstateAgentState as the state type
+    # ------------------------
     graph = StateGraph(RealEstateAgentState)
 
     # ------------------------
@@ -166,7 +173,7 @@ def build_graph():
         path_map={Node.AGENT: Node.AGENT, Node.END: END},
     )
 
-    checkpointer = _get_checkpointer()
+    checkpointer = _build_postgres_checkpointer()
     compiled = graph.compile(checkpointer=checkpointer)
 
     logger.info(
@@ -178,31 +185,13 @@ def build_graph():
     return compiled
 
 
-def _get_checkpointer():
-    env = os.getenv("ENVIRONMENT", "development")
-    if env == "production":
-        return _build_postgres_checkpointer()
-
-    logger.info("Using InMemorySaver (development)")
-    return InMemorySaver()
-
-
 def _build_postgres_checkpointer():
     try:
-        from langgraph.checkpoint.postgres import PostgresSaver
-        from app.core.config import settings
-
-        logger.info("Using PostgresSaver (production)")
-        checkpointer = PostgresSaver.from_conn_string(settings.DATABASE_URL)
-        checkpointer.setup()
+        checkpointer = PostgresSaver.from_conn_string(settings.POSTGRES_URL)
+        logger.info("PostgresSaver ready (production)")
         return checkpointer
 
-    except ImportError:
-        logger.error(
-            "PostgresSaver not available — falling back to MemorySaver")  # no exc ref needed
-        return InMemorySaver()
-
     except Exception as exc:
-        logger.error(
-            "PostgresSaver failed: %s — falling back to MemorySaver", exc)
+        logger.critical(
+            "PostgresSaver failed: %s — falling back to InMemorySaver (state will NOT persist)", exc)
         return InMemorySaver()
