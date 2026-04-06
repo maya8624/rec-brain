@@ -13,8 +13,10 @@ Flow:
 import logging
 import re
 
+from sqlalchemy import text
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from app.infrastructure.database import engine
 from app.prompts.sql import SQL_GENERATION_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -34,8 +36,7 @@ class SqlViewService:
     LLM generates the query — we validate and run it.
     """
 
-    def __init__(self, db, llm) -> None:
-        self._db = db
+    def __init__(self, llm) -> None:
         self._llm = llm
 
     async def search_listings(self, question: str) -> dict:
@@ -48,8 +49,11 @@ class SqlViewService:
 
             self._validate_sql(sql)
 
-            rows = self._db.run(sql)
-            result_count = len(rows) if isinstance(rows, list) else 0
+            with engine.connect() as conn:
+                result = conn.execute(text(sql))
+                rows = [dict(row._mapping) for row in result]
+
+            result_count = len(rows)
 
             logger.info("SqlViewService | complete | count=%d", result_count)
 
@@ -84,6 +88,7 @@ class SqlViewService:
             SystemMessage(content=SQL_GENERATION_PROMPT),
             HumanMessage(content=question),
         ]
+
         response = await self._llm.ainvoke(messages)
         sql = response.content.strip()
 

@@ -60,8 +60,11 @@ class BackendClient:
             },
             timeout=httpx.Timeout(10.0, connect=5.0),
         )
-        logger.info("BackendClient initialized",
-                    base_url=settings.BACKEND_BASE_URL)
+
+        logger.info(
+            "BackendClient initialized",
+            base_url=settings.BACKEND_BASE_URL
+        )
 
     async def close(self) -> None:
         if self._client:

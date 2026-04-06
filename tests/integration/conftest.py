@@ -35,6 +35,6 @@ async def client(app):
     """Async HTTP test client wired directly to the FastAPI app (no TCP)."""
     async with AsyncClient(
         transport=ASGITransport(app=app),
-        base_url="http://testserver",
+        base_url="http://127.0.0.1:8000:",
     ) as c:
         yield c

@@ -28,8 +28,10 @@ class BookingRequest(BaseModel):
             dt = datetime.strptime(value, DATETIME_FORMAT)
         except ValueError:
             raise ValueError(f"Expected YYYY-MM-DD HH:MM, got '{value}'")
+
         if dt <= datetime.now():
             raise ValueError("Inspection datetime must be in the future")
+
         return value
 
 

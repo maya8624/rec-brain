@@ -2,19 +2,17 @@
 Unit tests for vector_search_node.
 Uses make_rag_retriever and make_config fixtures from tests/conftest.py.
 """
-import pytest
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.agents.nodes.vector import vector_search_node
 from tests.conftest import parsed
 
 
-# ── Success paths ──────────────────────────────────────────────────────────────
-
 class TestVectorSearchSuccess:
     async def test_returns_system_message(self, make_rag_retriever, make_config):
         result = await vector_search_node(
-            {"messages": [HumanMessage(content="What are the lease conditions?")]},
+            {"messages": [HumanMessage(
+                content="What are the lease conditions?")]},
             make_config(rag_retriever=make_rag_retriever()),
         )
         assert "messages" in result
@@ -23,7 +21,8 @@ class TestVectorSearchSuccess:
 
     async def test_result_structure(self, make_rag_retriever, make_config):
         result = await vector_search_node(
-            {"messages": [HumanMessage(content="What are the lease conditions?")]},
+            {"messages": [HumanMessage(
+                content="What are the lease conditions?")]},
             make_config(rag_retriever=make_rag_retriever()),
         )
         content = parsed(result)
@@ -109,7 +108,8 @@ class TestVectorSearchGuards:
         assert result == {}
 
     async def test_retrieve_exception_returns_empty(self, make_rag_retriever, make_config):
-        rag = make_rag_retriever(raise_error=RuntimeError("pgvector connection lost"))
+        rag = make_rag_retriever(
+            raise_error=RuntimeError("pgvector connection lost"))
         result = await vector_search_node(
             {"messages": [HumanMessage(content="lease?")]},
             make_config(rag_retriever=rag),

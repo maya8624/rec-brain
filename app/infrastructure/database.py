@@ -17,7 +17,7 @@ engine = create_engine(
 )
 
 # Define the tables  Real Estate agent is allowed to 'see'
-# TODO: change to views for better security and to simplify schema for LLM
+# TODO: change to view only for better security and to simplify schema for LLM
 ALLOWED_TABLES = [
     TableNames.AGENCIES,
     TableNames.AGENTS,

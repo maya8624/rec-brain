@@ -20,6 +20,7 @@ Three roles depending on intent:
 import logging
 from typing import Any
 
+from groq import APIStatusError, RateLimitError
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.agents.state import RealEstateAgentState
@@ -71,7 +72,14 @@ async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
         state.get("error_count", 0),
     )
 
-    response = await llm.ainvoke(messages)
+    try:
+        response = await llm.ainvoke(messages)
+    except RateLimitError as exc:
+        logger.error("agent_node | Groq rate limit hit: %s", exc)
+        raise
+    except APIStatusError as exc:
+        logger.error("agent_node | Groq API error %s: %s", exc.status_code, exc.message)
+        raise
 
     if hasattr(response, "tool_calls") and response.tool_calls:
         logger.info(

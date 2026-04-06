@@ -91,8 +91,8 @@ V_LISTINGS COLUMNS:
     title             — text
     address_line1     — text
     address_line2     — text
-    suburb            — text
-    state             — text: 'NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'ACT', 'NT'
+    suburb            — text: local area or neighbourhood name (e.g. 'Sydney', 'Parramatta', 'Chatswood', 'Bondi')
+    state             — text: Australian state/territory abbreviation only — valid values: NSW, VIC, QLD, WA, SA, TAS, ACT, NT
     postcode          — text
     agent_first_name  — text
     agent_last_name   — text
@@ -109,12 +109,39 @@ RULES:
 5. NEVER query any table other than v_listings
 6. NEVER use INSERT, UPDATE, DELETE, DROP, CREATE, ALTER, TRUNCATE
 7. Use ILIKE '%value%' for text searches (suburb, property_type, agent name)
+   — suburb is a local area or neighbourhood name, NOT a state abbreviation
 8. Use numeric comparisons for price and bedrooms (price <= 800000)
 9. Convert price shorthands: "$800k" → 800000, "$1.2m" → 1200000
-10. State can be full name or abbreviation — use ILIKE for both:
-    (state ILIKE '%New South Wales%' OR state ILIKE '%NSW%')
+10. LOCATION RULES — critical:
+    - suburb column: local area or neighbourhood (e.g. 'Sydney', 'Parramatta', 'Chatswood', 'Bondi')
+    - state column: Australian state/territory only — valid values: NSW, VIC, QLD, WA, SA, TAS, ACT, NT
+    - If the location is a city, suburb, or neighbourhood → use suburb column
+    - If the location is a state or territory name → use state column
+    - Full state names map to abbreviations: 'New South Wales' → NSW, 'Victoria' → VIC,
+      'Queensland' → QLD, 'Western Australia' → WA, 'South Australia' → SA,
+      'Tasmania' → TAS, 'Australian Capital Territory' → ACT, 'Northern Territory' → NT
+    - NEVER filter the state column with a suburb or city name
 
-EXAMPLE:
+EXAMPLES:
+
+User: "Show me properties in Sydney"
+SQL: SELECT listing_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, address_line1, address_line2, suburb, state, postcode, agent_first_name, agent_last_name, agent_phone, agency_name FROM v_listings WHERE is_published = true AND is_active = true AND suburb ILIKE '%Sydney%' ORDER BY price ASC LIMIT 10
+
+User: "Show me properties in Queensland"
+SQL: SELECT listing_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, address_line1, address_line2, suburb, state, postcode, agent_first_name, agent_last_name, agent_phone, agency_name FROM v_listings WHERE is_published = true AND is_active = true AND (state ILIKE '%QLD%' OR state ILIKE '%Queensland%') ORDER BY price ASC LIMIT 10
+
+User: "Show me properties in Parramatta NSW"
+SQL: SELECT listing_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, address_line1, address_line2, suburb, state, postcode, agent_first_name, agent_last_name, agent_phone, agency_name FROM v_listings WHERE is_published = true AND is_active = true AND suburb ILIKE '%Parramatta%' AND state = 'NSW' ORDER BY price ASC LIMIT 10
+
 User: "Show me 3 bedroom houses in Parramatta under $800k"
-Output: SELECT listing_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, address_line1, address_line2, suburb, state, postcode, agent_first_name, agent_last_name, agent_phone, agency_name FROM v_listings WHERE is_published = true AND is_active = true AND bedrooms = 3 AND property_type ILIKE '%House%' AND suburb ILIKE '%Parramatta%' AND price <= 800000 ORDER BY price ASC LIMIT 10
+SQL: SELECT listing_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, address_line1, address_line2, suburb, state, postcode, agent_first_name, agent_last_name, agent_phone, agency_name FROM v_listings WHERE is_published = true AND is_active = true AND bedrooms = 3 AND property_type ILIKE '%House%' AND suburb ILIKE '%Parramatta%' AND price <= 800000 ORDER BY price ASC LIMIT 10
+
+User: "Rental apartments in Parramatta under $600 per week"
+SQL: SELECT listing_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, address_line1, address_line2, suburb, state, postcode, agent_first_name, agent_last_name, agent_phone, agency_name FROM v_listings WHERE is_published = true AND is_active = true AND listing_type = 'Rent' AND property_type ILIKE '%Apartment%' AND suburb ILIKE '%Parramatta%' AND price <= 600 ORDER BY price ASC LIMIT 10
+
+User: "Houses between $500k and $1.2m in Sydney"
+SQL: SELECT listing_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, address_line1, address_line2, suburb, state, postcode, agent_first_name, agent_last_name, agent_phone, agency_name FROM v_listings WHERE is_published = true AND is_active = true AND property_type ILIKE '%House%' AND suburb ILIKE '%Sydney%' AND price BETWEEN 500000 AND 1200000 ORDER BY price ASC LIMIT 10
+
+User: "Show me 3 bedroom townhouses in Parramatta NSW for sale under $900k"
+SQL: SELECT listing_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, address_line1, address_line2, suburb, state, postcode, agent_first_name, agent_last_name, agent_phone, agency_name FROM v_listings WHERE is_published = true AND is_active = true AND listing_type = 'Sale' AND bedrooms = 3 AND property_type ILIKE '%Townhouse%' AND suburb ILIKE '%Parramatta%' AND state = 'NSW' AND price <= 900000 ORDER BY price ASC LIMIT 10
 """

@@ -1,22 +1,19 @@
 """
 Live integration tests for SqlViewService.
-
 Hits a real Groq LLM and real PostgreSQL — requires a configured .env.
-Skip with: pytest -m unit
-Run with:  pytest -m integration
 """
 import pytest
 from tests.integration.conftest import skip_if_no_env
+
+from app.services.sql_service import SqlViewService
+from app.infrastructure.llm import get_llm
 
 pytestmark = [pytest.mark.integration, skip_if_no_env]
 
 
 @pytest.fixture(scope="module")
 def service():
-    from app.services.sql_service import SqlViewService
-    from app.infrastructure.database import get_db
-    from app.infrastructure.llm import get_llm
-    return SqlViewService(llm=get_llm(), db=get_db())
+    return SqlViewService(llm=get_llm())
 
 
 class TestSearchLive:

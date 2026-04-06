@@ -5,7 +5,7 @@ All LLM calls and DB calls are mocked so no Groq API or PostgreSQL needed.
 _validate_sql is a static method tested directly as a pure function.
 """
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.services.sql_service import SqlValidationError, SqlViewService
 
@@ -14,20 +14,25 @@ from app.services.sql_service import SqlValidationError, SqlViewService
 
 def make_service(llm_response: str = "SELECT * FROM v_listings", db_rows: list | None = None):
     """
-    Factory for SqlViewService with mocked LLM and DB.
+    Factory for SqlViewService with mocked LLM and engine.
 
     llm_response: the raw string the mock LLM returns
-    db_rows:      list of rows mock DB returns (defaults to one row)
+    db_rows:      list of row dicts mock DB returns (defaults to one row)
     """
     mock_llm = AsyncMock()
     mock_llm.ainvoke.return_value = MagicMock(content=llm_response)
 
-    mock_db = MagicMock()
-    mock_db.run.return_value = db_rows if db_rows is not None else [
+    default_rows = db_rows if db_rows is not None else [
         {"address": "1 Test St, Sydney", "price": 750_000, "bedrooms": 3}
     ]
+    mock_rows = [MagicMock(_mapping=row) for row in default_rows]
 
-    return SqlViewService(db=mock_db, llm=mock_llm), mock_llm, mock_db
+    mock_conn = MagicMock()
+    mock_conn.execute.return_value = mock_rows
+    mock_conn.__enter__ = MagicMock(return_value=mock_conn)
+    mock_conn.__exit__ = MagicMock(return_value=False)
+
+    return SqlViewService(llm=mock_llm), mock_llm, mock_conn
 
 
 # ── _validate_sql ──────────────────────────────────────────────────────────────
@@ -78,9 +83,7 @@ class TestGenerateSql:
         assert sql == "SELECT * FROM v_listings"
 
     async def test_strips_markdown_code_fence(self):
-        svc, _, _ = make_service(
-            llm_response="```sql\nSELECT * FROM v_listings\n```"
-        )
+        svc, _, _ = make_service(llm_response="```sql\nSELECT * FROM v_listings\n```")
         sql = await svc._generate_sql("houses in Sydney")
         assert "```" not in sql
         assert "SELECT" in sql
@@ -96,46 +99,54 @@ class TestGenerateSql:
 
 # ── search_listings ────────────────────────────────────────────────────────────
 
+@patch("app.services.sql_service.engine")
 class TestSearchListings:
-    async def test_success_returns_result_dict(self):
-        svc, _, _ = make_service()
+    async def test_success_returns_result_dict(self, mock_engine):
+        svc, _, mock_conn = make_service()
+        mock_engine.connect.return_value = mock_conn
         result = await svc.search_listings("Show me houses in Sydney")
         assert result["success"] is True
         assert result["result_count"] == 1
         assert result["output"] is not None
 
-    async def test_result_count_matches_db_rows(self):
+    async def test_result_count_matches_db_rows(self, mock_engine):
         rows = [{"address": f"{i} St"} for i in range(5)]
-        svc, _, _ = make_service(db_rows=rows)
+        svc, _, mock_conn = make_service(db_rows=rows)
+        mock_engine.connect.return_value = mock_conn
         result = await svc.search_listings("houses")
         assert result["result_count"] == 5
 
-    async def test_sql_used_is_returned(self):
-        svc, _, _ = make_service(llm_response="SELECT * FROM v_listings")
+    async def test_sql_used_is_returned(self, mock_engine):
+        svc, _, mock_conn = make_service(llm_response="SELECT * FROM v_listings")
+        mock_engine.connect.return_value = mock_conn
         result = await svc.search_listings("houses")
         assert result["sql_used"] == "SELECT * FROM v_listings"
 
-    async def test_validation_error_returns_success_false(self):
+    async def test_validation_error_returns_success_false(self, mock_engine):
         """LLM returns a non-SELECT query → validation fails → success=False, no crash."""
-        svc, _, _ = make_service(llm_response="DELETE FROM v_listings")
+        svc, _, mock_conn = make_service(llm_response="DELETE FROM v_listings")
+        mock_engine.connect.return_value = mock_conn
         result = await svc.search_listings("delete everything")
         assert result["success"] is False
         assert result["output"] is None
 
-    async def test_db_exception_returns_success_false(self):
-        svc, mock_llm, mock_db = make_service()
-        mock_db.run.side_effect = RuntimeError("connection timeout")
+    async def test_db_exception_returns_success_false(self, mock_engine):
+        svc, _, mock_conn = make_service()
+        mock_conn.execute.side_effect = RuntimeError("connection timeout")
+        mock_engine.connect.return_value = mock_conn
         result = await svc.search_listings("houses in Sydney")
         assert result["success"] is False
 
-    async def test_llm_exception_returns_success_false(self):
-        svc, mock_llm, _ = make_service()
+    async def test_llm_exception_returns_success_false(self, mock_engine):
+        svc, mock_llm, mock_conn = make_service()
         mock_llm.ainvoke.side_effect = RuntimeError("Groq API unreachable")
+        mock_engine.connect.return_value = mock_conn
         result = await svc.search_listings("houses")
         assert result["success"] is False
 
-    async def test_empty_result_returns_zero_count(self):
-        svc, _, _ = make_service(db_rows=[])
+    async def test_empty_result_returns_zero_count(self, mock_engine):
+        svc, _, mock_conn = make_service(db_rows=[])
+        mock_engine.connect.return_value = mock_conn
         result = await svc.search_listings("10 bedroom mansion under $10k")
         assert result["success"] is True
         assert result["result_count"] == 0

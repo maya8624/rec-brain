@@ -7,12 +7,10 @@ All factories follow the "fixture-as-factory" pattern:
 """
 import json
 
+from unittest.mock import AsyncMock, MagicMock
 import pytest
 from langchain_core.messages import HumanMessage
-from unittest.mock import AsyncMock, MagicMock
 
-
-# ── Vector / RAG factories ─────────────────────────────────────────────────────
 
 @pytest.fixture
 def make_node():
@@ -57,7 +55,8 @@ def make_sql_service():
             mock.search_listings.return_value = result or {
                 "success": True,
                 "output": [
-                    {"address": "12 Park Ave, Sydney", "price": 750_000, "bedrooms": 3},
+                    {"address": "12 Park Ave, Sydney",
+                        "price": 750_000, "bedrooms": 3},
                 ],
                 "result_count": 1,
                 "sql_used": "SELECT * FROM v_listings WHERE suburb = 'Sydney'",
@@ -92,8 +91,10 @@ def make_booking_service():
         else:
             mock.get_availability.return_value = (
                 availability if availability is not None else [
-                    {"datetime": "2026-04-12 10:00", "agent_name": "Jane Smith", "available": True},
-                    {"datetime": "2026-04-12 14:00", "agent_name": "Jane Smith", "available": True},
+                    {"datetime": "2026-04-12 10:00",
+                        "agent_name": "Jane Smith", "available": True},
+                    {"datetime": "2026-04-12 14:00",
+                        "agent_name": "Jane Smith", "available": True},
                 ]
             )
             mock.book.return_value = booking_result or {
@@ -151,8 +152,6 @@ def make_state():
         return state
     return _factory
 
-
-# ── Parsing helpers ────────────────────────────────────────────────────────────
 
 def parsed(result: dict) -> dict:
     """Parse the JSON content of the first SystemMessage in a node result dict."""

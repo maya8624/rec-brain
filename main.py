@@ -16,13 +16,12 @@ from app.core.middleware import RequestLoggingMiddleware
 from app.api.routes import chat, health
 from app.core.config import settings
 from app.core.logging import setup_logging
-from app.infrastructure.database import get_db
 from app.infrastructure.embedding import EmbeddingService
 from app.infrastructure.llm import get_llm
 from app.infrastructure.pgvector_store import PgVectorStoreService
 from app.services.booking_service import BookingService
 from app.services.sql_service import SqlViewService
-from app.services.vector_service import RagRetriever
+from app.services.rag_service import RagRetriever
 from app.services.backend_client import backend_client
 
 logger = structlog.get_logger(__name__)
@@ -62,13 +61,11 @@ async def lifespan(_app: FastAPI):
 
     try:
         await backend_client.initialize()
+
         _app.state.backend_client = backend_client
         _app.state.booking_service = BookingService(_app.state.backend_client)
 
-        _app.state.sql_view_service = SqlViewService(
-            llm=get_llm(),
-            db=get_db(),
-        )
+        _app.state.sql_view_service = SqlViewService(llm=get_llm())
 
         _app.state.rag_retriever = RagRetriever(
             vector_store_service=PgVectorStoreService(),
@@ -76,7 +73,6 @@ async def lifespan(_app: FastAPI):
         )
 
         # Agent — compiled once, stored on app.state, reused every request
-        # Compilation is expensive — never do this inside a request handler
         _app.state.ai_agent = build_graph()
 
         logger.info("AI agent ready")
@@ -88,7 +84,6 @@ async def lifespan(_app: FastAPI):
         raise
 
     finally:
-        # Always runs — even if startup raised an exception
         await backend_client.close()
         logger.info("AI service shutdown complete")
 
@@ -110,13 +105,14 @@ app = FastAPI(
 # Middleware
 # ------------------------------------
 # X-Request-ID on every request — enables tracing across .NET → Python
+# TODO: Double Check this
 app.add_middleware(RequestLoggingMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
-    allow_methods=["POST", "GET"],   # only what we actually use
+    allow_methods=["POST", "GET"],
     allow_headers=["*"],
 )
 
