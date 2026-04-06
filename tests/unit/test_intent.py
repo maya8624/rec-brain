@@ -1,9 +1,16 @@
 """
-Tests for intent_node classification.
-No DB or LLM required — pure keyword matching.
-"""
-from app.agents.nodes.intent import _classify_intent
+Unit tests for intent_node and _classify_intent.
 
+_classify_intent: pure keyword matching — no DB or LLM required.
+intent_node:      async node wrapper — tests state mutation (early_response).
+"""
+import pytest
+
+from app.agents.nodes.intent import _classify_intent, intent_node
+from langchain_core.messages import HumanMessage
+
+
+# ── _classify_intent ───────────────────────────────────────────────────────────
 
 class TestSearchIntent:
     def test_show_keyword(self):
@@ -95,6 +102,25 @@ class TestDocumentQueryIntent:
         assert _classify_intent("How do I break my lease?") == "document_query"
 
 
+class TestHybridSearchIntent:
+    """search + document_query together → hybrid_search (not general)."""
+
+    def test_search_and_lease(self):
+        assert _classify_intent(
+            "Show me 3 bedroom apartments and what are the lease terms?"
+        ) == "hybrid_search"
+
+    def test_find_and_contract(self):
+        assert _classify_intent(
+            "Find houses in Sydney and explain the contract"
+        ) == "hybrid_search"
+
+    def test_properties_and_strata(self):
+        assert _classify_intent(
+            "List properties in Parramatta and tell me about the strata"
+        ) == "hybrid_search"
+
+
 class TestGeneralIntent:
     def test_office_hours(self):
         assert _classify_intent("What are your office hours?") == "general"
@@ -114,7 +140,7 @@ class TestGeneralIntent:
 
 
 class TestCompoundIntent:
-    """Compound intents should fall through to 'general'."""
+    """search + booking or search + cancellation → 'general' (user must clarify)."""
 
     def test_search_and_book(self):
         assert _classify_intent(
@@ -135,3 +161,47 @@ class TestCompoundIntent:
         assert _classify_intent(
             "Find properties, book a viewing, and cancel my old booking"
         ) == "general"
+
+
+class TestIntentNode:
+    """Tests for the async intent_node wrapper — verifies state mutations."""
+
+    async def test_simple_intent_sets_user_intent(self):
+        state = {"messages": [HumanMessage(
+            content="Show me houses in Sydney")]}
+        result = await intent_node(state)
+        assert result["user_intent"] == "search"
+
+    async def test_simple_intent_does_not_set_early_response(self):
+        state = {"messages": [HumanMessage(
+            content="Show me houses in Sydney")]}
+        result = await intent_node(state)
+        assert "early_response" not in result or result.get(
+            "early_response") is None
+
+    async def test_compound_intent_sets_early_response(self):
+        state = {"messages": [HumanMessage(
+            content="Find me houses in Sydney and book an inspection"
+        )]}
+        result = await intent_node(state)
+        assert result.get("early_response") is not None
+        assert len(result["early_response"]) > 0
+
+    async def test_compound_intent_sets_general(self):
+        state = {"messages": [HumanMessage(
+            content="Find me houses in Sydney and book an inspection"
+        )]}
+        result = await intent_node(state)
+        assert result["user_intent"] == "general"
+
+    async def test_booking_intent_no_early_response(self):
+        state = {"messages": [HumanMessage(
+            content="I'd like to book an inspection")]}
+        result = await intent_node(state)
+        assert result["user_intent"] == "booking"
+        assert not result.get("early_response")
+
+    async def test_empty_state_messages(self):
+        state = {"messages": []}
+        result = await intent_node(state)
+        assert result["user_intent"] == "general"

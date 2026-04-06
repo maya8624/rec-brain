@@ -52,9 +52,11 @@ class BookingService:
             data = await self._client.get(BookingEndpoints.AVAILABILITY, params=params)
         except BackendClientError as exc:
             raise BookingServiceError(
-                f"Failed to fetch availability: {exc}") from exc
+                f"Failed to fetch availability: {exc}"
+            ) from exc
 
         slots = self._parse_availability(data)
+
         available_slots = [
             AvailableSlot(
                 datetime=slot["datetime"],

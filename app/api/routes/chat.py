@@ -66,8 +66,6 @@ async def chat(
         ) from exc
 
 
-# ── POST /api/chat/stream ──────────────────────────────────────────────────────
-
 @router.post("/stream")
 async def chat_stream(
     request: ChatRequest,

@@ -14,8 +14,6 @@ from pydantic import Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-# ── Guard — fail fast if .env is missing ──────────────────────────────────────
-
 env_path = Path(".env")
 
 if not env_path.exists():
@@ -24,8 +22,6 @@ if not env_path.exists():
         "Create one from .env.example before starting the service."
     )
 
-
-# ── Settings ──────────────────────────────────────────────────────────────────
 
 class Settings(BaseSettings):
     """
@@ -47,26 +43,22 @@ class Settings(BaseSettings):
         case_sensitive=False,   # GROQ_API_KEY == groq_api_key
     )
 
-    # ── App ───────────────────────────────────────────────────────────────────
     APP_VERSION: str = Field("1.0.0")
     ENVIRONMENT: str = Field(
         "development",
         description="development | staging | production",
     )
 
-    # ── CORS ──────────────────────────────────────────────────────────────────
     ALLOWED_ORIGINS: str = Field(
         "http://localhost:3000,http://localhost:5000",
         description="Comma-separated CORS origins — main.py splits into list",
     )
 
-    # ── Database (PostgreSQL + pgvector) ──────────────────────────────────────
     POSTGRES_URL: str = Field(
         ...,
         description="PostgreSQL connection string — used by SQL agent and app",
     )
 
-    # ChromaDB — current
     CHROMA_PATH: str = Field(
         "./chroma_db",
         description="Local path to ChromaDB storage directory",
