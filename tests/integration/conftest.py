@@ -8,7 +8,10 @@ This keeps `pytest -m unit` fast in CI without a live environment.
 import os
 
 import pytest
+from dotenv import load_dotenv
 from httpx import ASGITransport, AsyncClient
+
+load_dotenv()
 
 
 def _missing_env_vars() -> list[str]:

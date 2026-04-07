@@ -35,10 +35,18 @@ _INTENT_KEYWORDS: dict[UserIntent, frozenset[str]] = {
         "when can i", "open for inspection", "open home",
     ]),
     "document_query": frozenset([
+        # Legal / tenancy documents
         "lease", "contract", "strata", "terms", "clause",
         "bond", "deposit", "condition", "by-law", "bylaw",
         "pet policy", "break lease", "notice period",
         "landlord", "tenant", "agreement",
+        # Agency info
+        "address", "location", "where are you",
+        "phone", "call you", "contact",
+        "email",
+        "website", "web site", "online",
+        "hours", "trading hours", "office hours", "open", "opening hours", "when are you",
+        "who is", "staff", "agent", "personnel", "team", "manager", "principal",
     ]),
     "search": frozenset([
         "find", "search", "show", "list", "looking for",

@@ -21,6 +21,7 @@ from langchain_core.runnables import RunnableConfig
 
 from app.agents.nodes._base import last_human_message, resolve_app_service
 from app.agents.state import RealEstateAgentState
+from app.core.constants import AppStateKeys
 from app.services.rag_service import RagRetriever
 
 logger = logging.getLogger(__name__)
@@ -28,13 +29,13 @@ logger = logging.getLogger(__name__)
 
 async def vector_search_node(
     state: RealEstateAgentState,
-    runnable_config: RunnableConfig,
+    config: RunnableConfig,
 ) -> dict:
     """
     Direct vector search — no tool calls.
 
     Expects RagRetriever to be available at:
-        runnable_config["configurable"]["request"].app.state.rag_retriever
+        config["configurable"]["request"].app.state.rag_retriever
 
     Returns partial state: { messages: [SystemMessage] }
     Returns {} if there is no HumanMessage or the service cannot be resolved.
@@ -45,7 +46,7 @@ async def vector_search_node(
         return {}
 
     rag_retriever: RagRetriever | None = resolve_app_service(
-        runnable_config, "rag_retriever", "vector_search_node"
+        config, AppStateKeys.RAG_RETRIEVER, "vector_search_node"
     )
     if rag_retriever is None:
         return {}

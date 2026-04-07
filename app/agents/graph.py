@@ -32,7 +32,7 @@ TODO:
 """
 import logging
 
-from langgraph.checkpoint.postgres import PostgresSaver
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
@@ -187,11 +187,12 @@ def build_graph() -> CompiledStateGraph:
 
 def _build_postgres_checkpointer():
     try:
-        checkpointer = PostgresSaver.from_conn_string(settings.POSTGRES_URL)
-        logger.info("PostgresSaver ready (production)")
+        with AsyncPostgresSaver.from_conn_string(settings.POSTGRES_URL) as checkpointer:
+            checkpointer.setup()
+        logger.info("AsyncPostgresSaver ready (production)")
         return checkpointer
 
     except Exception as exc:
         logger.critical(
-            "PostgresSaver failed: %s — falling back to InMemorySaver (state will NOT persist)", exc)
+            "AsyncPostgresSaver failed: %s — falling back to InMemorySaver (state will NOT persist)", exc)
         return InMemorySaver()

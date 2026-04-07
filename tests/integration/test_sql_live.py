@@ -22,7 +22,7 @@ class TestSearchLive:
         assert result["success"] is True
 
     async def test_state_full_name(self, service):
-        result = await service.search_listings("Show me properties in Queensland")
+        result = await service.search_listings("Show me properties in New South Wales")
         assert result["success"] is True
 
     async def test_no_results_returns_success_with_zero_count(self, service):
@@ -33,7 +33,7 @@ class TestSearchLive:
 
 class TestFiltersLive:
     async def test_bedroom_filter(self, service):
-        result = await service.search_listings("3 bedroom houses in Melbourne")
+        result = await service.search_listings("3 bedroom houses in Sydney")
         assert result["success"] is True
 
     async def test_price_filter(self, service):
@@ -45,11 +45,11 @@ class TestFiltersLive:
         assert result["success"] is True
 
     async def test_rental_filter(self, service):
-        result = await service.search_listings("Rental apartments in Parramatta under $600 per week")
+        result = await service.search_listings("Rental apartments in Parramatta under $1000 per week")
         assert result["success"] is True
 
     async def test_combined_filters(self, service):
         result = await service.search_listings(
-            "Show me 3 bedroom townhouses in Parramatta NSW for sale under $900k"
+            "Show me 3 bedroom townhouses in Bondi NSW for sale under $900k"
         )
         assert result["success"] is True

@@ -24,20 +24,18 @@ from langchain_core.runnables import RunnableConfig
 
 from app.agents.nodes._base import last_human_message, resolve_app_service
 from app.agents.state import RealEstateAgentState
+from app.core.constants import AppStateKeys
 
 logger = logging.getLogger(__name__)
 
 
-async def hybrid_search_node(
-    state: RealEstateAgentState,
-    runnable_config: RunnableConfig,
-) -> dict[str, Any]:
+async def hybrid_search_node(state: RealEstateAgentState, config: RunnableConfig) -> dict[str, Any]:
     """
     Runs SQL listing search and vector document search concurrently.
 
     Expects services at:
-        runnable_config["configurable"]["request"].app.state.sql_view_service
-        runnable_config["configurable"]["request"].app.state.rag_retriever
+        config["configurable"]["request"].app.state.sql_view_service
+        config["configurable"]["request"].app.state.rag_retriever
 
     Returns partial state: { messages: [SystemMessage] }
     Returns {} if there is no HumanMessage or either service cannot be resolved.
@@ -48,10 +46,10 @@ async def hybrid_search_node(
         return {}
 
     sql_service = resolve_app_service(
-        runnable_config, "sql_view_service", "hybrid_search_node"
+        config, AppStateKeys.SQL_VIEW_SERVICE, "hybrid_search_node"
     )
     rag_retriever = resolve_app_service(
-        runnable_config, "rag_retriever", "hybrid_search_node"
+        config, AppStateKeys.RAG_RETRIEVER, "hybrid_search_node"
     )
 
     if sql_service is None or rag_retriever is None:

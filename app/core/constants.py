@@ -47,6 +47,15 @@ class StateKeys:
     BOOKING_STATUS = "booking_status"
 
 
+class AppStateKeys:
+    """
+    Keys for services stored on FastAPI app.state, accessed via RunnableConfig.
+    """
+    SQL_VIEW_SERVICE = "sql_view_service"
+    RAG_RETRIEVER = "rag_retriever"
+    BOOKING_SERVICE = "booking_service"
+
+
 class Node:
     """
     Constants for graph node names.

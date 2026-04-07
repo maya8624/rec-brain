@@ -74,6 +74,14 @@ class Settings(BaseSettings):
         "sentence-transformers/all-MiniLM-L6-v2",
         description="HuggingFace embedding model — used if OPENAI_API_KEY not set",
     )
+    EMBEDDING_DIM: int = Field(
+        384,
+        description="Embedding vector dimension — 384 for all-MiniLM-L6-v2",
+    )
+    VECTOR_TABLE: str = Field(
+        "documents",
+        description="pgvector table name for RAG document storage",
+    )
 
     # ------------------------------------
     # .NET Backend

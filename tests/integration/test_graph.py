@@ -70,14 +70,33 @@ class TestGraphFlows:
     async def test_general_intent_flow(self, graph):
         request = make_request_mock()
         result = await graph.ainvoke(
-            {
-                "messages": [HumanMessage(content="What are your office hours?")]
-            },
+            {"messages": [HumanMessage(content="Hi, can you help me?")]},
             config=get_config(request, "integ-general"),
         )
 
         assert result["user_intent"] == "general"
         assert len(result["messages"]) > 0
+
+    async def test_agency_info_intent_flow(self, graph):
+        rag_retriever = RagRetriever(
+            vector_store_service=PgVectorStoreService(),
+            embedding_service=EmbeddingService(),
+        )
+        request = make_request_mock()
+        request.app.state.rag_retriever = rag_retriever
+
+        result = await graph.ainvoke(
+            {
+                "messages": [HumanMessage(content="What are your office hours?")]
+            },
+            config=get_config(request, "integ-agency-info"),
+        )
+
+        assert result["user_intent"] == "document_query"
+        assert len(result["messages"]) > 0
+        last_message = result["messages"][-1]
+        assert last_message.content
+        assert len(last_message.content) > 20
 
     async def test_booking_intent_flow(self, graph):
         request = make_request_mock(booking_service=make_booking_service())
@@ -153,7 +172,7 @@ class TestGraphFlows:
         # Second turn — same thread_id continues the conversation
         result2 = await graph.ainvoke(
             {
-                "messages": [HumanMessage(content="What are your office hours?")]
+                "messages": [HumanMessage(content="Tell me about the buying process")]
             },
             config=get_config(request, "integ-doc-query"),
         )

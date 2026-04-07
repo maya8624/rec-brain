@@ -33,11 +33,7 @@ def last_ai_message(state: RealEstateAgentState) -> AIMessage | None:
     return None
 
 
-def resolve_app_service(
-    config: RunnableConfig,
-    attr: str,
-    caller: str,
-) -> Any | None:
+def resolve_app_service(config: RunnableConfig, attr: str, caller: str) -> Any | None:
     """
     Extract a service from FastAPI app.state via RunnableConfig.
 
