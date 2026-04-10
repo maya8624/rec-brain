@@ -125,6 +125,22 @@ class TestChatEndpoint:
         assert response.status_code == 200
         assert response.json()["booking_confirmed"] is False
 
+    async def test_compound_intent_returns_clarification_reply(self, client):
+        """Compound intent must return the early_response text, not the generic error fallback."""
+        response = await client.post(
+            "/api/chat",
+            json={
+                "message": "Find me houses in Sydney and book an inspection",
+                "thread_id": "integ-compound-api",
+                "user_id": "u1",
+                "is_new_conversation": True,
+            }
+        )
+        body = response.json()
+        assert response.status_code == 200
+        assert "one request at a time" in body["reply"].lower()
+        assert body["intent"] == "general"
+
     async def test_multi_turn_conversation(self, client):
         """Second message on same thread should continue state (no is_new_conversation)."""
         thread_id = "multi-turn-integ"

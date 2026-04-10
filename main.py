@@ -12,6 +12,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.agents.graph import build_graph
+from app.infrastructure.checkpointer import PostgresCheckpointer
 from app.core.middleware import RequestLoggingMiddleware
 from app.api.routes import chat, health
 from app.core.config import settings
@@ -71,8 +72,8 @@ async def lifespan(_app: FastAPI):
             embedding_service=EmbeddingService(),
         )
 
-        # Agent — compiled once, stored on app.state, reused every request
-        _app.state.ai_agent = build_graph()
+        _app.state.checkpointer = await PostgresCheckpointer.create()
+        _app.state.ai_agent = build_graph(_app.state.checkpointer.instance)
 
         logger.info("AI agent ready")
 
@@ -84,6 +85,10 @@ async def lifespan(_app: FastAPI):
 
     finally:
         await backend_client.close()
+
+        if hasattr(_app.state, "checkpointer"):
+            await _app.state.checkpointer.close()
+
         logger.info("AI service shutdown complete")
 
 

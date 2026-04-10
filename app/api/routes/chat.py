@@ -86,12 +86,12 @@ async def chat_stream(
     request_id = getattr(http_request.state, "request_id", "unknown")
 
     logger.info(
-        "chat/stream | session=%s | user=%s | id=%s",
-        request.session_id, request.user_id, request_id,
+        "chat/stream | thread_id=%s | user=%s | id=%s",
+        request.thread_id, request.user_id, request_id,
     )
 
     return StreamingResponse(
-        _event_generator(request, agent),
+        _event_generator(request, http_request, agent),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -101,12 +101,17 @@ async def chat_stream(
     )
 
 
-async def _event_generator(request: ChatRequest, agent):
+async def _event_generator(request: ChatRequest, http_request: Request, agent):
     """
     Mirrors the pattern from your original stream_agent() approach.
     """
     try:
-        config = {"configurable": {"thread_id": request.session_id}}
+        config = {
+            "configurable": {
+                "thread_id": request.thread_id,
+                "request": http_request,
+            }
+        }
 
         if request.is_new_conversation:
             input_state = initial_state()
@@ -114,17 +119,28 @@ async def _event_generator(request: ChatRequest, agent):
         else:
             input_state = {"messages": [HumanMessage(content=request.message)]}
 
+        emitted_tokens = False
         async for event in agent.astream_events(input_state, config=config, version="v2"):
+            # Capture early_response from graph end event (compound intent)
+            if event.get("event") == "on_chain_end" and event.get("name") == "LangGraph":
+                output = event.get("data", {}).get("output", {})
+                early = output.get("early_response")
+                if early and not emitted_tokens:
+                    yield f"data: {json.dumps({'type': 'token', 'content': early})}\n\n"
+                continue
+
             sse = _to_sse_event(event)
             if sse:
+                if sse.get("type") == "token":
+                    emitted_tokens = True
                 yield f"data: {json.dumps(sse)}\n\n"
 
         yield "data: [DONE]\n\n"
 
     except Exception as exc:
         logger.exception(
-            "chat/stream | error | session=%s | %s",
-            request.session_id, exc,
+            "chat/stream | error | thread_id=%s | %s",
+            request.thread_id, exc,
         )
         yield f"data: {json.dumps({'type': 'error', 'message': 'An unexpected error occurred.'})}\n\n"
 
@@ -167,7 +183,11 @@ def _build_response(thread_id: str, result: dict) -> ChatResponse:
         if isinstance(message, AIMessage)
     ]
 
-    reply = ai_messages[-1].content if ai_messages else "I couldn't process that request."
+    reply = (
+        ai_messages[-1].content
+        if ai_messages
+        else result.get("early_response") or "I couldn't process that request."
+    )
 
     booking_status = result.get("booking_status", {})
     booking_context = result.get("booking_context", {})

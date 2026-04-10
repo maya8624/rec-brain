@@ -6,13 +6,13 @@ Constants used across the codebase, e.g. API endpoints, config keys, etc.
 from langgraph.graph import END
 
 
-class BookingEndpoints:
+class InspectionBookingEndpoints:
     """
     Constants for the .NET backend API.
     """
-    AVAILABILITY = "/api/inspections/availability"
-    BOOK = "/api/inspections/book"
-    CANCEL = "/api/inspections/cancel"
+    AVAILABLE = "/api/inspection-slots/available"
+    BOOK = "/api/inspection-bookings/book"
+    CANCEL = "/api/inspection-bookings/{id}/cancel"
 
 
 class ToolNames:

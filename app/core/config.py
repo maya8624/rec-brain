@@ -79,7 +79,7 @@ class Settings(BaseSettings):
         description="Embedding vector dimension — 384 for all-MiniLM-L6-v2",
     )
     VECTOR_TABLE: str = Field(
-        "documents",
+        "property_documents",
         description="pgvector table name for RAG document storage",
     )
 

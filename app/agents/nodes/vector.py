@@ -21,7 +21,7 @@ from langchain_core.runnables import RunnableConfig
 
 from app.agents.nodes._base import last_human_message, resolve_app_service
 from app.agents.state import RealEstateAgentState
-from app.core.constants import AppStateKeys
+from app.core.constants import AppStateKeys, Node
 from app.services.rag_service import RagRetriever
 
 logger = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ async def vector_search_node(
         return {}
 
     rag_retriever: RagRetriever | None = resolve_app_service(
-        config, AppStateKeys.RAG_RETRIEVER, "vector_search_node"
+        config, AppStateKeys.RAG_RETRIEVER, Node.VECTOR_SEARCH
     )
     if rag_retriever is None:
         return {}

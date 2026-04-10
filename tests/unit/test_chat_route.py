@@ -46,7 +46,16 @@ class TestBuildResponse:
     def test_fallback_reply_when_no_ai_message(self):
         result = self._make_result(messages=[HumanMessage(content="hi")])
         response = _build_response("thread_1", result)
-        assert len(response.reply) > 0  # fallback message
+        assert response.reply == "I couldn't process that request."
+
+    def test_early_response_used_as_reply_when_no_ai_messages(self):
+        """Compound intent: early_response in state must become the reply, not the generic fallback."""
+        result = self._make_result(
+            messages=[HumanMessage(content="find houses and book an inspection")],
+            early_response="I can only handle one request at a time. Would you like to search for properties, or book an inspection?",
+        )
+        response = _build_response("t", result)
+        assert "one request at a time" in response.reply
 
     def test_thread_id_echoed(self):
         response = _build_response("my-thread-99", self._make_result())

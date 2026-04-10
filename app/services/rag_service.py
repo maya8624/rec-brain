@@ -18,7 +18,7 @@ class RagRetriever:
         self,
         vector_store_service: PgVectorStoreService,
         embedding_service: EmbeddingService,
-        similarity_top_k: int = 5,
+        similarity_top_k: int = 3,
     ) -> None:
         self._vector_store = vector_store_service.create_vector_store()
         self._embed_model = embedding_service.model

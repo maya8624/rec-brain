@@ -32,13 +32,11 @@ TODO:
 """
 import logging
 
-from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
-from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode
 from app.core.constants import Node
-from app.core.config import settings
 from app.agents.nodes.agent import agent_node
 from app.agents.nodes.context import context_update_node
 from app.agents.nodes.hybrid import hybrid_search_node
@@ -60,7 +58,7 @@ from app.tools import get_all_tools
 logger = logging.getLogger(__name__)
 
 
-def build_graph() -> CompiledStateGraph:
+def build_graph(checkpointer: BaseCheckpointSaver) -> CompiledStateGraph:
     '''
     Constructs the StateGraph with nodes and edges.
     Called once at app startup to create the compiled graph.
@@ -173,7 +171,6 @@ def build_graph() -> CompiledStateGraph:
         path_map={Node.AGENT: Node.AGENT, Node.END: END},
     )
 
-    checkpointer = _build_postgres_checkpointer()
     compiled = graph.compile(checkpointer=checkpointer)
 
     logger.info(
@@ -183,16 +180,3 @@ def build_graph() -> CompiledStateGraph:
     )
 
     return compiled
-
-
-def _build_postgres_checkpointer():
-    try:
-        with AsyncPostgresSaver.from_conn_string(settings.POSTGRES_URL) as checkpointer:
-            checkpointer.setup()
-        logger.info("AsyncPostgresSaver ready (production)")
-        return checkpointer
-
-    except Exception as exc:
-        logger.critical(
-            "AsyncPostgresSaver failed: %s — falling back to InMemorySaver (state will NOT persist)", exc)
-        return InMemorySaver()

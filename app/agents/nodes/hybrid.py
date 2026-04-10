@@ -24,7 +24,7 @@ from langchain_core.runnables import RunnableConfig
 
 from app.agents.nodes._base import last_human_message, resolve_app_service
 from app.agents.state import RealEstateAgentState
-from app.core.constants import AppStateKeys
+from app.core.constants import AppStateKeys, Node
 
 logger = logging.getLogger(__name__)
 
@@ -46,10 +46,10 @@ async def hybrid_search_node(state: RealEstateAgentState, config: RunnableConfig
         return {}
 
     sql_service = resolve_app_service(
-        config, AppStateKeys.SQL_VIEW_SERVICE, "hybrid_search_node"
+        config, AppStateKeys.SQL_VIEW_SERVICE, Node.HYBRID_SEARCH
     )
     rag_retriever = resolve_app_service(
-        config, AppStateKeys.RAG_RETRIEVER, "hybrid_search_node"
+        config, AppStateKeys.RAG_RETRIEVER, Node.HYBRID_SEARCH
     )
 
     if sql_service is None or rag_retriever is None:

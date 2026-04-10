@@ -5,7 +5,7 @@ All booking state is owned by .NET — Python never stores booking records.
 import logging
 from datetime import datetime
 
-from app.core.constants import BookingEndpoints
+from app.core.constants import InspectionBookingEndpoints
 from app.services.backend_client import BackendClient
 from app.core.exceptions import BackendClientError, BookingServiceError, BookingValidationError
 from app.schemas.booking import (
@@ -48,8 +48,10 @@ class BookingService:
         logger.info("get_availability | property=%s | date=%s",
                     property_id, preferred_date)
 
+    # url = f"{InspectionBookingEndpoints.AVAILABLE}?listingId={listing_id}"
+
         try:
-            data = await self._client.get(BookingEndpoints.AVAILABILITY, params=params)
+            data = await self._client.get(InspectionBookingEndpoints.AVAILABLE, params=params)
         except BackendClientError as exc:
             raise BookingServiceError(
                 f"Failed to fetch availability: {exc}"
@@ -102,7 +104,7 @@ class BookingService:
         )
 
         try:
-            data = await self._client.post(BookingEndpoints.BOOK, json=payload)
+            data = await self._client.post(InspectionBookingEndpoints.BOOK, json=payload)
         except BackendClientError as exc:
             raise BookingServiceError(f"Booking failed: {exc}") from exc
 
@@ -117,6 +119,7 @@ class BookingService:
     # Cancel booking
     # ------------------------------------
 
+    # url = CANCEL.format(id=booking_id)
     async def cancel(self, request: CancellationRequest) -> dict:
         """Cancel an existing booking. Returns CancellationConfirmation as dict."""
 
@@ -128,7 +131,7 @@ class BookingService:
         logger.info("cancel | id=%s", request.confirmation_id)
 
         try:
-            await self._client.post(BookingEndpoints.CANCEL, json=payload)
+            await self._client.post(InspectionBookingEndpoints.CANCEL, json=payload)
         except BackendClientError as exc:
             raise BookingServiceError(f"Cancellation failed: {exc}") from exc
 

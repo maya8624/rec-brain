@@ -11,6 +11,8 @@ from langchain_core.messages import HumanMessage
 
 from tests.integration.conftest import skip_if_no_env
 
+from app.agents.graph import build_graph
+from app.infrastructure.checkpointer import PostgresCheckpointer
 from app.infrastructure.llm import get_llm
 from app.services.sql_service import SqlViewService
 from app.services.rag_service import RagRetriever
@@ -21,9 +23,10 @@ pytestmark = [pytest.mark.integration, skip_if_no_env]
 
 
 @pytest.fixture(scope="module")
-def graph():
-    from app.agents.graph import build_graph
-    return build_graph()
+async def graph():
+    checkpointer = await PostgresCheckpointer.create()
+    yield build_graph(checkpointer.instance)
+    await checkpointer.close()
 
 
 def make_booking_service():
@@ -94,6 +97,7 @@ class TestGraphFlows:
 
         assert result["user_intent"] == "document_query"
         assert len(result["messages"]) > 0
+
         last_message = result["messages"][-1]
         assert last_message.content
         assert len(last_message.content) > 20
@@ -101,11 +105,9 @@ class TestGraphFlows:
     async def test_booking_intent_flow(self, graph):
         request = make_request_mock(booking_service=make_booking_service())
         result = await graph.ainvoke(
-            {
-                "messages": [HumanMessage(
-                    content="I'd like to book an inspection for property prop_123"
-                )]
-            },
+            {"messages": [HumanMessage(
+                content="I'd like to book an inspection for property prop_123")]
+             },
             config=get_config(request, "integ-booking"),
         )
 
@@ -133,6 +135,10 @@ class TestGraphFlows:
 
         assert result["user_intent"] == "general"
         assert result.get("early_response")
+        assert "one request at a time" in result["early_response"].lower()
+        # Graph must end without calling the LLM — no AIMessage should be added
+        from langchain_core.messages import AIMessage
+        assert not any(isinstance(m, AIMessage) for m in result["messages"])
 
     async def test_search_intent_flow(self, graph):
         sql_service = SqlViewService(llm=get_llm())
