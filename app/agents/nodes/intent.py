@@ -74,8 +74,12 @@ async def intent_node(state: RealEstateAgentState) -> dict[str, Any]:
         message,
     )
 
-    # Compound intent — set early_response so router goes straight to END
+    # Compound intent handling
     if intent == "general" and _is_compound(message):
+        # search + booking: run search first, agent prompts user to pick a property
+        if _is_search_and_book(message):
+            return {"user_intent": "search_then_book"}
+        # all other compounds: ask user to clarify one request at a time
         return {
             "user_intent": "general",
             "early_response": "I can only handle one request at a time. "
@@ -129,6 +133,15 @@ def _is_compound(message: str) -> bool:
         if _matches_keywords(msg_lower, _INTENT_KEYWORDS[intent])
     ]
     return len(compound_matches) > 1
+
+
+def _is_search_and_book(message: str) -> bool:
+    """True only when the compound is exactly search + booking (not cancellation)."""
+    msg_lower = message.lower()
+    return (
+        _matches_keywords(msg_lower, _INTENT_KEYWORDS["search"]) and
+        _matches_keywords(msg_lower, _INTENT_KEYWORDS["booking"])
+    )
 
 
 def _matches_keywords(msg_lower: str, keywords: frozenset[str]) -> bool:

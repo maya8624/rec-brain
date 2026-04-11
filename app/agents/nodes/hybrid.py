@@ -34,8 +34,8 @@ async def hybrid_search_node(state: RealEstateAgentState, config: RunnableConfig
     Runs SQL listing search and vector document search concurrently.
 
     Expects services at:
-        config["configurable"]["request"].app.state.sql_view_service
-        config["configurable"]["request"].app.state.rag_retriever
+        config["configurable"]["sql_view_service"]
+        config["configurable"]["rag_retriever"]
 
     Returns partial state: { messages: [SystemMessage] }
     Returns {} if there is no HumanMessage or either service cannot be resolved.

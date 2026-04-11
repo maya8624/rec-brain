@@ -45,12 +45,13 @@ def route_intent_output(state: RealEstateAgentState) -> str:
     intent = state.get("user_intent", "general")
 
     route = {
-        "search":         Node.LISTING_SEARCH,
-        "document_query": Node.VECTOR_SEARCH,
-        "hybrid_search":  Node.HYBRID_SEARCH,
-        "booking":        Node.AGENT,
-        "cancellation":   Node.AGENT,
-        "general":        Node.AGENT,
+        "search":           Node.LISTING_SEARCH,
+        "search_then_book": Node.LISTING_SEARCH,
+        "document_query":   Node.VECTOR_SEARCH,
+        "hybrid_search":    Node.HYBRID_SEARCH,
+        "booking":          Node.AGENT,
+        "cancellation":     Node.AGENT,
+        "general":          Node.AGENT,
     }.get(intent, Node.AGENT)
 
     logger.info("route_intent_output | intent=%s → %s", intent, route)

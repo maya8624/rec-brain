@@ -7,7 +7,7 @@ Run with:  pytest -m integration
 """
 from unittest.mock import AsyncMock
 import pytest
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 
 from tests.integration.conftest import skip_if_no_env
 
@@ -66,7 +66,14 @@ def make_request_mock(booking_service=None, sql_view_service=None):
 
 
 def get_config(request, thread_id: str = "integ-thread") -> dict:
-    return {"configurable": {"thread_id": thread_id, "request": request}}
+    return {
+        "configurable": {
+            "thread_id":        thread_id,
+            "booking_service":  request.app.state.booking_service,
+            "sql_view_service": request.app.state.sql_view_service,
+            "rag_retriever":    request.app.state.rag_retriever,
+        }
+    }
 
 
 class TestGraphFlows:
@@ -106,7 +113,7 @@ class TestGraphFlows:
         request = make_request_mock(booking_service=make_booking_service())
         result = await graph.ainvoke(
             {"messages": [HumanMessage(
-                content="I'd like to book an inspection for property prop_123")]
+                content="I'd like to book an inspection for property 08d1202e-cd7e-d6cc-f2b3-c309f377d123")]
              },
             config=get_config(request, "integ-booking"),
         )
@@ -124,6 +131,61 @@ class TestGraphFlows:
 
         assert result["user_intent"] == "cancellation"
 
+    async def test_search_then_book_intent_flow(self, graph):
+        sql_service = SqlViewService(llm=get_llm())
+        request = make_request_mock(sql_view_service=sql_service)
+
+        result = await graph.ainvoke(
+            {
+                "messages": [HumanMessage(
+                    content="Find me 2 bedroom apartments in Sydney and book an inspection"
+                )]
+            },
+            config=get_config(request, "integ-search-then-book"),
+        )
+
+        # Turn 1: only search runs — no booking, no early_response refusal
+        assert result["user_intent"] == "search_then_book"
+        assert not result.get("early_response")
+        assert len(result["messages"]) > 0
+
+    async def test_search_then_book_full_flow(self, graph):
+        """Two-turn flow: Turn 1 searches, Turn 2 books a specific property."""
+        sql_service = SqlViewService(llm=get_llm())
+        booking_service = make_booking_service()
+        request = make_request_mock(
+            booking_service=booking_service,
+            sql_view_service=sql_service,
+        )
+        config = get_config(request, "integ-search-then-book-full")
+
+        # Turn 1 — search runs, agent prompts user to pick a property
+        result1 = await graph.ainvoke(
+            {"messages": [HumanMessage(content="Find me 2 bedroom apartments in Sydney and book an inspection")]},
+            config=config,
+        )
+
+        assert result1["user_intent"] == "search_then_book"
+        assert not result1.get("early_response")
+        assert len(result1["messages"]) > 0
+
+        # Turn 2 — user picks a specific property to book
+        result2 = await graph.ainvoke(
+            {"messages": [HumanMessage(content="Book an inspection for property 08d1202e-cd7e-d6cc-f2b3-c309f377d123")]},
+            config=config,
+        )
+
+        assert result2["user_intent"] == "booking"
+        # Conversation history from Turn 1 is preserved
+        assert len(result2["messages"]) > len(result1["messages"])
+
+        # check_availability ran — slots should be in booking_context
+        booking_ctx = result2.get("booking_context", {})
+        assert booking_ctx.get("available_slots"), "expected available_slots after check_availability"
+
+        last_message = result2["messages"][-1]
+        assert last_message.content
+
     async def test_compound_intent_sets_early_response(self, graph):
         request = make_request_mock()
         result = await graph.ainvoke(
@@ -137,7 +199,6 @@ class TestGraphFlows:
         assert result.get("early_response")
         assert "one request at a time" in result["early_response"].lower()
         # Graph must end without calling the LLM — no AIMessage should be added
-        from langchain_core.messages import AIMessage
         assert not any(isinstance(m, AIMessage) for m in result["messages"])
 
     async def test_search_intent_flow(self, graph):

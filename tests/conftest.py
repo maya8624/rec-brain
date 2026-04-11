@@ -116,18 +116,21 @@ def make_booking_service():
 
 @pytest.fixture
 def make_config():
-    """Factory for a LangGraph RunnableConfig with services on app.state."""
+    """Factory for a LangGraph RunnableConfig with services in configurable directly."""
     def _factory(
         sql_service=None,
         rag_retriever=None,
         booking_service=None,
         thread_id: str = "test-thread",
     ) -> dict:
-        request = MagicMock()
-        request.app.state.sql_view_service = sql_service
-        request.app.state.rag_retriever = rag_retriever
-        request.app.state.booking_service = booking_service
-        return {"configurable": {"thread_id": thread_id, "request": request}}
+        return {
+            "configurable": {
+                "thread_id":        thread_id,
+                "sql_view_service": sql_service,
+                "rag_retriever":    rag_retriever,
+                "booking_service":  booking_service,
+            }
+        }
     return _factory
 
 

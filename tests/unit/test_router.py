@@ -79,6 +79,11 @@ class TestRouteIntentOutput:
         assert route_intent_output(base_state(
             user_intent="general")) == Node.AGENT
 
+    def test_search_then_book_goes_to_listing_search(self):
+        assert route_intent_output(base_state(
+            user_intent="search_then_book"
+        )) == Node.LISTING_SEARCH
+
     def test_unknown_intent_defaults_to_agent(self):
         assert route_intent_output(base_state(
             user_intent="unknown")) == Node.AGENT

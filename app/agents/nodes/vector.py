@@ -35,7 +35,7 @@ async def vector_search_node(
     Direct vector search — no tool calls.
 
     Expects RagRetriever to be available at:
-        config["configurable"]["request"].app.state.rag_retriever
+        config["configurable"]["rag_retriever"]
 
     Returns partial state: { messages: [SystemMessage] }
     Returns {} if there is no HumanMessage or the service cannot be resolved.

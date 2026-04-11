@@ -35,20 +35,16 @@ def last_ai_message(state: RealEstateAgentState) -> AIMessage | None:
 
 def resolve_app_service(config: RunnableConfig, attr: str, caller: str) -> Any | None:
     """
-    Extract a service from FastAPI app.state via RunnableConfig.
+    Extract a service from RunnableConfig configurable by key name.
 
-    Looks up ``request.app.state.<attr>`` from the configurable context.
+    Expects the service to be stored directly under config["configurable"][attr].
     Returns None and logs an error rather than raising, so callers can
     decide how to handle the missing service.
     """
     try:
-        request = config.get("configurable", {}).get("request")
-        if request is None:
-            raise ValueError("no 'request' key in configurable")
-
-        service = getattr(request.app.state, attr, None)
+        service = config.get("configurable", {}).get(attr)
         if service is None:
-            raise ValueError(f"app.state.{attr} is not set")
+            raise ValueError(f"'{attr}' not found in configurable")
 
         return service
 

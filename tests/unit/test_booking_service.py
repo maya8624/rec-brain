@@ -90,23 +90,10 @@ class TestGetAvailability:
 
         assert result["slot_count"] == 1
 
-    async def test_preferred_date_included_in_request_params(self):
-        client = make_backend_client(get_return={"availableSlots": []})
-
-        await BookingService(client).get_availability("prop_123", "2027-04-12")
-        _, kwargs = client.get.call_args
-
-        assert kwargs["params"]["preferredDate"] == "2027-04-12"
-
     async def test_empty_property_id_raises_validation_error(self):
         svc = make_service()
         with pytest.raises(BookingValidationError, match="property_id"):
             await svc.get_availability("")
-
-    async def test_invalid_date_format_raises_validation_error(self):
-        svc = make_service()
-        with pytest.raises(BookingValidationError, match="YYYY-MM-DD"):
-            await svc.get_availability("prop_123", "12/04/2027")
 
     async def test_backend_client_error_raises_booking_service_error(self):
         client = make_backend_client(

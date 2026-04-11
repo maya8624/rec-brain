@@ -4,8 +4,9 @@ via BookingService. Always call this BEFORE book_inspection
 so the user can choose from real available slots.
 """
 import logging
-from typing import Annotated
-from langchain_core.tools import InjectedToolArg, tool
+from langchain_core.runnables import RunnableConfig
+from langchain_core.tools import tool
+from app.core.constants import AppStateKeys
 from app.core.exceptions import BookingServiceError
 from app.schemas.booking import AvailabilityResult, AvailableSlot
 from app.services.booking_service import BookingService
@@ -14,23 +15,17 @@ logger = logging.getLogger(__name__)
 
 
 @tool
-async def check_availability(
-    property_id: str,
-    booking_service: Annotated[BookingService, InjectedToolArg],
-    preferred_date: str | None = None,
-) -> dict:
+async def check_availability(property_id: str, config: RunnableConfig) -> dict:
     """
-     Check available inspection time slots for a property.
-    preferred_date format: YYYY-MM-DD (eg "2025-06-14")
+    Check available inspection time slots for a property.
+    Call immediately once you have the property_id.
     """
+    booking_service: BookingService = config["configurable"][AppStateKeys.BOOKING_SERVICE]
 
-    logger.info(
-        "check_availability | property_id=%s | preferred_date=%s",
-        property_id, preferred_date,
-    )
+    logger.info("check_availability | property_id=%s", property_id)
 
     try:
-        slots = await booking_service.get_availability(property_id, preferred_date)
+        slots = await booking_service.get_availability(property_id)
         avaliable_slots = [
             AvailableSlot(
                 datetime=slot["datetime"],

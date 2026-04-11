@@ -63,6 +63,15 @@ CANCELLATION FLOW:
     Step 3: Wait for explicit confirmation to cancel
     Step 4: Call {ToolNames.CANCEL_INSPECTION}
 
+SEARCH THEN BOOK:
+- When the user asked to both search and book in the same message, present the
+  search results first.
+- If results were found, end your response with:
+  "Which of these properties would you like to inspect?"
+- If no results were found, say so and suggest broadening the search criteria.
+  Do NOT prompt for booking.
+- Do NOT call any booking tools yet — wait for the user to select a property.
+
 FORMATTING SEARCH RESULTS:
 - Present each property as a clean summary with:
   address, price, bedrooms, bathrooms, property type, agent name and phone

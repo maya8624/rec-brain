@@ -4,11 +4,11 @@ Only call this after availability has been checked, a slot chosen,
 contact details collected, and the user has explicitly confirmed.
 """
 import logging
-from typing import Annotated
 
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
-from langchain_core.tools import InjectedToolArg
 
+from app.core.constants import AppStateKeys
 from app.core.exceptions import BookingServiceError, BookingValidationError
 from app.schemas.booking import BookingRequest, BookingResult, ContactInfo
 from app.services.booking_service import BookingService
@@ -23,11 +23,12 @@ async def book_inspection(
     contact_name: str,
     contact_email: str,
     contact_phone: str,
-    booking_service: Annotated[BookingService, InjectedToolArg]
+    config: RunnableConfig,
 ) -> dict:
     """
     Book a property inspection via the .NET backend.
     """
+    booking_service: BookingService = config["configurable"][AppStateKeys.BOOKING_SERVICE]
 
     logger.info(
         "book_inspection | property_id=%s | slot=%s | contact=%s",

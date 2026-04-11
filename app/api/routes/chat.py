@@ -34,10 +34,23 @@ async def chat(
                 request.thread_id, request.user_id, request.is_new_conversation)
 
     try:
+        # Before: passed the whole http_request into the graph so nodes could
+        # walk request.app.state.<service> themselves via resolve_app_service.
+        # config = {
+        #     "configurable": {
+        #         "thread_id": request.thread_id,
+        #         "request":   http_request,        ← entire FastAPI Request object
+        #     }
+        # }
+        #
+        # Now: extract only the services the graph needs and pass them directly.
+        # Nodes and tools both read from configurable["<service_name>"] — no request in the graph.
         config = {
             "configurable": {
-                "thread_id": request.thread_id,
-                "request": http_request,
+                "thread_id":        request.thread_id,
+                "booking_service":  http_request.app.state.booking_service,
+                "sql_view_service": http_request.app.state.sql_view_service,
+                "rag_retriever":    http_request.app.state.rag_retriever,
             }
         }
 
@@ -106,10 +119,21 @@ async def _event_generator(request: ChatRequest, http_request: Request, agent):
     Mirrors the pattern from your original stream_agent() approach.
     """
     try:
+        # Before: passed the whole http_request into the graph.
+        # config = {
+        #     "configurable": {
+        #         "thread_id": request.thread_id,
+        #         "request":   http_request,        ← entire FastAPI Request object
+        #     }
+        # }
+        #
+        # Now: extract only the services the graph needs and pass them directly.
         config = {
             "configurable": {
-                "thread_id": request.thread_id,
-                "request": http_request,
+                "thread_id":        request.thread_id,
+                "booking_service":  http_request.app.state.booking_service,
+                "sql_view_service": http_request.app.state.sql_view_service,
+                "rag_retriever":    http_request.app.state.rag_retriever,
             }
         }
 

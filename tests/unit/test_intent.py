@@ -123,7 +123,8 @@ class TestHybridSearchIntent:
 
 class TestGeneralIntent:
     def test_office_hours(self):
-        assert _classify_intent("What are your office hours?") == "general"
+        # "hours" is a document_query keyword — routes to vector search for agency info
+        assert _classify_intent("What are your office hours?") == "document_query"
 
     def test_greeting(self):
         assert _classify_intent("Hello, how are you?") == "general"
@@ -139,13 +140,22 @@ class TestGeneralIntent:
             "How does the rental process work?") == "general"
 
 
-class TestCompoundIntent:
-    """search + booking or search + cancellation → 'general' (user must clarify)."""
+class TestSearchThenBookIntent:
+    """search + booking compound → 'search_then_book' (not early_response refusal)."""
 
-    def test_search_and_book(self):
+    def test_find_and_book(self):
         assert _classify_intent(
             "Find me houses in Sydney and book an inspection"
+        ) == "general"  # _classify_intent returns general; intent_node upgrades to search_then_book
+
+    def test_show_and_schedule(self):
+        assert _classify_intent(
+            "Show me apartments in Melbourne and schedule a viewing"
         ) == "general"
+
+
+class TestCompoundIntent:
+    """Non search+book compounds → 'general' (user must clarify)."""
 
     def test_search_and_cancel(self):
         assert _classify_intent(
@@ -179,20 +189,30 @@ class TestIntentNode:
         assert "early_response" not in result or result.get(
             "early_response") is None
 
-    async def test_compound_intent_sets_early_response(self):
+    async def test_search_and_book_sets_search_then_book(self):
         state = {"messages": [HumanMessage(
             content="Find me houses in Sydney and book an inspection"
         )]}
         result = await intent_node(state)
-        assert result.get("early_response") is not None
-        assert len(result["early_response"]) > 0
+        assert result["user_intent"] == "search_then_book"
+        assert not result.get("early_response")
 
-    async def test_compound_intent_sets_general(self):
+    async def test_search_and_book_does_not_set_early_response(self):
         state = {"messages": [HumanMessage(
-            content="Find me houses in Sydney and book an inspection"
+            content="Show me apartments in Parramatta and schedule a viewing"
+        )]}
+        result = await intent_node(state)
+        assert result["user_intent"] == "search_then_book"
+        assert not result.get("early_response")
+
+    async def test_search_and_cancel_still_sets_early_response(self):
+        """search + cancellation is not search_then_book — user must clarify."""
+        state = {"messages": [HumanMessage(
+            content="Show me apartments and cancel my booking"
         )]}
         result = await intent_node(state)
         assert result["user_intent"] == "general"
+        assert result.get("early_response")
 
     async def test_booking_intent_no_early_response(self):
         state = {"messages": [HumanMessage(

@@ -3,9 +3,10 @@ LangGraph @tool for cancelling a property inspection via the .NET backend.
 Requires explicit user confirmation before cancelling.
 """
 import logging
-from typing import Annotated
-from langchain_core.tools import tool, InjectedToolArg
+from langchain_core.runnables import RunnableConfig
+from langchain_core.tools import tool
 
+from app.core.constants import AppStateKeys
 from app.core.exceptions import BookingServiceError, BookingValidationError
 from app.schemas.booking import CancellationRequest, CancellationResult
 from app.services.booking_service import BookingService
@@ -16,12 +17,13 @@ logger = logging.getLogger(__name__)
 @tool
 async def cancel_inspection(
     confirmation_id: str,
-    booking_service: Annotated[BookingService, InjectedToolArg],
+    config: RunnableConfig,
     reason: str | None = None,
 ) -> dict:
     """
     Cancel an existing property inspection booking.
     """
+    booking_service: BookingService = config["configurable"][AppStateKeys.BOOKING_SERVICE]
 
     logger.info(
         "cancel_inspection | confirmation_id=%s | reason=%s",

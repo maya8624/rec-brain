@@ -3,7 +3,6 @@ HTTP client for the .NET backend booking API.
 All booking state is owned by .NET — Python never stores booking records.
 """
 import logging
-from datetime import datetime
 
 from app.core.constants import InspectionBookingEndpoints
 from app.services.backend_client import BackendClient
@@ -30,10 +29,7 @@ class BookingService:
     # Check availability
     # ------------------------------------
 
-    async def get_availability(
-            self,
-            property_id: str,
-            preferred_date: str | None = None) -> dict:
+    async def get_availability(self, property_id: str) -> dict:
         """
         Fetch available inspection slots. Returns AvailabilityResult as dict.
         """
@@ -41,12 +37,7 @@ class BookingService:
         self._validate_property_id(property_id)
         params = {"propertyId": property_id}
 
-        if preferred_date:
-            self._validate_date_string(preferred_date)
-            params["preferredDate"] = preferred_date
-
-        logger.info("get_availability | property=%s | date=%s",
-                    property_id, preferred_date)
+        logger.info("get_availability | property=%s", property_id)
 
     # url = f"{InspectionBookingEndpoints.AVAILABLE}?listingId={listing_id}"
 
@@ -148,15 +139,6 @@ class BookingService:
     def _validate_property_id(self, property_id: str):
         if not property_id or not property_id.strip():
             raise BookingValidationError("property_id is required")
-
-    def _validate_date_string(self, date_str: str):
-        try:
-            datetime.strptime(date_str, "%Y-%m-%d")
-
-        except ValueError:
-            raise BookingValidationError(
-                f"Invalid date format: '{date_str}'. Expected YYYY-MM-DD"
-            ) from None
 
     # ------------------------------------
     # Response parsers
