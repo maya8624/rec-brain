@@ -53,12 +53,19 @@ async def listing_search_node(state: RealEstateAgentState, config: RunnableConfi
             result.get("result_count", 0),
         )
 
-        result_message = SystemMessage(content=json.dumps({
+        count = result.get("result_count", 0)
+
+        payload = json.dumps({
             "search_results": result.get("output"),
-            "result_count": result.get("result_count", 0),
+            "result_count": count,
             "success": result.get("success"),
             "error": result.get("error"),
-        }))
+        }, default=str)
+
+        result_message = SystemMessage(
+            content=f"[PROPERTY SEARCH RESULTS — {count} listing(s) found. "
+                    f"Format these for the customer using the FORMATTING SEARCH RESULTS rules.]\n{payload}"
+        )
 
         return {"messages": [result_message]}
 

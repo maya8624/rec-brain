@@ -50,8 +50,9 @@ async def book_inspection(
             )
         )
 
-        logger.info("book_inspection | confirmed | id=%s",
-                    result["confirmation_id"])
+        logger.info(
+            "book_inspection | confirmed | id=%s", result["confirmation_id"]
+        )
 
         return BookingResult(
             success=True,

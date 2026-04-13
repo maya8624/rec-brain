@@ -63,10 +63,20 @@ async def hybrid_search_node(state: RealEstateAgentState, config: RunnableConfig
         return_exceptions=True,
     )
 
-    result_message = SystemMessage(content=json.dumps({
-        "sql_results": _unwrap_sql(sql_outcome),
-        "vector_results": _unwrap_vector(vector_outcome),
-    }))
+    sql = _unwrap_sql(sql_outcome)
+    vector = _unwrap_vector(vector_outcome)
+    sql_count = sql.get("result_count", 0)
+    vector_count = vector.get("result_count", 0)
+
+    payload = json.dumps({
+        "sql_results": sql,
+        "vector_results": vector,
+    }, default=str)
+    result_message = SystemMessage(
+        content=f"[HYBRID SEARCH RESULTS — {sql_count} property listing(s) and "
+                f"{vector_count} document excerpt(s) found. "
+                f"Answer the customer using both sources.]\n{payload}"
+    )
 
     return {"messages": [result_message]}
 

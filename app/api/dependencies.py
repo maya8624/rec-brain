@@ -15,11 +15,6 @@ def get_agent(request: Request) -> CompiledStateGraph:
     return request.app.state.ai_agent
 
 
-# ------------------------------------
-# Internal API key guard
-# ------------------------------------
-
-
 async def verify_internal_key(x_api_key: Annotated[str, Header(alias="X-API-Key")]) -> str:
     """
     Dependency — verifies the internal service API key.

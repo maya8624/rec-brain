@@ -18,7 +18,7 @@ class ChatRequest(BaseModel):
     message: str = Field(
         ...,
         min_length=1,
-        max_length=2000,
+        max_length=1000,
         description="User's message text",
     )
 
@@ -32,6 +32,11 @@ class ChatRequest(BaseModel):
         ...,
         min_length=1,
         description="Authenticated user ID from .NET JWT",
+    )
+
+    property_id: str | None = Field(
+        default=None,
+        description="Optional property ID from .NET — lets agent personalise response with property details",
     )
 
     is_new_conversation: bool = Field(

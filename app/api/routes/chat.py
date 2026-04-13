@@ -1,7 +1,5 @@
 """
-All traffic arrives from .NET backend — never directly from React.
-thread_id(session_id) from .NET maps to LangGraph thread_id for state persistence.
-
+All traffic arrives from .NET backend at this /api/chat endpoint.
 No AI logic here — only HTTP concerns:
     parsing, routing to agent, formatting response, error handling.
 """
@@ -14,18 +12,18 @@ from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from app.agents.state import initial_state
-from app.api.dependencies import get_agent
+from app.api.dependencies import get_agent, verify_internal_key, CompiledStateGraph
 from app.schemas.chat import ChatErrorResponse, ChatRequest, ChatResponse, SourceDocument
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 
-@router.post("", response_model=ChatResponse)
+@router.post("", response_model=ChatResponse, dependencies=[Depends(verify_internal_key)])
 async def chat(
         request: ChatRequest,
         http_request: Request,
-        agent=Depends(get_agent)) -> ChatResponse:
+        agent: CompiledStateGraph = Depends(get_agent)) -> ChatResponse:
     """
     Main chat endpoint — called by .NET backend for every user message.
     """
@@ -34,17 +32,6 @@ async def chat(
                 request.thread_id, request.user_id, request.is_new_conversation)
 
     try:
-        # Before: passed the whole http_request into the graph so nodes could
-        # walk request.app.state.<service> themselves via resolve_app_service.
-        # config = {
-        #     "configurable": {
-        #         "thread_id": request.thread_id,
-        #         "request":   http_request,        ← entire FastAPI Request object
-        #     }
-        # }
-        #
-        # Now: extract only the services the graph needs and pass them directly.
-        # Nodes and tools both read from configurable["<service_name>"] — no request in the graph.
         config = {
             "configurable": {
                 "thread_id":        request.thread_id,
@@ -59,16 +46,18 @@ async def chat(
             input_state["messages"] = [HumanMessage(content=request.message)]
 
         else:
-            # LangGraph rehydrates existing state from checkpointer automatically
+            # LangGraph reload existing state from checkpointer automatically
             input_state = {"messages": [HumanMessage(content=request.message)]}
 
         result = await agent.ainvoke(input_state, config=config)
+        chat_response = _build_response(request.thread_id, result)
 
-        return _build_response(request.thread_id, result)
+        return chat_response
 
     except Exception as exc:
-        logger.exception("chat | error | thread_id=%s | %s",
-                         request.thread_id, exc)
+        logger.exception(
+            "chat | error | thread_id=%s | %s",
+            request.thread_id, exc)
 
         raise HTTPException(
             status_code=500,
@@ -79,12 +68,11 @@ async def chat(
         ) from exc
 
 
-@router.post("/stream")
+@router.post("/stream", dependencies=[Depends(verify_internal_key)])
 async def chat_stream(
-    request: ChatRequest,
-    http_request: Request,
-    agent=Depends(get_agent),
-) -> StreamingResponse:
+        request: ChatRequest,
+        http_request: Request,
+        agent: CompiledStateGraph = Depends(get_agent)) -> StreamingResponse:
     """
     Streaming chat — returns tokens via Server-Sent Events.
     Connect from React using EventSource or fetch with streaming.
@@ -194,12 +182,9 @@ def _to_sse_event(event: dict) -> dict | None:
     return None
 
 
-# ── Response builder ───────────────────────────────────────────────────────────
-
 def _build_response(thread_id: str, result: dict) -> ChatResponse:
     """
     Builds a ChatResponse from the final LangGraph state dict.
-    Extracts reply text, tools used, booking state, RAG sources.
     """
 
     ai_messages = [

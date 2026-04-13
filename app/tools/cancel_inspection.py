@@ -15,11 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 @tool
-async def cancel_inspection(
-    confirmation_id: str,
-    config: RunnableConfig,
-    reason: str | None = None,
-) -> dict:
+async def cancel_inspection(confirmation_id: str, config: RunnableConfig, reason: str | None = None) -> dict:
     """
     Cancel an existing property inspection booking.
     """

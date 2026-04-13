@@ -1,0 +1,15 @@
+# ============================================================
+# Heavy ML dependencies — installed as a separate Docker layer
+# so retries don't re-download lighter packages
+# ============================================================
+
+# Embedding model — pulls torch transitively (largest download)
+sentence-transformers==3.3.1
+
+# LlamaIndex — RAG framework
+llama-index-core==0.14.19
+llama-index-vector-stores-postgres==0.8.1
+llama-index-embeddings-huggingface==0.7.0
+
+# Vector store
+chromadb==0.6.3

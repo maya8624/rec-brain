@@ -161,7 +161,8 @@ class TestGraphFlows:
 
         # Turn 1 — search runs, agent prompts user to pick a property
         result1 = await graph.ainvoke(
-            {"messages": [HumanMessage(content="Find me 2 bedroom apartments in Sydney and book an inspection")]},
+            {"messages": [HumanMessage(
+                content="Find me 2 bedroom apartments in Sydney and book an inspection")]},
             config=config,
         )
 
@@ -171,7 +172,8 @@ class TestGraphFlows:
 
         # Turn 2 — user picks a specific property to book
         result2 = await graph.ainvoke(
-            {"messages": [HumanMessage(content="Book an inspection for property 08d1202e-cd7e-d6cc-f2b3-c309f377d123")]},
+            {"messages": [HumanMessage(
+                content="Book an inspection for property 08d1202e-cd7e-d6cc-f2b3-c309f377d123")]},
             config=config,
         )
 
@@ -181,7 +183,8 @@ class TestGraphFlows:
 
         # check_availability ran — slots should be in booking_context
         booking_ctx = result2.get("booking_context", {})
-        assert booking_ctx.get("available_slots"), "expected available_slots after check_availability"
+        assert booking_ctx.get(
+            "available_slots"), "expected available_slots after check_availability"
 
         last_message = result2["messages"][-1]
         assert last_message.content
@@ -190,7 +193,7 @@ class TestGraphFlows:
         request = make_request_mock()
         result = await graph.ainvoke(
             {
-                "messages": [HumanMessage(content="Find me houses in Sydney and book an inspection")]
+                "messages": [HumanMessage(content="Book an inspection and cancel my booking CONF-12345")]
             },
             config=get_config(request, "integ-compound"),
         )

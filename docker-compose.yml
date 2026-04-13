@@ -1,0 +1,17 @@
+# Docker Compose file for rec-brain
+# Run with: docker compose up --build
+
+services:
+
+  # rec-brain — FastAPI AI orchestration service
+  rec-brain:
+    build:
+      context: .                                   # current directory contains the Dockerfile
+    container_name: rec-brain                      # fixed name so .NET backend can call http://rec-brain:8000
+    env_file:
+      - .env                                       # load environment variables from local .env file
+    volumes:
+      - .:/app                                     # mount local code so changes reflect without rebuilding
+    ports:
+      - "8000:8000"                                # expose API to host for direct testing (Postman, curl)
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload  # --reload restarts on code changes

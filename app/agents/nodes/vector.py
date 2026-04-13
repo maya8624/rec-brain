@@ -56,7 +56,8 @@ async def vector_search_node(
 
         logger.info("vector_search_node | retrieved %d nodes", len(nodes))
 
-        result_message = SystemMessage(content=json.dumps({
+        count = len(nodes)
+        payload = json.dumps({
             "results": [
                 {
                     "text": n.node.get_content(),
@@ -65,9 +66,13 @@ async def vector_search_node(
                 }
                 for n in nodes
             ],
-            "result_count": len(nodes),
+            "result_count": count,
             "source": "vector_db",
-        }))
+        })
+        result_message = SystemMessage(
+            content=f"[DOCUMENT SEARCH RESULTS — {count} relevant excerpt(s) found. "
+                    f"Answer the customer's question using only this retrieved content.]\n{payload}"
+        )
 
         return {"messages": [result_message]}
 

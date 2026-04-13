@@ -102,7 +102,7 @@ class TestChatEndpoint:
         response = await client.post(
             "/api/chat",
             json={
-                "message": "What are your office hours?",
+                "message": "Hi, can you help me?",
                 "thread_id": "integ-general",
                 "user_id": "u1",
                 "is_new_conversation": True,
@@ -130,7 +130,7 @@ class TestChatEndpoint:
         response = await client.post(
             "/api/chat",
             json={
-                "message": "Find me houses in Sydney and book an inspection",
+                "message": "Book an inspection and cancel my booking CONF-12345",
                 "thread_id": "integ-compound-api",
                 "user_id": "u1",
                 "is_new_conversation": True,

@@ -8,6 +8,7 @@ This keeps `pytest -m unit` fast in CI without a live environment.
 import os
 
 import pytest
+from asgi_lifespan import LifespanManager
 from dotenv import load_dotenv
 from httpx import ASGITransport, AsyncClient
 
@@ -27,10 +28,11 @@ skip_if_no_env = pytest.mark.skipif(
 
 
 @pytest.fixture(scope="session")
-def app():
-    """FastAPI app instance — initialised once for the whole integration session."""
+async def app():
+    """FastAPI app with lifespan — runs startup/shutdown once for the whole integration session."""
     from main import app as _app
-    return _app
+    async with LifespanManager(_app, startup_timeout=60) as manager:
+        yield manager.app
 
 
 @pytest.fixture
@@ -38,6 +40,6 @@ async def client(app):
     """Async HTTP test client wired directly to the FastAPI app (no TCP)."""
     async with AsyncClient(
         transport=ASGITransport(app=app),
-        base_url="http://127.0.0.1:8000:",
+        base_url="http://127.0.0.1:8000",
     ) as c:
         yield c
