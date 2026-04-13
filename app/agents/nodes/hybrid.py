@@ -22,7 +22,7 @@ from typing import Any
 from langchain_core.messages import SystemMessage
 from langchain_core.runnables import RunnableConfig
 
-from app.agents.nodes._base import last_human_message, resolve_app_service
+from app.agents.nodes._base import last_human_message, listing_summary, resolve_app_service, slim_rows
 from app.agents.state import RealEstateAgentState
 from app.core.constants import AppStateKeys, Node
 
@@ -68,17 +68,22 @@ async def hybrid_search_node(state: RealEstateAgentState, config: RunnableConfig
     sql_count = sql.get("result_count", 0)
     vector_count = vector.get("result_count", 0)
 
-    payload = json.dumps({
-        "sql_results": sql,
-        "vector_results": vector,
-    }, default=str)
+    rows = slim_rows(sql.get("output") or [])
+    summary = listing_summary(rows) if rows else "No listings found."
+    vector_payload = json.dumps({"vector_results": vector}, default=str)
+
     result_message = SystemMessage(
         content=f"[HYBRID SEARCH RESULTS — {sql_count} property listing(s) and "
                 f"{vector_count} document excerpt(s) found. "
-                f"Answer the customer using both sources.]\n{payload}"
+                f"Answer the customer using both sources.]\n"
+                f"LISTINGS:\n{summary}\n\n"
+                f"DOCUMENTS:\n{vector_payload}"
     )
 
-    return {"messages": [result_message]}
+    return {
+        "messages": [result_message],
+        "search_results": rows,
+    }
 
 
 # ---------------------------------------------------------------------------

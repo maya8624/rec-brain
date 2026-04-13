@@ -150,6 +150,11 @@ class RealEstateAgentState(TypedDict):
     # set by intent_node for compound intents, bypasses LLM
     early_response: str | None
 
+    # ── Search results ────────────────────────────────────────────────────────
+    # Slim property rows from the last SQL search — returned in ChatResponse
+    # for the frontend to render as property cards. Reset each search turn.
+    search_results: list[dict]
+
     # ── Flow control ──────────────────────────────────────────────────────────
     requires_human: bool                # True → escalate to human agent
     error_count: int                    # consecutive tool failures this session
@@ -179,6 +184,7 @@ def initial_state() -> RealEstateAgentState:
             keywords=[],
             last_result_count=0,
         ),
+        search_results=[],
         requires_human=False,
         error_count=0,
     )

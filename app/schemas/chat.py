@@ -45,6 +45,25 @@ class ChatRequest(BaseModel):
     )
 
 
+class Listing(BaseModel):
+    """A property listing returned from a search — sent to .NET for frontend rendering."""
+    listing_id: str
+    address: str
+    suburb: str
+    state: str
+    postcode: str
+    price: float
+    bedrooms: int
+    bathrooms: int
+    car_spaces: int = 0
+    property_type: str
+    listing_type: str   # Sale | Rent
+    listing_status: str
+    agent_name: str = ""
+    agent_phone: str = ""
+    agency_name: str = ""
+
+
 class SourceDocument(BaseModel):
     """A source document cited in a RAG response."""
     document: str
@@ -102,6 +121,12 @@ class ChatResponse(BaseModel):
     requires_human: bool = Field(
         default=False,
         description="True if agent could not handle the request",
+    )
+
+    # Property listings — lets frontend render a property list
+    listings: list[Listing] = Field(
+        default_factory=list,
+        description="Structured property listings from SQL search — render as property cards",
     )
 
     # RAG sources — lets frontend show "Sources" section

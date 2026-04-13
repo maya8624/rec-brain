@@ -70,3 +70,37 @@ def build_tool_message(tool_call_id: str, name: str, content: dict) -> ToolMessa
 def error_content(error: Exception) -> dict:
     """Standard error payload shape shared by all search nodes."""
     return {"success": False, "error": str(error)}
+
+
+def slim_rows(rows: list[dict]) -> list[dict]:
+    """Strip unused columns — keeps only what the LLM and frontend need."""
+    return [
+        {
+            "listing_id":     row.get("listing_id", ""),
+            "address":        row.get("address_line1", ""),
+            "suburb":         row.get("suburb", ""),
+            "state":          row.get("state", ""),
+            "postcode":       row.get("postcode", ""),
+            "price":          row.get("price", 0),
+            "bedrooms":       row.get("bedrooms", 0),
+            "bathrooms":      row.get("bathrooms", 0),
+            "car_spaces":     row.get("car_spaces", 0),
+            "property_type":  row.get("property_type", ""),
+            "listing_type":   row.get("listing_type", ""),
+            "listing_status": row.get("listing_status", ""),
+            "agent_name":     f"{row.get('agent_first_name', '')} {row.get('agent_last_name', '')}".strip(),
+            "agent_phone":    row.get("agent_phone", ""),
+            "agency_name":    row.get("agency_name", ""),
+        }
+        for row in rows
+    ]
+
+
+def listing_summary(rows: list[dict]) -> str:
+    """Compact one-line-per-listing text for LLM — saves tokens vs full JSON."""
+    return "\n".join(
+        f"{i+1}. {row['address']}, {row['suburb']} {row['state']} — "
+        f"${row['price']:,.0f} | {row['bedrooms']}bed {row['bathrooms']}bath | "
+        f"{row['property_type']} | {row['listing_type']}"
+        for i, row in enumerate(rows)
+    )

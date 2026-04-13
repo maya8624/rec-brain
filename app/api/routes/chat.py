@@ -13,7 +13,7 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from app.agents.state import initial_state
 from app.api.dependencies import get_agent, verify_internal_key, CompiledStateGraph
-from app.schemas.chat import ChatErrorResponse, ChatRequest, ChatResponse, SourceDocument
+from app.schemas.chat import ChatErrorResponse, ChatRequest, ChatResponse, Listing, SourceDocument
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -210,8 +210,20 @@ def _build_response(thread_id: str, result: dict) -> ChatResponse:
         booking_cancelled=booking_status.get("cancelled", False),
         confirmation_id=booking_context.get("confirmation_id"),
         requires_human=result.get("requires_human", False),
+        listings=_extract_listings(result.get("search_results", [])),
         sources=_extract_sources(result.get("messages", [])),
     )
+
+
+def _extract_listings(rows: list[dict]) -> list[Listing]:
+    """Convert slim state rows into Listing response models."""
+    listings = []
+    for r in rows:
+        try:
+            listings.append(Listing(**r))
+        except Exception:
+            pass
+    return listings
 
 
 def _extract_tools_used(messages: list) -> list[str]:

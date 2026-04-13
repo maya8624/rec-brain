@@ -10,14 +10,13 @@ Flow:
 No tool calls involved — bypasses LLM tool-calling entirely.
 """
 
-import json
 import logging
 from typing import Any
 
 from langchain_core.messages import SystemMessage
 from langchain_core.runnables import RunnableConfig
 
-from app.agents.nodes._base import last_human_message, resolve_app_service
+from app.agents.nodes._base import last_human_message, listing_summary, resolve_app_service, slim_rows
 from app.agents.state import RealEstateAgentState
 from app.core.constants import AppStateKeys, Node
 
@@ -47,27 +46,25 @@ async def listing_search_node(state: RealEstateAgentState, config: RunnableConfi
     try:
         result = await sql_service.search_listings(question)
 
+        count = result.get("result_count", 0)
         logger.info(
             "listing_search_node | success=%s | count=%d",
-            result.get("success"),
-            result.get("result_count", 0),
+            result.get("success"), count,
         )
 
-        count = result.get("result_count", 0)
-
-        payload = json.dumps({
-            "search_results": result.get("output"),
-            "result_count": count,
-            "success": result.get("success"),
-            "error": result.get("error"),
-        }, default=str)
+        rows = slim_rows(result.get("output") or [])
+        summary = listing_summary(rows) if rows else result.get("error", "No results found.")
 
         result_message = SystemMessage(
             content=f"[PROPERTY SEARCH RESULTS — {count} listing(s) found. "
-                    f"Format these for the customer using the FORMATTING SEARCH RESULTS rules.]\n{payload}"
+                    f"Format these for the customer using the FORMATTING SEARCH RESULTS rules.]\n"
+                    f"{summary}"
         )
 
-        return {"messages": [result_message]}
+        return {
+            "messages": [result_message],
+            "search_results": rows,
+        }
 
     except Exception as exc:
         logger.exception("listing_search_node | failed | %s", exc)
