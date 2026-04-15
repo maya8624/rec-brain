@@ -6,6 +6,10 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# Upgrade pip before any installs — pip 24.0 (bundled with python:3.11-slim)
+# has a bug that triggers false hash-mismatch errors on transitive dependencies
+RUN pip install --upgrade pip
+
 # Step 1 — install heavy ML packages first (separate layer)
 # If requirements.txt install fails later, this layer stays cached
 COPY requirements.base.txt .

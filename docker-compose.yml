@@ -7,9 +7,10 @@ services:
   rec-brain:
     build:
       context: .                                   # current directory contains the Dockerfile
+    image: rec-brain
     container_name: rec-brain                      # fixed name so .NET backend can call http://rec-brain:8000
     env_file:
-      - .env                                       # load environment variables from local .env file
+      - .env.docker                                # load environment variables for Docker (uses host.docker.internal)
     volumes:
       - .:/app                                     # mount local code so changes reflect without rebuilding
     ports:
