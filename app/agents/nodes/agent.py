@@ -32,7 +32,31 @@ logger = logging.getLogger(__name__)
 
 # Only these intents need tool calling
 _TOOL_INTENTS = frozenset(["booking", "cancellation"])
-_MAX_HISTORY = 10
+
+# Stale search-result SystemMessages — injected once per turn, useless after agent formats them
+_RESULT_PREFIXES = (
+    "[PROPERTY SEARCH RESULTS",
+    "[DOCUMENT SEARCH RESULTS",
+    "[HYBRID SEARCH RESULTS",
+)
+
+# Intent-aware history depth: booking/cancellation need more turns to collect contact details
+_HISTORY_BY_INTENT = {
+    "booking": 10,
+    "cancellation": 10,
+    "search": 6,
+    "hybrid_search": 6,
+    "document_query": 4,
+    "general": 4,
+}
+
+
+def _trim_history(messages: list) -> list:
+    """Drop stale search-result SystemMessages; keep human/AI/tool messages."""
+    return [
+        m for m in messages
+        if not (isinstance(m, SystemMessage) and m.content.startswith(_RESULT_PREFIXES))
+    ]
 
 
 def _get_plain_llm():
@@ -58,16 +82,16 @@ async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
     needs_tools = _needs_tools(state)
     llm = _get_tool_llm() if needs_tools else _get_plain_llm()
 
-    # TODO: optimize by sending only relevant subset based on call type
-    messages = [
-        SystemMessage(content=REAL_ESTATE_AGENT_SYSTEM),
-        *state["messages"][-_MAX_HISTORY:],
-    ]
+    intent = state.get("user_intent", "general")
+    history_limit = _HISTORY_BY_INTENT.get(intent, 6)
+    history = _trim_history(list(state["messages"]))[-history_limit:]
+    messages = [SystemMessage(content=REAL_ESTATE_AGENT_SYSTEM), *history]
 
     logger.info(
-        "agent_node | intent=%s | needs_tools=%s | messages=%d | errors=%d",
-        state.get("user_intent", "general"),
+        "agent_node | intent=%s | needs_tools=%s | history=%d/%d | errors=%d",
+        intent,
         needs_tools,
+        len(history),
         len(state["messages"]),
         state.get("error_count", 0),
     )

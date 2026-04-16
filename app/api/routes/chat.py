@@ -195,7 +195,16 @@ def _build_response(thread_id: str, result: dict) -> ChatResponse:
     reply = (
         ai_messages[-1].content
         if ai_messages
-        else result.get("early_response") or "I couldn't process that request."
+        else result.get("early_response")
+        or (
+            # requires_human=True: graph exited via safety escalation with no AIMessage.
+            # Option B: replace this with a human_escalation_node in graph.py that appends
+            # an AIMessage so the graph itself owns the escalation message — worth doing
+            # when escalation needs side effects (webhook, CRM notify, staff alert, etc.).
+            "I'm having trouble completing this — a team member will follow up shortly."
+            if result.get("requires_human")
+            else "I couldn't process that request."
+        )
     )
 
     booking_status = result.get("booking_status", {})

@@ -99,6 +99,16 @@ class TestBuildResponse:
         response = _build_response("t", self._make_result(requires_human=True))
         assert response.requires_human is True
 
+    def test_requires_human_reply_when_no_ai_message(self):
+        """Escalation path: no AIMessage in state → escalation reply, not generic fallback."""
+        result = self._make_result(
+            messages=[HumanMessage(content="book")],
+            requires_human=True,
+        )
+        response = _build_response("t", result)
+        assert "team member" in response.reply.lower()
+        assert response.reply != "I couldn't process that request."
+
     def test_sources_empty_by_default(self):
         response = _build_response("t", self._make_result())
         assert response.sources == []

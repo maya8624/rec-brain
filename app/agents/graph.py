@@ -6,29 +6,46 @@ Graph topology:
     START
       │
       ▼
-    intent_node
+    intent_node  (keyword classifier — no LLM call)
       │
       ├──► listing_search_node ──┐
       ├──► vector_search_node ───┤
-      ├──► hybrid_search_node ───┼──► agent_node (format) ──► END
+      ├──► hybrid_search_node ───┼──► agent_node (format reply) ──► END
       │                          │
       ├──► agent_node ───────────┘
-      │    (booking/cancellation)
+      │    (booking / cancellation — tool-calling mode)
       │         │
-      │    tools_node
+      │    tools_node  (check_availability / book / cancel)
       │         │
-      │    context_update ──► agent_node (format) ──► END
+      │    context_update_node  (writes booking_context / booking_status)
       │         │
-      │       safety ──► agent_node or END
+      │    safety_node  (error counting → requires_human flag)
+      │         │
+      │    agent_node (format reply) ──► END
       │
-      └──► END (early_response — compound intent)
+      └──► END (early_response — compound intent, user must clarify)
+
+agent_node history management (see app/agents/nodes/agent.py):
+  - Stale search-result SystemMessages are stripped before each LLM call
+    so large JSON payloads don't accumulate in the rolling window.
+  - History depth is intent-aware:
+      booking / cancellation  → 10 turns  (multi-turn contact collection)
+      search / hybrid_search  →  6 turns
+      document_query / general →  4 turns
 
 TODO:
-- [ ] human_escalation_node — add AIMessage before END when requires_human=True
+- [ ] human_escalation_node — requires_human=True currently exits via every
+      router's _requires_human() guard with no AIMessage. The escalation reply
+      is handled for now in _build_response (app/api/routes/chat.py) as a
+      formatting fallback. Promote to a dedicated graph node when escalation
+      needs side effects: webhook calls, CRM notifications, staff alerts, etc.
+      Implementation: insert human_escalation_node between safety_node (or any
+      _requires_human guard) and END; it appends a canned AIMessage and can
+      trigger external calls. All _requires_human guards in router.py route to
+      it instead of END.
 - [ ] multi-step tool calling for compound intents
-- [ ] Agency info storage — office hours, processes, policies
-      Options: vector store (document_query intent) or dedicated DB node
-      Leaning towards vector store — add keywords to document_query intent
+- [ ] Move search results out of messages into state["retrieved_docs"] to keep
+      history clean (see docs/reduce-llm-messages.md §3)
 """
 import logging
 
