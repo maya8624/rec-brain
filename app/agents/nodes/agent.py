@@ -21,7 +21,7 @@ import logging
 from typing import Any
 
 from groq import APIStatusError, RateLimitError
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from app.agents.state import RealEstateAgentState
 from app.infrastructure.llm import get_llm
@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 _TOOL_INTENTS = frozenset(["booking", "cancellation"])
 
 # Stale search-result SystemMessages — injected once per turn, useless after agent formats them
+# TODO: revisit this approach: maybe better way
 _RESULT_PREFIXES = (
     "[PROPERTY SEARCH RESULTS",
     "[DOCUMENT SEARCH RESULTS",
@@ -49,22 +50,6 @@ _HISTORY_BY_INTENT = {
     "document_query": 4,
     "general": 4,
 }
-
-
-def _trim_history(messages: list) -> list:
-    """Drop stale search-result SystemMessages; keep human/AI/tool messages."""
-    return [
-        m for m in messages
-        if not (isinstance(m, SystemMessage) and m.content.startswith(_RESULT_PREFIXES))
-    ]
-
-
-def _get_plain_llm():
-    return get_llm()
-
-
-def _get_tool_llm():
-    return get_llm().bind_tools(get_all_tools())
 
 
 async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
@@ -102,7 +87,8 @@ async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
         logger.error("agent_node | Groq rate limit hit: %s", exc)
         raise
     except APIStatusError as exc:
-        logger.error("agent_node | Groq API error %s: %s", exc.status_code, exc.message)
+        logger.error("agent_node | Groq API error %s: %s",
+                     exc.status_code, exc.message)
         raise
 
     if hasattr(response, "tool_calls") and response.tool_calls:
@@ -112,6 +98,14 @@ async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
         )
 
     return {"messages": [response]}
+
+
+def _get_plain_llm():
+    return get_llm()
+
+
+def _get_tool_llm():
+    return get_llm().bind_tools(get_all_tools())
 
 
 def _needs_tools(state: RealEstateAgentState) -> bool:
@@ -128,3 +122,21 @@ def _needs_tools(state: RealEstateAgentState) -> bool:
         return False
 
     return isinstance(state["messages"][-1], HumanMessage)
+
+
+def _trim_history(messages: list) -> list:
+    """Drop stale search-result SystemMessages; keep current turn's (not yet formatted).
+
+    A search result is stale when an AIMessage follows it — the agent already
+    formatted it into a response. Any search result after the last AIMessage
+    has not been formatted yet and belongs to the current turn.
+    """
+    last_ai_idx = next(
+        (i for i in range(len(messages) - 1, -1, -1) if isinstance(messages[i], AIMessage)),
+        -1,
+    )
+    return [
+        m for i, m in enumerate(messages)
+        if not (isinstance(m, SystemMessage) and m.content.startswith(_RESULT_PREFIXES))
+        or i > last_ai_idx
+    ]

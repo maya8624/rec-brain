@@ -72,6 +72,7 @@ class TestTrimHistory:
         return SystemMessage(content=f"{prefix}]\n{{...}}")
 
     def test_strips_property_search_results(self):
+        """Search result followed by AIMessage is stale — agent already formatted it."""
         msgs = [
             HumanMessage(content="show me flats"),
             self._search_msg("[PROPERTY SEARCH RESULTS"),
@@ -82,12 +83,20 @@ class TestTrimHistory:
         assert all(not isinstance(m, SystemMessage) for m in result)
 
     def test_strips_document_search_results(self):
-        msgs = [self._search_msg("[DOCUMENT SEARCH RESULTS"), HumanMessage(content="ok")]
-        assert len(_trim_history(msgs)) == 1
+        msgs = [
+            HumanMessage(content="office hours?"),
+            self._search_msg("[DOCUMENT SEARCH RESULTS"),
+            AIMessage(content="We are open 9-5."),
+        ]
+        assert len(_trim_history(msgs)) == 2
 
     def test_strips_hybrid_search_results(self):
-        msgs = [self._search_msg("[HYBRID SEARCH RESULTS"), AIMessage(content="ok")]
-        assert len(_trim_history(msgs)) == 1
+        msgs = [
+            HumanMessage(content="show flats and lease terms"),
+            self._search_msg("[HYBRID SEARCH RESULTS"),
+            AIMessage(content="Here are the results."),
+        ]
+        assert len(_trim_history(msgs)) == 2
 
     def test_keeps_non_search_system_messages(self):
         """System messages that are not search results (e.g. the agent prompt) are kept."""
@@ -101,22 +110,30 @@ class TestTrimHistory:
         msgs = [HumanMessage(content="a"), AIMessage(content="b")]
         assert _trim_history(msgs) == msgs
 
-    def test_current_turn_result_not_stripped(self):
-        """The most recent search result (last message) survives trimming — it's current turn."""
+    def test_current_turn_result_preserved(self):
+        """Stale result (AI followed it) is stripped; current turn result (no AI yet) is kept."""
+        stale = self._search_msg("[PROPERTY SEARCH RESULTS")
+        current = self._search_msg("[PROPERTY SEARCH RESULTS")
         msgs = [
-            self._search_msg("[PROPERTY SEARCH RESULTS"),  # stale (previous turn)
+            HumanMessage(content="show me flats"),
+            stale,
+            AIMessage(content="Here are some flats."),   # agent formatted stale → it's stale
             HumanMessage(content="show more"),
-            self._search_msg("[PROPERTY SEARCH RESULTS"),  # current turn (last)
+            current,                                      # no AIMessage after → current turn
         ]
         result = _trim_history(msgs)
-        # Both search SystemMessages are stripped by _trim_history itself;
-        # agent_node uses [-history_limit:] AFTER trimming, so current-turn result
-        # survives because search nodes append it as the very last message before
-        # agent_node runs — it is not yet in the trimmed window when dropped.
-        # Here we just verify _trim_history drops ALL matching prefixes (both stale
-        # and the last one), consistent with the implementation.
-        assert len(result) == 1  # only the HumanMessage survives
-        assert isinstance(result[0], HumanMessage)
+        assert len(result) == 4                            # stale stripped, everything else kept
+        assert not any(m is stale for m in result)        # identity check — same content as current
+        assert result[-1] is current
+
+    def test_single_search_result_preserved(self):
+        """A single search result (no prior history) is always kept."""
+        msgs = [
+            HumanMessage(content="office hours?"),
+            self._search_msg("[DOCUMENT SEARCH RESULTS"),
+        ]
+        result = _trim_history(msgs)
+        assert len(result) == 2
 
 
 @pytest.fixture

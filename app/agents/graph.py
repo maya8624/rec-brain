@@ -45,7 +45,7 @@ TODO:
       it instead of END.
 - [ ] multi-step tool calling for compound intents
 - [ ] Move search results out of messages into state["retrieved_docs"] to keep
-      history clean (see docs/reduce-llm-messages.md §3)
+      history clean (see docs/reduce-llm-messages.md #3)
 """
 import logging
 
