@@ -1,180 +1,159 @@
 """
-intent_node — classifies user intent before any LLM call.
+intent_node — classifies user intent before routing through the graph.
 
-Reads the latest HumanMessage, runs keyword classification,
-writes user_intent into state — no LLM cost.
+Strategy: hybrid keyword + LLM (Option 3)
 
-Intent values:
-    "search"          → listing_search_node  (v_listings direct query)
-    "document_query"  → vector_search_node
-    "hybrid_search"   → hybrid_search_node   (search + document_query together)
-    "booking"         → agent_node           (LLM calls check_availability/book_inspection)
-    "cancellation"    → agent_node           (LLM calls cancel_inspection)
-    "general"         → agent_node           (LLM plain response)
+    Fast path (keyword, no LLM):
+        - Obvious cancellation  → "cancellation"
+        - Obvious booking only  → "booking"
 
-Compound intents (e.g. search + booking) → "general"
-    — LLM responds asking user to clarify one action at a time.
+    LLM path (everything else):
+        - Ambiguous, follow-up, compound, search queries
+        - Returns IntentClassification with intent + extracted entities
+        - Entities written to state["search_context"] for downstream nodes
+
+Why hybrid:
+    Cancellation and standalone booking are unambiguous and need no entity
+    extraction — keyword matching is faster and free. Everything else benefits
+    from LLM context awareness (follow-ups, compound intents, entity extraction).
 """
 
 import logging
 import re
 from typing import Any
+
+from langchain_core.messages import HumanMessage, SystemMessage
+
 from app.agents.nodes._base import last_human_message
-from app.agents.state import RealEstateAgentState, UserIntent
+from app.agents.state import IntentClassification, RealEstateAgentState, UserIntent
+from app.infrastructure.llm import get_llm
+from app.prompts.intent import INTENT_CLASSIFICATION_PROMPT
 
 logger = logging.getLogger(__name__)
 
-_INTENT_KEYWORDS: dict[UserIntent, frozenset[str]] = {
-    "cancellation": frozenset([
-        "cancel", "cancellation", "cancelled", "withdraw",
-        "no longer", "don't want", "remove booking",
-    ]),
-    "booking": frozenset([
-        "book", "viewing", "view the property",
-        "schedule", "arrange", "available", "availability",
-        "when can i", "open for inspection", "open home",
-    ]),
-    "document_query": frozenset([
-        # Legal / tenancy documents
-        "lease", "contract", "strata", "terms", "clause",
-        "bond", "deposit", "condition", "by-law", "bylaw",
-        "pet policy", "break lease", "notice period",
-        "landlord", "tenant", "agreement",
-        # Agency info
-        "address", "location", "where are you",
-        "phone", "call you", "contact",
-        "email",
-        "website", "web site", "online",
-        "hours", "trading hours", "office hours", "open", "opening hours", "when are you",
-        "who is", "staff", "agent", "personnel", "team", "manager", "principal",
-    ]),
-    "search": frozenset([
-        "find", "search", "show", "list", "looking for",
-        "properties", "house", "apartment", "unit", "townhouse",
-        "bedroom", "bathroom", "suburb", "price", "budget",
-        "under", "rent for", "for rent", "to rent", "buy", "purchase",
-    ]),
-}
+# ------------------------------------
+#  Keyword sets for the fast path
+# ------------------------------------
+_CANCELLATION_KEYWORDS = frozenset([
+    "cancel", "cancellation", "cancelled", "withdraw",
+    "no longer", "don't want", "remove booking",
+])
 
-# If more than one of these match → compound intent → "general"
-_COMPOUND_INTENTS = frozenset(["search", "booking", "cancellation"])
+_BOOKING_KEYWORDS = frozenset([
+    "book", "viewing", "view the property",
+    "schedule", "arrange", "open for inspection", "open home",
+])
 
-# Patterns that indicate a location was provided in a search query
-_LOCATION_PATTERN = re.compile(
-    r'\b(in|at|near|around|within)\s+\w+'       # "in Sydney", "near the CBD"
-    r'|\b(sydney|melbourne|brisbane|perth|adelaide|hobart|darwin|canberra'
-    r'|nsw|vic|qld|wa|sa|tas|nt|act)\b',         # city / state names
-    re.IGNORECASE,
-)
+_SEARCH_KEYWORDS = frozenset([
+    "find", "search", "show", "list", "looking for",
+    "properties", "house", "apartment", "unit", "townhouse",
+    "bedroom", "bathroom", "suburb", "price", "budget",
+    "under", "rent for", "for rent", "to rent", "buy", "purchase",
+])
+
+# History depth for LLM path — enough to resolve follow-up references
+_LLM_HISTORY_LIMIT = 4
 
 
 async def intent_node(state: RealEstateAgentState) -> dict[str, Any]:
     """
     Classifies intent from the latest HumanMessage.
-    Writes user_intent into state — no LLM call.
+
+    Fast path: keyword match for obvious cancellation / booking — no LLM call.
+    LLM path:  everything else — returns intent + extracted search entities.
     """
     message = last_human_message(state)
-    intent = _classify_intent(message)
+    if not message:
+        return {"user_intent": "general"}
+
+    #  Fast path: keyword-based intent classification
+    obvious = _obvious_intent(message)
+    if obvious:
+        logger.info(
+            "intent_node | fast-path | intent=%s | message=%.60s", obvious, message)
+        return {"user_intent": obvious}
+
+    #  LLM path: everything else — returns intent + extracted search entities.
+    # Only HumanMessages are sent — AIMessages contain full listing/RAG responses
+    # that add noise and tokens the intent classifier doesn't need.
+    history = [m for m in state["messages"] if isinstance(m, HumanMessage)][-_LLM_HISTORY_LIMIT:]
+    prompt = [SystemMessage(content=INTENT_CLASSIFICATION_PROMPT), *history]
+
+    try:
+        llm = get_llm().with_structured_output(IntentClassification)
+        result: IntentClassification = await llm.ainvoke(prompt)
+    except Exception as exc:
+        logger.error("intent_node | LLM classification failed: %s", exc)
+        return {"user_intent": "general"}
 
     logger.info(
-        "intent_node | intent=%s | message=%.60s",
-        intent,
+        "intent_node | llm-path | intent=%s | early_response=%s | "
+        "location=%s | property_type=%s | bedrooms=%s | max_price=%s | message=%.60s",
+        result.intent,
+        bool(result.early_response),
+        result.location,
+        result.property_type,
+        result.bedrooms,
+        result.max_price,
         message,
     )
 
-    # Vague search — no location provided
-    # TODO: Option 3 — promote to a dedicated clarify_node between intent_node
-    #   and listing_search_node. It would check query completeness (location,
-    #   price range, property type) and route to END with a clarifying question
-    #   if required criteria are missing, or forward to listing_search_node if
-    #   sufficient. Cleaner separation of concerns and easier to extend with
-    #   more validation rules without growing intent_node further.
-    if intent == "search" and not _has_location(message):
-        return {
-            "user_intent": "search",
-            "early_response": "Which suburb or area are you looking in?",
-        }
+    updates: dict[str, Any] = {
+        "user_intent": result.intent,
+        "early_response": result.early_response,
+    }
 
-    # Compound intent handling
-    if intent == "general" and _is_compound(message):
-        # search + booking: run search first, agent prompts user to pick a property
-        if _is_search_and_book(message):
-            return {"user_intent": "search_then_book"}
-        # all other compounds: ask user to clarify one request at a time
-        return {
-            "user_intent": "general",
-            "early_response": "I can only handle one request at a time. "
-                              "Would you like to search for properties, or book an inspection?"
-        }
+    # Merge extracted entities into search_context (preserves previous filters)
+    entities = _extract_entities(result)
+    if entities:
+        existing = dict(state.get("search_context") or {})
+        updates["search_context"] = {**existing, **entities}
 
-    return {"user_intent": intent}
+    return updates
 
 
-def _classify_intent(message: str) -> UserIntent:
+def _obvious_intent(message: str) -> UserIntent | None:
     """
-    Keyword-based intent classification. Zero LLM cost.
-    Returns a plain string intent — never a dict.
+    Returns a high-confidence intent without an LLM call, or None if ambiguous.
+
+    Cancellation: very distinctive vocabulary, never overlaps with other intents.
+    Booking:      only when no search keywords present — avoids missing search_then_book.
     """
-    if not message:
-        return "general"
-
     msg_lower = message.lower()
 
-    matched_intents = [
-        intent
-        for intent, keywords in _INTENT_KEYWORDS.items()
-        if _matches_keywords(msg_lower, keywords)
-    ]
+    if (_matches_keywords(msg_lower, _CANCELLATION_KEYWORDS) and
+            not _matches_keywords(msg_lower, _SEARCH_KEYWORDS)):
+        return "cancellation"
 
-    # Hybrid: search + document_query together → use both sources
-    if "search" in matched_intents and "document_query" in matched_intents:
-        logger.debug("_classify_intent | search+document_query → hybrid_search")
-        return "hybrid_search"
+    if (_matches_keywords(msg_lower, _BOOKING_KEYWORDS) and
+            not _matches_keywords(msg_lower, _SEARCH_KEYWORDS)):
+        return "booking"
 
-    compound_matches = [i for i in matched_intents if i in _COMPOUND_INTENTS]
-    if len(compound_matches) > 1:
-        logger.debug(
-            "_classify_intent | compound=%s → general", compound_matches
-        )
-        return "general"  # ← plain string, early_response handled in intent_node
-
-    if matched_intents:
-        intent = matched_intents[0]
-        logger.debug("_classify_intent | '%.40s' → %s", message, intent)
-        return intent  # ← plain string
-
-    return "general"  # ← plain string
+    return None
 
 
-def _is_compound(message: str) -> bool:
-    """Returns True if multiple compound intents match the message."""
-    msg_lower = message.lower()
-    compound_matches = [
-        intent for intent in _COMPOUND_INTENTS
-        if _matches_keywords(msg_lower, _INTENT_KEYWORDS[intent])
-    ]
-    return len(compound_matches) > 1
-
-
-def _is_search_and_book(message: str) -> bool:
-    """True only when the compound is exactly search + booking (not cancellation)."""
-    msg_lower = message.lower()
-    return (
-        _matches_keywords(msg_lower, _INTENT_KEYWORDS["search"]) and
-        _matches_keywords(msg_lower, _INTENT_KEYWORDS["booking"])
-    )
-
-
-def _has_location(message: str) -> bool:
-    """Returns True if the message contains a recognisable location indicator."""
-    return bool(_LOCATION_PATTERN.search(message))
+def _extract_entities(result: IntentClassification) -> dict:
+    """Build a partial SearchContext dict from LLM-extracted entities."""
+    entities = {}
+    if result.location:
+        entities["location"] = result.location
+    if result.listing_type:
+        entities["listing_type"] = result.listing_type
+    if result.property_type:
+        entities["property_type"] = result.property_type
+    if result.bedrooms is not None:
+        entities["bedrooms"] = result.bedrooms
+    if result.bathrooms is not None:
+        entities["bathrooms"] = result.bathrooms
+    if result.max_price is not None:
+        entities["max_price"] = result.max_price
+    if result.min_price is not None:
+        entities["min_price"] = result.min_price
+    return entities
 
 
 def _matches_keywords(msg_lower: str, keywords: frozenset[str]) -> bool:
-    """
-    Match keywords as whole words/phrases using word boundary matching.
-    Prevents substring false positives e.g. "rent" matching "rental".
-    """
+    """Whole-word/phrase keyword match — prevents substring false positives."""
     for keyword in keywords:
         if re.search(rf'\b{re.escape(keyword)}\b', msg_lower):
             return True

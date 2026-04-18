@@ -101,6 +101,7 @@ def listing_summary(rows: list[dict]) -> str:
     return "\n".join(
         f"{i+1}. {row['address']}, {row['suburb']} {row['state']} — "
         f"${row['price']:,.0f} | {row['bedrooms']}bed {row['bathrooms']}bath | "
-        f"{row['property_type']} | {row['listing_type']}"
+        f"{row['property_type']} | {row['listing_type']} | "
+        f"Agent: {row['agent_name']} {row['agent_phone']}"
         for i, row in enumerate(rows)
     )

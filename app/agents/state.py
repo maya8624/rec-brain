@@ -19,6 +19,7 @@ LangGraph state rules:
 from typing import Annotated, Literal, Sequence, TypedDict
 import operator
 from langchain_core.messages import BaseMessage
+from pydantic import BaseModel
 
 # ------------------------------------
 # Intent literals)
@@ -30,13 +31,15 @@ UserIntent = Literal[
     "hybrid_search",    # user wants property listings + document context together
     "booking",          # user wants to inspect a property
     "cancellation",     # user wants to cancel an existing inspection
-    "search_then_book", # user wants to search first, then book — run search, prompt to pick
+    "search_then_book",  # user wants to search first, then book — run search, prompt to pick
     "general",          # general question about the agency / process
     "unknown",          # intent not yet determined
 ]
 
 
-# ── Nested context types ───────────────────────────────────────────────────────
+# ------------------------------------
+#  Nested context types
+# ------------------------------------
 
 class PropertyContext(TypedDict, total=False):
     """
@@ -112,13 +115,35 @@ class SearchContext(TypedDict, total=False):
     across separate messages — this accumulates those filters.
     """
     location: str                   # suburb or area name
-    max_price: float                # AUD
-    min_price: float                # AUD
+    listing_type: str               # "Sale" or "Rent"
+    property_type: str              # House | Apartment | Townhouse | Unit | Villa | Studio
     bedrooms: int
     bathrooms: int
-    property_type: str              # house | apartment | townhouse | unit | villa
+    max_price: float                # AUD
+    min_price: float                # AUD
     keywords: list[str]             # ["pool", "garage", "pet friendly"]
     last_result_count: int          # how many results the last search returned
+
+
+# ------------------------------------
+#  LLM-based intent classification output
+# ------------------------------------
+class IntentClassification(BaseModel):
+    """
+    Structured output returned by the LLM intent classifier.
+    Pydantic BaseModel so LangChain's with_structured_output can deserialise it.
+    """
+    intent: UserIntent
+    early_response: str | None = None
+    # Search entities — null means not mentioned, do not guess
+    location: str | None = None
+    listing_type: str | None = None     # "Sale" or "Rent"
+    # House | Apartment | Townhouse | Unit | Villa | Studio
+    property_type: str | None = None
+    bedrooms: int | None = None
+    bathrooms: int | None = None
+    max_price: float | None = None
+    min_price: float | None = None
 
 
 # ── Main agent state ──────────────────────────────────────────────────────────

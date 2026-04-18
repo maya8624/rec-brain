@@ -1,6 +1,4 @@
 """
-app/services/sql_search.py
-
 SqlViewService — LLM-generated SQL queries scoped to v_listings only.
 
 Flow:
@@ -18,8 +16,16 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.infrastructure.database import engine
 from app.prompts.sql import SQL_GENERATION_PROMPT
+from app.agents.state import SearchContext
 
 logger = logging.getLogger(__name__)
+
+# Fixed SELECT columns — mirrors SQL_GENERATION_PROMPT rule 1
+_SELECT_COLS = (
+    "SELECT listing_id, listing_type, listing_status, price, bedrooms, bathrooms, "
+    "car_spaces, property_type, title, address_line1, address_line2, suburb, state, "
+    "postcode, agent_first_name, agent_last_name, agent_phone, agency_name"
+)
 
 
 class SqlValidationError(Exception):
@@ -46,41 +52,43 @@ class SqlViewService:
         try:
             sql = await self._generate_sql(question)
             logger.debug("SqlViewService | generated sql=%s", sql)
-
-            self._validate_sql(sql)
-
-            with engine.connect() as conn:
-                result = conn.execute(text(sql))
-                rows = [dict(row._mapping) for row in result]
-
-            result_count = len(rows)
-
-            logger.info("SqlViewService | complete | count=%d", result_count)
-
-            return {
-                "success": True,
-                "output": rows,
-                "result_count": result_count,
-                "sql_used": sql,
-            }
+            rows = self._execute_sql(sql)
+            logger.info("SqlViewService | complete | count=%d", len(rows))
+            return {"success": True, "output": rows, "result_count": len(rows), "sql_used": sql}
 
         except SqlValidationError as exc:
             logger.error("SqlViewService | validation failed | %s", exc)
-            return {
-                "success": False,
-                "output": None,
-                "result_count": 0,
-                "error": "Property search is temporarily unavailable.",
-            }
+            return {"success": False, "output": None, "result_count": 0, "error": "Property search is temporarily unavailable."}
 
         except Exception as exc:
             logger.exception("SqlViewService | failed | %s", exc)
-            return {
-                "success": False,
-                "output": None,
-                "result_count": 0,
-                "error": "Property search is temporarily unavailable.",
-            }
+            return {"success": False, "output": None, "result_count": 0, "error": "Property search is temporarily unavailable."}
+
+    async def search_from_context(self, ctx: SearchContext) -> dict:
+        """
+        Execute a template-built SQL query from SearchContext — no LLM call.
+        Used by listing_search_node when intent_node has already extracted entities.
+        """
+        logger.info("SqlViewService.search_from_context | ctx=%s", ctx)
+
+        try:
+            sql = self.build_sql_from_context(ctx)
+            rows = self._execute_sql(sql)
+            logger.info(
+                "SqlViewService.search_from_context | count=%d", len(rows))
+            return {"success": True, "output": rows, "result_count": len(rows), "sql_used": sql}
+
+        except Exception as exc:
+            logger.exception(
+                "SqlViewService.search_from_context | failed | %s", exc)
+            return {"success": False, "output": None, "result_count": 0, "error": "Property search is temporarily unavailable."}
+
+    def _execute_sql(self, sql: str) -> list[dict]:
+        """Validate and run a SELECT query. Returns rows as a list of dicts."""
+        self._validate_sql(sql)
+        with engine.connect() as conn:
+            result = conn.execute(text(sql))
+            return [dict(row._mapping) for row in result]
 
     async def _generate_sql(self, question: str) -> str:
         """Send question + v_listings schema to LLM. Returns raw SQL string."""
@@ -99,6 +107,46 @@ class SqlViewService:
                 sql = sql[3:]
 
         return sql.strip()
+
+    @staticmethod
+    def build_sql_from_context(ctx: SearchContext) -> str:
+        """
+        Build a deterministic SELECT query from structured SearchContext fields.
+        No LLM involved — avoids the SQL_GENERATION_PROMPT token cost entirely.
+
+        Falls back to search_listings (LLM) when search_context lacks a location
+        or contains criteria this template cannot express (e.g. "near good schools").
+        """
+        conditions = ["is_published = true", "is_active = true"]
+
+        if ctx.get("location"):
+            loc = ctx["location"].replace("'", "")
+            conditions.append(f"suburb ILIKE '%{loc}%'")
+
+        if ctx.get("listing_type") in ("Sale", "Rent"):
+            conditions.append(f"listing_type = '{ctx['listing_type']}'")
+
+        if ctx.get("property_type"):
+            pt = ctx["property_type"].replace("'", "")
+            # "Unit" is not a valid DB value — Australians use it interchangeably with Apartment
+            if pt.lower() == "unit":
+                pt = "Apartment"
+            conditions.append(f"property_type ILIKE '{pt}'")
+
+        if ctx.get("bedrooms") is not None:
+            conditions.append(f"bedrooms = {int(ctx['bedrooms'])}")
+
+        if ctx.get("bathrooms") is not None:
+            conditions.append(f"bathrooms >= {int(ctx['bathrooms'])}")
+
+        if ctx.get("max_price") is not None:
+            conditions.append(f"price <= {float(ctx['max_price'])}")
+
+        if ctx.get("min_price") is not None:
+            conditions.append(f"price >= {float(ctx['min_price'])}")
+
+        where = " AND ".join(conditions)
+        return f"{_SELECT_COLS} FROM v_listings WHERE {where} ORDER BY price ASC LIMIT 10"
 
     @staticmethod
     def _validate_sql(sql: str) -> None:

@@ -49,18 +49,21 @@ def make_sql_service():
     """Factory for a mock SqlViewService."""
     def _factory(result: dict | None = None, raise_error: Exception | None = None):
         mock = AsyncMock()
+        default_result = result or {
+            "success": True,
+            "output": [
+                {"address": "12 Park Ave, Sydney",
+                    "price": 750_000, "bedrooms": 3},
+            ],
+            "result_count": 1,
+            "sql_used": "SELECT * FROM v_listings WHERE suburb = 'Sydney'",
+        }
         if raise_error:
             mock.search_listings.side_effect = raise_error
+            mock.search_from_context.side_effect = raise_error
         else:
-            mock.search_listings.return_value = result or {
-                "success": True,
-                "output": [
-                    {"address": "12 Park Ave, Sydney",
-                        "price": 750_000, "bedrooms": 3},
-                ],
-                "result_count": 1,
-                "sql_used": "SELECT * FROM v_listings WHERE suburb = 'Sydney'",
-            }
+            mock.search_listings.return_value = default_result
+            mock.search_from_context.return_value = default_result
         return mock
     return _factory
 

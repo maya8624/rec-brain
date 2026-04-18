@@ -18,6 +18,7 @@ from langchain_core.runnables import RunnableConfig
 from app.agents.nodes._base import last_human_message, listing_summary, resolve_app_service, slim_rows
 from app.agents.state import RealEstateAgentState
 from app.core.constants import AppStateKeys, Node
+from app.services.sql_service import SqlViewService
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,7 @@ async def listing_search_node(state: RealEstateAgentState, config: RunnableConfi
         logger.warning("listing_search_node | no human message found")
         return {}
 
-    sql_service = resolve_app_service(
+    sql_service: SqlViewService | None = resolve_app_service(
         config, AppStateKeys.SQL_VIEW_SERVICE, Node.LISTING_SEARCH
     )
 
@@ -43,13 +44,24 @@ async def listing_search_node(state: RealEstateAgentState, config: RunnableConfi
         return {}
 
     try:
-        result = await sql_service.search_listings(question)
+        ctx = state.get("search_context") or {}
+
+        if ctx.get("location"):
+            # Fast path — entities already extracted by intent_node, no LLM call
+            result = await sql_service.search_from_context(ctx)
+            logger.info(
+                "listing_search_node | context-path | count=%d",
+                result.get("result_count", 0),
+            )
+        else:
+            # Fallback — complex query, let LLM generate SQL
+            result = await sql_service.search_listings(question)
+            logger.info(
+                "listing_search_node | llm-path | count=%d",
+                result.get("result_count", 0),
+            )
 
         count = result.get("result_count", 0)
-        logger.info(
-            "listing_search_node | success=%s | count=%d",
-            result.get("success"), count,
-        )
 
         rows = slim_rows(result.get("output") or [])
 

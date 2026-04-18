@@ -1,251 +1,194 @@
 """
-Unit tests for intent_node and _classify_intent.
+Unit tests for intent_node and its helpers.
 
-_classify_intent: pure keyword matching — no DB or LLM required.
-intent_node:      async node wrapper — tests state mutation (early_response).
+Fast path (_obvious_intent): pure keyword matching — no DB or LLM required.
+LLM path (intent_node):      patched LLM — tests state mutations and entity extraction.
 """
 import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from app.agents.nodes.intent import _classify_intent, intent_node
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage
 
-
-# ── _classify_intent ───────────────────────────────────────────────────────────
-
-class TestSearchIntent:
-    def test_show_keyword(self):
-        assert _classify_intent(
-            "Show me 3 bedroom houses in Sydney") == "search"
-
-    def test_find_keyword(self):
-        assert _classify_intent("Find apartments in Melbourne") == "search"
-
-    def test_looking_for(self):
-        assert _classify_intent(
-            "I'm looking for a unit in Parramatta") == "search"
-
-    def test_list_keyword(self):
-        assert _classify_intent("List properties under $500k") == "search"
-
-    def test_buy_keyword(self):
-        assert _classify_intent(
-            "I want to buy a house in Brisbane") == "search"
-
-    def test_rent_keyword(self):
-        assert _classify_intent("Show me rentals in Sydney CBD") == "search"
-
-    def test_bedroom_keyword(self):
-        assert _classify_intent("3 bedroom apartment") == "search"
-
-    def test_price_keyword(self):
-        assert _classify_intent("Properties under $800k") == "search"
+from app.agents.nodes.intent import _obvious_intent, _matches_keywords, intent_node
+from app.agents.state import IntentClassification
 
 
-class TestBookingIntent:
-    def test_book_keyword(self):
-        assert _classify_intent("I'd like to book an inspection") == "booking"
+# ── _obvious_intent ────────────────────────────────────────────────────────────
 
-    def test_inspection_keyword(self):
-        assert _classify_intent("Can I arrange an inspection?") == "booking"
-
-    def test_viewing_keyword(self):
-        assert _classify_intent("I'd like a viewing please") == "booking"
-
-    def test_availability_keyword(self):
-        assert _classify_intent("Is this property available?") == "booking"
-
-    def test_open_home_keyword(self):
-        assert _classify_intent("When is the next open home?") == "booking"
-
-    def test_schedule_keyword(self):
-        assert _classify_intent("Can we schedule a viewing?") == "booking"
-
-
-class TestCancellationIntent:
+class TestObviousIntent:
     def test_cancel_keyword(self):
-        assert _classify_intent(
-            "I want to cancel my inspection") == "cancellation"
+        assert _obvious_intent("I want to cancel my inspection") == "cancellation"
 
     def test_cancellation_keyword(self):
-        assert _classify_intent("I need a cancellation") == "cancellation"
-
-    def test_no_longer_keyword(self):
-        assert _classify_intent(
-            "I no longer want to inspect this property") == "cancellation"
+        assert _obvious_intent("I need a cancellation") == "cancellation"
 
     def test_withdraw_keyword(self):
-        assert _classify_intent(
-            "I'd like to withdraw my booking") == "cancellation"
+        assert _obvious_intent("I'd like to withdraw my booking") == "cancellation"
+
+    def test_no_longer_keyword(self):
+        assert _obvious_intent("I no longer want to inspect this property") == "cancellation"
+
+    def test_book_keyword_alone(self):
+        assert _obvious_intent("I'd like to book an inspection") == "booking"
+
+    def test_schedule_keyword_alone(self):
+        assert _obvious_intent("Can we schedule a viewing?") == "booking"
+
+    def test_open_home_keyword(self):
+        assert _obvious_intent("When is the next open home?") == "booking"
+
+    def test_book_with_search_returns_none(self):
+        """search + booking → not obvious, needs LLM to detect search_then_book."""
+        assert _obvious_intent("Find houses in Sydney and book an inspection") is None
+
+    def test_cancel_with_search_returns_none(self):
+        """search + cancellation → compound, needs LLM."""
+        assert _obvious_intent("Show me apartments and cancel my booking") is None
+
+    def test_search_returns_none(self):
+        """Search always goes to LLM for entity extraction."""
+        assert _obvious_intent("Show me 3 bedroom houses in Sydney") is None
+
+    def test_general_returns_none(self):
+        assert _obvious_intent("Hello, how are you?") is None
+
+    def test_empty_message_returns_none(self):
+        assert _obvious_intent("") is None
+
+    def test_follow_up_returns_none(self):
+        assert _obvious_intent("what about his number?") is None
 
 
-class TestDocumentQueryIntent:
-    def test_lease_keyword(self):
-        assert _classify_intent(
-            "What are the lease conditions?") == "document_query"
+# ── intent_node fast path ──────────────────────────────────────────────────────
 
-    def test_strata_keyword(self):
-        assert _classify_intent(
-            "Can you explain the strata report?") == "document_query"
+class TestIntentNodeFastPath:
+    async def test_cancellation_skips_llm(self):
+        state = {"messages": [HumanMessage(content="cancel my inspection")]}
+        with patch("app.agents.nodes.intent.get_llm") as mock_get_llm:
+            result = await intent_node(state)
+            mock_get_llm.assert_not_called()
+        assert result["user_intent"] == "cancellation"
 
-    def test_contract_keyword(self):
-        assert _classify_intent(
-            "Tell me about the contract") == "document_query"
+    async def test_booking_skips_llm(self):
+        state = {"messages": [HumanMessage(content="I'd like to book a viewing")]}
+        with patch("app.agents.nodes.intent.get_llm") as mock_get_llm:
+            result = await intent_node(state)
+            mock_get_llm.assert_not_called()
+        assert result["user_intent"] == "booking"
 
-    def test_bond_keyword(self):
-        assert _classify_intent(
-            "What are the bond requirements?") == "document_query"
-
-    def test_pet_policy_keyword(self):
-        assert _classify_intent("What is the pet policy?") == "document_query"
-
-    def test_break_lease_keyword(self):
-        assert _classify_intent("How do I break my lease?") == "document_query"
-
-
-class TestHybridSearchIntent:
-    """search + document_query together → hybrid_search (not general)."""
-
-    def test_search_and_lease(self):
-        assert _classify_intent(
-            "Show me 3 bedroom apartments and what are the lease terms?"
-        ) == "hybrid_search"
-
-    def test_find_and_contract(self):
-        assert _classify_intent(
-            "Find houses in Sydney and explain the contract"
-        ) == "hybrid_search"
-
-    def test_properties_and_strata(self):
-        assert _classify_intent(
-            "List properties in Parramatta and tell me about the strata"
-        ) == "hybrid_search"
-
-
-class TestGeneralIntent:
-    def test_office_hours(self):
-        # "hours" is a document_query keyword — routes to vector search for agency info
-        assert _classify_intent("What are your office hours?") == "document_query"
-
-    def test_greeting(self):
-        assert _classify_intent("Hello, how are you?") == "general"
-
-    def test_empty_message(self):
-        assert _classify_intent("") == "general"
-
-    def test_whitespace_only(self):
-        assert _classify_intent("   ") == "general"
-
-    def test_process_question(self):
-        assert _classify_intent(
-            "How does the rental process work?") == "general"
-
-
-class TestSearchThenBookIntent:
-    """search + booking compound → 'search_then_book' (not early_response refusal)."""
-
-    def test_find_and_book(self):
-        assert _classify_intent(
-            "Find me houses in Sydney and book an inspection"
-        ) == "general"  # _classify_intent returns general; intent_node upgrades to search_then_book
-
-    def test_show_and_schedule(self):
-        assert _classify_intent(
-            "Show me apartments in Melbourne and schedule a viewing"
-        ) == "general"
-
-
-class TestCompoundIntent:
-    """Non search+book compounds → 'general' (user must clarify)."""
-
-    def test_search_and_cancel(self):
-        assert _classify_intent(
-            "Show me apartments and cancel my booking"
-        ) == "general"
-
-    def test_book_and_cancel(self):
-        assert _classify_intent(
-            "I want to book but also cancel my existing inspection"
-        ) == "general"
-
-    def test_search_book_cancel(self):
-        assert _classify_intent(
-            "Find properties, book a viewing, and cancel my old booking"
-        ) == "general"
-
-
-class TestIntentNode:
-    """Tests for the async intent_node wrapper — verifies state mutations."""
-
-    async def test_simple_intent_sets_user_intent(self):
-        state = {"messages": [HumanMessage(
-            content="Show me houses in Sydney")]}
+    async def test_empty_messages_returns_general(self):
+        state = {"messages": []}
         result = await intent_node(state)
+        assert result["user_intent"] == "general"
+
+
+# ── intent_node LLM path ───────────────────────────────────────────────────────
+
+def _make_llm_mock(classification: IntentClassification):
+    """Returns a mock get_llm() that produces the given IntentClassification."""
+    structured = AsyncMock(return_value=classification)
+    llm = MagicMock()
+    llm.with_structured_output.return_value = MagicMock(ainvoke=structured)
+    return llm
+
+
+@patch("app.agents.nodes.intent.get_llm")
+class TestIntentNodeLLMPath:
+    async def test_search_intent_with_entities(self, mock_get_llm):
+        mock_get_llm.return_value = _make_llm_mock(IntentClassification(
+            intent="search",
+            location="Sydney",
+            property_type="House",
+            bedrooms=3,
+            max_price=800000,
+        ))
+        state = {"messages": [HumanMessage(content="Show me 3 bedroom houses in Sydney under $800k")]}
+        result = await intent_node(state)
+
         assert result["user_intent"] == "search"
+        assert result["search_context"]["location"] == "Sydney"
+        assert result["search_context"]["property_type"] == "House"
+        assert result["search_context"]["bedrooms"] == 3
+        assert result["search_context"]["max_price"] == 800000
 
-    async def test_simple_intent_does_not_set_early_response(self):
-        state = {"messages": [HumanMessage(
-            content="Show me houses in Sydney")]}
+    async def test_search_without_location_sets_early_response(self, mock_get_llm):
+        mock_get_llm.return_value = _make_llm_mock(IntentClassification(
+            intent="search",
+            early_response="Which suburb or area are you looking in?",
+        ))
+        state = {"messages": [HumanMessage(content="Find apartments with 2 bathrooms for rent")]}
         result = await intent_node(state)
-        assert "early_response" not in result or result.get(
-            "early_response") is None
 
-    async def test_search_and_book_sets_search_then_book(self):
+        assert result["user_intent"] == "search"
+        assert result["early_response"]
+
+    async def test_follow_up_resolved_from_history(self, mock_get_llm):
+        mock_get_llm.return_value = _make_llm_mock(IntentClassification(
+            intent="document_query",
+        ))
+        state = {"messages": [
+            HumanMessage(content="Who is the principal agent?"),
+            AIMessage(content="Sam Jones is the principal agent."),
+            HumanMessage(content="what is his number?"),
+        ]}
+        result = await intent_node(state)
+        assert result["user_intent"] == "document_query"
+
+    async def test_search_then_book_intent(self, mock_get_llm):
+        mock_get_llm.return_value = _make_llm_mock(IntentClassification(
+            intent="search_then_book",
+            location="Sydney",
+        ))
         state = {"messages": [HumanMessage(
             content="Find me houses in Sydney and book an inspection"
         )]}
         result = await intent_node(state)
         assert result["user_intent"] == "search_then_book"
-        assert not result.get("early_response")
 
-    async def test_search_and_book_does_not_set_early_response(self):
-        state = {"messages": [HumanMessage(
-            content="Show me apartments in Parramatta and schedule a viewing"
-        )]}
-        result = await intent_node(state)
-        assert result["user_intent"] == "search_then_book"
-        assert not result.get("early_response")
-
-    async def test_search_and_cancel_still_sets_early_response(self):
-        """search + cancellation is not search_then_book — user must clarify."""
+    async def test_compound_sets_early_response(self, mock_get_llm):
+        mock_get_llm.return_value = _make_llm_mock(IntentClassification(
+            intent="general",
+            early_response="I can only handle one request at a time. "
+                           "Would you like to search or cancel a booking?",
+        ))
         state = {"messages": [HumanMessage(
             content="Show me apartments and cancel my booking"
         )]}
         result = await intent_node(state)
         assert result["user_intent"] == "general"
-        assert result.get("early_response")
+        assert result["early_response"]
 
-    async def test_booking_intent_no_early_response(self):
-        state = {"messages": [HumanMessage(
-            content="I'd like to book an inspection")]}
+    async def test_entities_merged_with_existing_search_context(self, mock_get_llm):
+        """New entities merge with existing context — previous filters preserved."""
+        mock_get_llm.return_value = _make_llm_mock(IntentClassification(
+            intent="search",
+            max_price=600000,
+        ))
+        state = {
+            "messages": [HumanMessage(content="actually make it under $600k")],
+            "search_context": {"location": "Sydney", "bedrooms": 3},
+        }
         result = await intent_node(state)
-        assert result["user_intent"] == "booking"
-        assert not result.get("early_response")
 
-    async def test_empty_state_messages(self):
-        state = {"messages": []}
+        ctx = result["search_context"]
+        assert ctx["location"] == "Sydney"    # preserved from previous turn
+        assert ctx["bedrooms"] == 3           # preserved
+        assert ctx["max_price"] == 600000     # new from this turn
+
+    async def test_no_entities_does_not_write_search_context(self, mock_get_llm):
+        mock_get_llm.return_value = _make_llm_mock(IntentClassification(
+            intent="general",
+        ))
+        state = {"messages": [HumanMessage(content="Hello!")]}
+        result = await intent_node(state)
+        assert "search_context" not in result
+
+    async def test_llm_failure_falls_back_to_general(self, mock_get_llm):
+        llm = MagicMock()
+        llm.with_structured_output.return_value = MagicMock(
+            ainvoke=AsyncMock(side_effect=RuntimeError("Groq down"))
+        )
+        mock_get_llm.return_value = llm
+        state = {"messages": [HumanMessage(content="show me something nice")]}
         result = await intent_node(state)
         assert result["user_intent"] == "general"
-
-    async def test_vague_search_without_location_sets_early_response(self):
-        """Search with no location → ask for suburb before running SQL."""
-        state = {"messages": [HumanMessage(content="Find apartments with 2 bathrooms for rent")]}
-        result = await intent_node(state)
-        assert result["user_intent"] == "search"
-        assert result.get("early_response")
-
-    async def test_search_with_location_does_not_set_early_response(self):
-        state = {"messages": [HumanMessage(content="Find apartments in Melbourne")]}
-        result = await intent_node(state)
-        assert result["user_intent"] == "search"
-        assert not result.get("early_response")
-
-    async def test_search_with_preposition_location_passes(self):
-        """'near the CBD' matches the preposition pattern."""
-        state = {"messages": [HumanMessage(content="Show me houses near the CBD")]}
-        result = await intent_node(state)
-        assert not result.get("early_response")
-
-    async def test_search_with_state_abbreviation_passes(self):
-        state = {"messages": [HumanMessage(content="Show me houses in NSW")]}
-        result = await intent_node(state)
-        assert not result.get("early_response")

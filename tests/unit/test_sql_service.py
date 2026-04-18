@@ -35,6 +35,89 @@ def make_service(llm_response: str = "SELECT * FROM v_listings", db_rows: list |
     return SqlViewService(llm=mock_llm), mock_llm, mock_conn
 
 
+# ── build_sql_from_context ─────────────────────────────────────────────────────
+
+class TestBuildSqlFromContext:
+    def test_location_only(self):
+        sql = SqlViewService.build_sql_from_context({"location": "Sydney"})
+        assert "suburb ILIKE '%Sydney%'" in sql
+        assert "is_published = true" in sql
+        assert "LIMIT 10" in sql
+
+    def test_all_filters(self):
+        sql = SqlViewService.build_sql_from_context({
+            "location": "Parramatta",
+            "listing_type": "Sale",
+            "property_type": "House",
+            "bedrooms": 3,
+            "bathrooms": 2,
+            "max_price": 800000,
+            "min_price": 500000,
+        })
+        assert "suburb ILIKE '%Parramatta%'" in sql
+        assert "listing_type = 'Sale'" in sql
+        assert "property_type ILIKE 'House'" in sql
+        assert "bedrooms = 3" in sql
+        assert "bathrooms >= 2" in sql
+        assert "price <= 800000.0" in sql
+        assert "price >= 500000.0" in sql
+
+    def test_property_type_exact_no_wildcard(self):
+        """No % wildcards — prevents House matching Townhouse."""
+        sql = SqlViewService.build_sql_from_context({"location": "Sydney", "property_type": "House"})
+        assert "property_type ILIKE 'House'" in sql
+        assert "property_type ILIKE '%House%'" not in sql
+
+    def test_invalid_listing_type_excluded(self):
+        """Only 'Sale' or 'Rent' are valid — anything else is ignored."""
+        sql = SqlViewService.build_sql_from_context({"location": "Sydney", "listing_type": "unknown"})
+        assert "listing_type = " not in sql
+
+    def test_quote_stripped_from_location(self):
+        """Single quotes in LLM output are stripped to prevent SQL injection."""
+        sql = SqlViewService.build_sql_from_context({"location": "O'Brien"})
+        assert "OBrien" in sql
+        assert "'O'" not in sql
+
+    def test_empty_context_still_valid_sql(self):
+        sql = SqlViewService.build_sql_from_context({})
+        assert sql.upper().startswith("SELECT")
+        assert "v_listings" in sql.lower()
+        assert "is_published = true" in sql
+
+
+# ── search_from_context ────────────────────────────────────────────────────────
+
+@patch("app.services.sql_service.engine")
+class TestSearchFromContext:
+    async def test_success_returns_result_dict(self, mock_engine):
+        svc, _, mock_conn = make_service()
+        mock_engine.connect.return_value = mock_conn
+        result = await svc.search_from_context({"location": "Sydney", "bedrooms": 3})
+        assert result["success"] is True
+        assert result["result_count"] == 1
+
+    async def test_does_not_call_llm(self, mock_engine):
+        svc, mock_llm, mock_conn = make_service()
+        mock_engine.connect.return_value = mock_conn
+        await svc.search_from_context({"location": "Sydney"})
+        mock_llm.ainvoke.assert_not_called()
+
+    async def test_sql_used_is_returned(self, mock_engine):
+        svc, _, mock_conn = make_service()
+        mock_engine.connect.return_value = mock_conn
+        result = await svc.search_from_context({"location": "Sydney"})
+        assert "v_listings" in result["sql_used"]
+        assert "Sydney" in result["sql_used"]
+
+    async def test_db_exception_returns_success_false(self, mock_engine):
+        svc, _, mock_conn = make_service()
+        mock_conn.execute.side_effect = RuntimeError("DB down")
+        mock_engine.connect.return_value = mock_conn
+        result = await svc.search_from_context({"location": "Sydney"})
+        assert result["success"] is False
+
+
 # ── _validate_sql ──────────────────────────────────────────────────────────────
 
 class TestValidateSql:

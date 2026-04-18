@@ -53,6 +53,33 @@ class TestListingSearchSuccess:
 
         svc.search_listings.assert_called_once_with(question)
 
+    async def test_context_path_uses_search_from_context(self, make_sql_service, make_config):
+        """When search_context has a location, use search_from_context — no LLM call."""
+        svc = make_sql_service()
+        state = {
+            "messages": [HumanMessage(content="3 bed houses in Sydney under $800k")],
+            "search_context": {"location": "Sydney", "property_type": "House", "bedrooms": 3},
+        }
+        await listing_search_node(state, make_config(sql_service=svc))
+
+        svc.search_from_context.assert_called_once_with(
+            {"location": "Sydney", "property_type": "House", "bedrooms": 3}
+        )
+        svc.search_listings.assert_not_called()
+
+    async def test_no_location_falls_back_to_llm(self, make_sql_service, make_config):
+        """Without a location in search_context, fall back to sql_service LLM path."""
+        svc = make_sql_service()
+        question = "properties near good schools"
+        state = {
+            "messages": [HumanMessage(content=question)],
+            "search_context": {},
+        }
+        await listing_search_node(state, make_config(sql_service=svc))
+
+        svc.search_listings.assert_called_once_with(question)
+        svc.search_from_context.assert_not_called()
+
     async def test_zero_results_returns_retrieved_docs(self, make_sql_service, make_config):
         """0 results still returns retrieved_docs with a no-results message."""
         svc = make_sql_service(result={

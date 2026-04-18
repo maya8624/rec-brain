@@ -6,7 +6,9 @@ Graph topology:
     START
       │
       ▼
-    intent_node  (keyword classifier — no LLM call)
+    intent_node  (hybrid classifier — keyword fast path + LLM structured output)
+      │            LLM path extracts entities → state["search_context"]
+      │            (location, property_type, bedrooms, max_price, listing_type, etc.)
       │
       ├──► listing_search_node ──┐
       ├──► vector_search_node ───┤
@@ -23,11 +25,19 @@ Graph topology:
       │         │
       │    agent_node (format reply) ──► END
       │
-      └──► END (early_response — compound intent, user must clarify)
+      └──► END (early_response — vague query or compound intent, user must clarify)
 
-agent_node history management (see app/agents/nodes/agent.py):
-  - Stale search-result SystemMessages are stripped before each LLM call
-    so large JSON payloads don't accumulate in the rolling window.
+intent_node strategy (see app/agents/nodes/intent.py):
+  - Fast path (no LLM): obvious cancellation and standalone booking via keywords
+  - LLM path: everything else — search, follow-ups, compound intents, general
+    Uses last 4 messages as history to resolve follow-up references
+    Returns IntentClassification (Pydantic) with intent + extracted search entities
+
+search results (see app/agents/nodes/agent.py):
+  - Search nodes write results to state["retrieved_docs"] (plain assignment)
+    instead of state["messages"] — prevents stale results accumulating in history
+  - agent_node injects retrieved_docs as an ephemeral SystemMessage at the end
+    of the prompt, then clears it to None after each LLM call
   - History depth is intent-aware:
       booking / cancellation  → 10 turns  (multi-turn contact collection)
       search / hybrid_search  →  6 turns
@@ -44,8 +54,8 @@ TODO:
       trigger external calls. All _requires_human guards in router.py route to
       it instead of END.
 - [ ] multi-step tool calling for compound intents
-- [ ] Move search results out of messages into state["retrieved_docs"] to keep
-      history clean (see docs/reduce-llm-messages.md #3)
+- [ ] Use state["search_context"] entities in listing_search_node to build SQL
+      from structured data instead of re-parsing the raw message via sql_service
 """
 import logging
 

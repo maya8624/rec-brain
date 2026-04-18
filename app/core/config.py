@@ -150,12 +150,20 @@ class Settings(BaseSettings):
         description="Ollama server URL — used when running LLM locally",
     )
 
-    # ── OpenAI (optional — for embeddings) ────────────────────────────────────
-    # If set: uses text-embedding-3-small for higher quality embeddings
-    # If not set: falls back to local HuggingFace EMBEDDING_MODEL
+    # ── OpenAI ────────────────────────────────────────────────────────────────
     OPENAI_API_KEY: str = Field(
         "",
-        description="OpenAI API key — optional, only for embedding quality upgrade",
+        description="OpenAI API key — required when LLM_PROVIDER=openai",
+    )
+    OPENAI_MODEL_NAME: str = Field(
+        "gpt-4o-mini",
+        description="OpenAI model — used when LLM_PROVIDER=openai",
+    )
+
+    # ── LLM provider switch ───────────────────────────────────────────────────
+    LLM_PROVIDER: str = Field(
+        "groq",
+        description="LLM provider: 'groq' or 'openai'",
     )
 
     # ── LangSmith observability (optional) ────────────────────────────────────

@@ -91,6 +91,7 @@ class TestVectorSearchSuccess:
         rag.aretrieve.assert_called_once_with(question)
 
 
+
 class TestVectorSearchGuards:
     async def test_no_human_message_returns_empty(self, make_rag_retriever, make_config):
         rag = make_rag_retriever()
