@@ -6,7 +6,7 @@ import pytest
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
-from app.agents.nodes.agent import agent_node, _needs_tools, _trim_history
+from app.agents.nodes.agent import agent_node, _needs_tools
 
 
 class TestNeedsTools:
@@ -66,25 +66,6 @@ class TestNeedsTools:
         state = {"messages": [], "user_intent": "booking"}
         assert _needs_tools(state) is False
 
-
-class TestTrimHistory:
-    """Search results no longer live in messages — _trim_history is now a pass-through."""
-
-    def test_empty_list(self):
-        assert _trim_history([]) == []
-
-    def test_returns_messages_unchanged(self):
-        msgs = [HumanMessage(content="a"), AIMessage(content="b")]
-        assert _trim_history(msgs) == msgs
-
-    def test_system_messages_not_stripped(self):
-        """SystemMessages are no longer written to state["messages"], so no stripping needed."""
-        msgs = [
-            HumanMessage(content="show me flats"),
-            SystemMessage(content="You are a real estate agent."),
-            AIMessage(content="Here are some flats."),
-        ]
-        assert _trim_history(msgs) == msgs
 
 
 @pytest.fixture

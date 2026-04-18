@@ -21,7 +21,7 @@ import logging
 from typing import Any
 
 from groq import APIStatusError, RateLimitError
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.agents.state import RealEstateAgentState
 from app.infrastructure.llm import get_llm
@@ -62,7 +62,7 @@ async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
 
     intent = state.get("user_intent", "general")
     history_limit = _HISTORY_BY_INTENT.get(intent, 6)
-    history = _trim_history(list(state["messages"]))[-history_limit:]
+    history = list(state["messages"])[-history_limit:]
 
     # Build prompt: system + history + current-turn search results (if any).
     # retrieved_docs is injected here and never written to state["messages"],
@@ -123,13 +123,3 @@ def _needs_tools(state: RealEstateAgentState) -> bool:
         return False
 
     return isinstance(state["messages"][-1], HumanMessage)
-
-
-def _trim_history(messages: list) -> list:
-    """Return messages as-is.
-
-    Search results are no longer written to state["messages"] — they live in
-    state["retrieved_docs"] and are injected ephemerally per turn. No stripping
-    needed here; this function is kept as a hook for any future filtering.
-    """
-    return messages
