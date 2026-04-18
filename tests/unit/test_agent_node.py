@@ -68,72 +68,23 @@ class TestNeedsTools:
 
 
 class TestTrimHistory:
-    def _search_msg(self, prefix: str) -> SystemMessage:
-        return SystemMessage(content=f"{prefix}]\n{{...}}")
-
-    def test_strips_property_search_results(self):
-        """Search result followed by AIMessage is stale — agent already formatted it."""
-        msgs = [
-            HumanMessage(content="show me flats"),
-            self._search_msg("[PROPERTY SEARCH RESULTS"),
-            AIMessage(content="Here are some flats."),
-        ]
-        result = _trim_history(msgs)
-        assert len(result) == 2
-        assert all(not isinstance(m, SystemMessage) for m in result)
-
-    def test_strips_document_search_results(self):
-        msgs = [
-            HumanMessage(content="office hours?"),
-            self._search_msg("[DOCUMENT SEARCH RESULTS"),
-            AIMessage(content="We are open 9-5."),
-        ]
-        assert len(_trim_history(msgs)) == 2
-
-    def test_strips_hybrid_search_results(self):
-        msgs = [
-            HumanMessage(content="show flats and lease terms"),
-            self._search_msg("[HYBRID SEARCH RESULTS"),
-            AIMessage(content="Here are the results."),
-        ]
-        assert len(_trim_history(msgs)) == 2
-
-    def test_keeps_non_search_system_messages(self):
-        """System messages that are not search results (e.g. the agent prompt) are kept."""
-        msgs = [SystemMessage(content="You are a real estate agent."), HumanMessage(content="hi")]
-        assert len(_trim_history(msgs)) == 2
+    """Search results no longer live in messages — _trim_history is now a pass-through."""
 
     def test_empty_list(self):
         assert _trim_history([]) == []
 
-    def test_no_search_messages_unchanged(self):
+    def test_returns_messages_unchanged(self):
         msgs = [HumanMessage(content="a"), AIMessage(content="b")]
         assert _trim_history(msgs) == msgs
 
-    def test_current_turn_result_preserved(self):
-        """Stale result (AI followed it) is stripped; current turn result (no AI yet) is kept."""
-        stale = self._search_msg("[PROPERTY SEARCH RESULTS")
-        current = self._search_msg("[PROPERTY SEARCH RESULTS")
+    def test_system_messages_not_stripped(self):
+        """SystemMessages are no longer written to state["messages"], so no stripping needed."""
         msgs = [
             HumanMessage(content="show me flats"),
-            stale,
-            AIMessage(content="Here are some flats."),   # agent formatted stale → it's stale
-            HumanMessage(content="show more"),
-            current,                                      # no AIMessage after → current turn
+            SystemMessage(content="You are a real estate agent."),
+            AIMessage(content="Here are some flats."),
         ]
-        result = _trim_history(msgs)
-        assert len(result) == 4                            # stale stripped, everything else kept
-        assert not any(m is stale for m in result)        # identity check — same content as current
-        assert result[-1] is current
-
-    def test_single_search_result_preserved(self):
-        """A single search result (no prior history) is always kept."""
-        msgs = [
-            HumanMessage(content="office hours?"),
-            self._search_msg("[DOCUMENT SEARCH RESULTS"),
-        ]
-        result = _trim_history(msgs)
-        assert len(result) == 2
+        assert _trim_history(msgs) == msgs
 
 
 @pytest.fixture
@@ -233,3 +184,38 @@ class TestAgentNode:
         call_messages = mock_llm.ainvoke.call_args.args[0]
         # 1 SystemMessage + 10 history
         assert len(call_messages) == 11
+
+    async def test_retrieved_docs_injected_into_prompt(self, mock_get_llm, mock_llm):
+        """retrieved_docs is appended as a SystemMessage at the end of the prompt."""
+        mock_get_llm.return_value = mock_llm
+        state = {
+            "messages": [HumanMessage(content="show me houses")],
+            "user_intent": "search",
+            "error_count": 0,
+            "retrieved_docs": "[PROPERTY SEARCH RESULTS — 2 listing(s) found.]\n1. 12 Park St...",
+        }
+        await agent_node(state)
+        call_messages = mock_llm.ainvoke.call_args.args[0]
+        last_msg = call_messages[-1]
+        assert isinstance(last_msg, SystemMessage)
+        assert "[PROPERTY SEARCH RESULTS" in last_msg.content
+
+    async def test_retrieved_docs_cleared_in_return(self, mock_get_llm, mock_llm):
+        """agent_node always returns retrieved_docs=None to clear it for next turn."""
+        mock_get_llm.return_value = mock_llm
+        state = {
+            "messages": [HumanMessage(content="show me houses")],
+            "user_intent": "search",
+            "error_count": 0,
+            "retrieved_docs": "[PROPERTY SEARCH RESULTS — 2 listing(s) found.]\n...",
+        }
+        result = await agent_node(state)
+        assert result["retrieved_docs"] is None
+
+    async def test_no_retrieved_docs_prompt_has_no_extra_system_message(self, mock_get_llm, mock_llm, base_state):
+        """When retrieved_docs is absent, the prompt is just system + history."""
+        mock_get_llm.return_value = mock_llm
+        await agent_node(base_state)
+        call_messages = mock_llm.ainvoke.call_args.args[0]
+        # Only the REAL_ESTATE_AGENT_SYSTEM prompt + 1 HumanMessage
+        assert len(call_messages) == 2

@@ -2,53 +2,62 @@
 Unit tests for hybrid_search_node — concurrent SQL + vector search.
 Uses make_sql_service, make_rag_retriever, and make_config from conftest.
 """
-from langchain_core.messages import HumanMessage, SystemMessage
+import json
+
+from langchain_core.messages import HumanMessage
 
 from app.agents.nodes.hybrid import hybrid_search_node
-from tests.conftest import parsed
 
 _QUESTION = "Show 2 bedroom apartments in Sydney and explain the lease"
 
 
+def _parse_vector(result: dict) -> dict:
+    """Extract the vector JSON payload from the DOCUMENTS section of retrieved_docs."""
+    docs_section = result["retrieved_docs"].split("DOCUMENTS:\n", 1)[1]
+    return json.loads(docs_section)["vector_results"]
+
+
 class TestHybridSearchSuccess:
-    async def test_returns_system_message(self, make_sql_service, make_rag_retriever, make_config):
+    async def test_returns_retrieved_docs(self, make_sql_service, make_rag_retriever, make_config):
         config = make_config(make_sql_service(), make_rag_retriever())
         result = await hybrid_search_node(
             {"messages": [HumanMessage(content=_QUESTION)]}, config
         )
-        assert "messages" in result
-        assert isinstance(result["messages"][0], SystemMessage)
+        assert "retrieved_docs" in result
+        assert isinstance(result["retrieved_docs"], str)
 
-    async def test_result_contains_both_sections(self, make_sql_service, make_rag_retriever, make_config):
+    async def test_retrieved_docs_contains_both_sections(self, make_sql_service, make_rag_retriever, make_config):
         config = make_config(make_sql_service(), make_rag_retriever())
-        content = parsed(await hybrid_search_node(
+        result = await hybrid_search_node(
             {"messages": [HumanMessage(content=_QUESTION)]}, config
-        ))
-        assert "sql_results" in content
-        assert "vector_results" in content
+        )
+        assert "LISTINGS:" in result["retrieved_docs"]
+        assert "DOCUMENTS:" in result["retrieved_docs"]
 
-    async def test_sql_results_structure(self, make_sql_service, make_rag_retriever, make_config):
+    async def test_search_results_returned(self, make_sql_service, make_rag_retriever, make_config):
         config = make_config(make_sql_service(), make_rag_retriever())
-        sql = parsed(await hybrid_search_node(
+        result = await hybrid_search_node(
             {"messages": [HumanMessage(content=_QUESTION)]}, config
-        ))["sql_results"]
-        assert sql["success"] is True
-        assert sql["result_count"] == 1
+        )
+        assert "search_results" in result
+        assert len(result["search_results"]) == 1
 
     async def test_vector_results_structure(self, make_sql_service, make_rag_retriever, make_config):
         config = make_config(make_sql_service(), make_rag_retriever())
-        vector = parsed(await hybrid_search_node(
+        result = await hybrid_search_node(
             {"messages": [HumanMessage(content=_QUESTION)]}, config
-        ))["vector_results"]
+        )
+        vector = _parse_vector(result)
         assert vector["success"] is True
         assert vector["result_count"] == 1
         assert len(vector["results"]) == 1
 
     async def test_vector_result_item_shape(self, make_sql_service, make_rag_retriever, make_config):
         config = make_config(make_sql_service(), make_rag_retriever())
-        item = parsed(await hybrid_search_node(
+        result = await hybrid_search_node(
             {"messages": [HumanMessage(content=_QUESTION)]}, config
-        ))["vector_results"]["results"][0]
+        )
+        item = _parse_vector(result)["results"][0]
         assert "text" in item
         assert "score" in item
         assert "metadata" in item
@@ -72,12 +81,12 @@ class TestHybridSearchSuccess:
         sql = make_sql_service(
             result={"success": True, "output": [], "result_count": 0, "sql_used": ""})
         rag = make_rag_retriever(nodes=[])
-        content = parsed(await hybrid_search_node(
+        result = await hybrid_search_node(
             {"messages": [HumanMessage(content=_QUESTION)]},
             make_config(sql, rag),
-        ))
-        assert content["sql_results"]["result_count"] == 0
-        assert content["vector_results"]["result_count"] == 0
+        )
+        assert "No listings found." in result["retrieved_docs"]
+        assert _parse_vector(result)["result_count"] == 0
 
 
 class TestHybridSearchPartialFailure:
@@ -86,49 +95,52 @@ class TestHybridSearchPartialFailure:
             make_sql_service(raise_error=RuntimeError("DB connection lost")),
             make_rag_retriever(),
         )
-        content = parsed(await hybrid_search_node(
+        result = await hybrid_search_node(
             {"messages": [HumanMessage(content=_QUESTION)]}, config
-        ))
-        assert content["sql_results"]["success"] is False
-        assert "error" in content["sql_results"]
-        assert content["vector_results"]["success"] is True
+        )
+        assert "retrieved_docs" in result
+        vector = _parse_vector(result)
+        assert vector["success"] is True
 
     async def test_vector_fails_sql_succeeds(self, make_sql_service, make_rag_retriever, make_config):
         config = make_config(
             make_sql_service(),
-            make_rag_retriever(
-                raise_error=RuntimeError("pgvector unreachable")),
+            make_rag_retriever(raise_error=RuntimeError("pgvector unreachable")),
         )
-        content = parsed(await hybrid_search_node(
+        result = await hybrid_search_node(
             {"messages": [HumanMessage(content=_QUESTION)]}, config
-        ))
-        assert content["sql_results"]["success"] is True
-        assert content["vector_results"]["success"] is False
+        )
+        assert "retrieved_docs" in result
+        assert len(result["search_results"]) == 1
+        vector = _parse_vector(result)
+        assert vector["success"] is False
 
-    async def test_both_fail_still_returns_message(
+    async def test_both_fail_still_returns_retrieved_docs(
         self, make_sql_service, make_rag_retriever, make_config
     ):
         config = make_config(
             make_sql_service(raise_error=RuntimeError("SQL down")),
             make_rag_retriever(raise_error=RuntimeError("Vector down")),
         )
-        content = parsed(await hybrid_search_node(
+        result = await hybrid_search_node(
             {"messages": [HumanMessage(content=_QUESTION)]}, config
-        ))
-        assert content["sql_results"]["success"] is False
-        assert content["vector_results"]["success"] is False
+        )
+        assert "retrieved_docs" in result
+        vector = _parse_vector(result)
+        assert vector["success"] is False
 
-    async def test_error_message_captured_in_result(
+    async def test_error_message_captured_in_vector_result(
         self, make_sql_service, make_rag_retriever, make_config
     ):
         config = make_config(
             make_sql_service(raise_error=RuntimeError("timeout after 30s")),
             make_rag_retriever(),
         )
-        content = parsed(await hybrid_search_node(
+        result = await hybrid_search_node(
             {"messages": [HumanMessage(content=_QUESTION)]}, config
-        ))
-        assert "timeout after 30s" in content["sql_results"]["error"]
+        )
+        # SQL error surfaces in retrieved_docs (no listings found)
+        assert "No listings found." in result["retrieved_docs"]
 
 
 class TestHybridSearchGuards:

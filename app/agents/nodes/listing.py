@@ -52,19 +52,27 @@ async def listing_search_node(state: RealEstateAgentState, config: RunnableConfi
         )
 
         rows = slim_rows(result.get("output") or [])
-        summary = listing_summary(rows) if rows else result.get("error", "No results found.")
 
-        pagination_note = (
-            "\nNote: Only the top 10 results are shown. "
-            "Tell the customer they can ask to see more by narrowing their search criteria."
-            if count == 10 else ""
-        )
-        retrieved_docs = (
-            f"[PROPERTY SEARCH RESULTS — {count} listing(s) found. "
-            f"Format these for the customer using the FORMATTING SEARCH RESULTS rules.]\n"
-            f"{summary}"
-            f"{pagination_note}"
-        )
+        if rows:
+            summary = listing_summary(rows)
+            pagination_note = (
+                "\nNote: Only the top 10 results are shown. "
+                "Tell the customer they can ask to see more by narrowing their search criteria."
+                if count == 10 else ""
+            )
+            instruction = (
+                f"[PROPERTY SEARCH RESULTS — {count} listing(s) found. "
+                f"Format these for the customer using the FORMATTING SEARCH RESULTS rules.]"
+            )
+            retrieved_docs = f"{instruction}\n{summary}{pagination_note}"
+        else:
+            summary = result.get("error", "No results found.")
+            retrieved_docs = (
+                f"[PROPERTY SEARCH RESULTS — 0 listing(s) found. "
+                f"IMPORTANT: Do NOT reference or repeat any listings from previous responses. "
+                f"Tell the customer no properties matched their search and suggest broadening the criteria.]\n"
+                f"{summary}"
+            )
 
         return {
             "retrieved_docs": retrieved_docs,

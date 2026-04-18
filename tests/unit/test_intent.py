@@ -225,3 +225,27 @@ class TestIntentNode:
         state = {"messages": []}
         result = await intent_node(state)
         assert result["user_intent"] == "general"
+
+    async def test_vague_search_without_location_sets_early_response(self):
+        """Search with no location → ask for suburb before running SQL."""
+        state = {"messages": [HumanMessage(content="Find apartments with 2 bathrooms for rent")]}
+        result = await intent_node(state)
+        assert result["user_intent"] == "search"
+        assert result.get("early_response")
+
+    async def test_search_with_location_does_not_set_early_response(self):
+        state = {"messages": [HumanMessage(content="Find apartments in Melbourne")]}
+        result = await intent_node(state)
+        assert result["user_intent"] == "search"
+        assert not result.get("early_response")
+
+    async def test_search_with_preposition_location_passes(self):
+        """'near the CBD' matches the preposition pattern."""
+        state = {"messages": [HumanMessage(content="Show me houses near the CBD")]}
+        result = await intent_node(state)
+        assert not result.get("early_response")
+
+    async def test_search_with_state_abbreviation_passes(self):
+        state = {"messages": [HumanMessage(content="Show me houses in NSW")]}
+        result = await intent_node(state)
+        assert not result.get("early_response")

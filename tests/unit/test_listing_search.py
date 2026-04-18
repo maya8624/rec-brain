@@ -2,35 +2,31 @@
 Unit tests for listing_search_node — direct SQL search, no tool calls.
 Uses make_sql_service and make_config from conftest.
 """
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage
 
 from app.agents.nodes.listing import listing_search_node
-from tests.conftest import parsed
 
 
 class TestListingSearchSuccess:
-    async def test_returns_system_message(self, make_sql_service, make_config):
+    async def test_returns_retrieved_docs(self, make_sql_service, make_config):
         result = await listing_search_node(
             {"messages": [HumanMessage(content="3 bedroom houses in Sydney")]},
             make_config(sql_service=make_sql_service()),
         )
 
-        assert "messages" in result
-        assert len(result["messages"]) == 1
-        assert isinstance(result["messages"][0], SystemMessage)
+        assert "retrieved_docs" in result
+        assert isinstance(result["retrieved_docs"], str)
 
-    async def test_result_structure(self, make_sql_service, make_config):
+    async def test_retrieved_docs_contains_result_count(self, make_sql_service, make_config):
         result = await listing_search_node(
             {"messages": [HumanMessage(content="3 bedroom houses in Sydney")]},
             make_config(sql_service=make_sql_service()),
         )
 
-        content = parsed(result)
-        assert "search_results" in content
-        assert "result_count" in content
-        assert "success" in content
+        assert "[PROPERTY SEARCH RESULTS" in result["retrieved_docs"]
+        assert "1 listing(s) found" in result["retrieved_docs"]
 
-    async def test_result_count_matches_service(self, make_sql_service, make_config):
+    async def test_search_results_returned(self, make_sql_service, make_config):
         svc = make_sql_service(result={
             "success": True,
             "output": [{"address": "1 Test St"}, {"address": "2 Test St"}],
@@ -38,12 +34,13 @@ class TestListingSearchSuccess:
             "sql_used": "SELECT * FROM v_listings",
         })
 
-        content = parsed(await listing_search_node(
+        result = await listing_search_node(
             {"messages": [HumanMessage(content="houses in Melbourne")]},
             make_config(sql_service=svc),
-        ))
+        )
 
-        assert content["result_count"] == 2
+        assert "search_results" in result
+        assert len(result["search_results"]) == 2
 
     async def test_calls_service_with_exact_question(self, make_sql_service, make_config):
         svc = make_sql_service()
@@ -56,8 +53,66 @@ class TestListingSearchSuccess:
 
         svc.search_listings.assert_called_once_with(question)
 
-    async def test_success_false_still_returns_message(self, make_sql_service, make_config):
-        """If service reports success=False (e.g. SQL error), the node still returns a message."""
+    async def test_zero_results_returns_retrieved_docs(self, make_sql_service, make_config):
+        """0 results still returns retrieved_docs with a no-results message."""
+        svc = make_sql_service(result={
+            "success": True,
+            "output": [],
+            "result_count": 0,
+            "sql_used": "SELECT * FROM v_listings",
+        })
+
+        result = await listing_search_node(
+            {"messages": [HumanMessage(content="houses in Sydney")]},
+            make_config(sql_service=svc),
+        )
+
+        assert "retrieved_docs" in result
+        assert "0 listing(s) found" in result["retrieved_docs"]
+
+    async def test_zero_results_does_not_reference_previous_listings(self, make_sql_service, make_config):
+        """0-result message includes instruction not to reuse previous responses."""
+        svc = make_sql_service(result={
+            "success": True,
+            "output": [],
+            "result_count": 0,
+            "sql_used": "SELECT * FROM v_listings",
+        })
+
+        result = await listing_search_node(
+            {"messages": [HumanMessage(content="townhouses in Melbourne")]},
+            make_config(sql_service=svc),
+        )
+
+        assert "Do NOT reference" in result["retrieved_docs"]
+
+    async def test_ten_results_includes_pagination_note(self, make_sql_service, make_config):
+        """When exactly 10 results are returned, a pagination note is appended."""
+        svc = make_sql_service(result={
+            "success": True,
+            "output": [{"address": f"{i} St"} for i in range(10)],
+            "result_count": 10,
+            "sql_used": "SELECT * FROM v_listings LIMIT 10",
+        })
+
+        result = await listing_search_node(
+            {"messages": [HumanMessage(content="apartments in Sydney")]},
+            make_config(sql_service=svc),
+        )
+
+        assert "top 10" in result["retrieved_docs"]
+
+    async def test_fewer_than_ten_results_no_pagination_note(self, make_sql_service, make_config):
+        """Fewer than 10 results — no pagination note needed."""
+        result = await listing_search_node(
+            {"messages": [HumanMessage(content="houses in Sydney")]},
+            make_config(sql_service=make_sql_service()),  # default returns 1 result
+        )
+
+        assert "top 10" not in result["retrieved_docs"]
+
+    async def test_success_false_still_returns_retrieved_docs(self, make_sql_service, make_config):
+        """If service reports success=False, the node still returns retrieved_docs."""
         svc = make_sql_service(result={
             "success": False,
             "output": None,
@@ -70,9 +125,8 @@ class TestListingSearchSuccess:
             make_config(sql_service=svc),
         )
 
-        content = parsed(result)
-        assert content["success"] is False
-        assert content["error"] is not None
+        assert "retrieved_docs" in result
+        assert isinstance(result["retrieved_docs"], str)
 
 
 class TestListingSearchGuards:

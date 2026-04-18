@@ -2,30 +2,40 @@
 Unit tests for vector_search_node.
 Uses make_rag_retriever and make_config fixtures from tests/conftest.py.
 """
-from langchain_core.messages import HumanMessage, SystemMessage
+import json
+
+from langchain_core.messages import HumanMessage
 
 from app.agents.nodes.vector import vector_search_node
-from tests.conftest import parsed
+
+
+def _parse_docs(result: dict) -> dict:
+    """Extract the JSON payload from retrieved_docs (after the header line)."""
+    return json.loads(result["retrieved_docs"].split("]\n", 1)[1])
 
 
 class TestVectorSearchSuccess:
-    async def test_returns_system_message(self, make_rag_retriever, make_config):
+    async def test_returns_retrieved_docs(self, make_rag_retriever, make_config):
         result = await vector_search_node(
-            {"messages": [HumanMessage(
-                content="What are the lease conditions?")]},
+            {"messages": [HumanMessage(content="What are the lease conditions?")]},
             make_config(rag_retriever=make_rag_retriever()),
         )
-        assert "messages" in result
-        assert len(result["messages"]) == 1
-        assert isinstance(result["messages"][0], SystemMessage)
+        assert "retrieved_docs" in result
+        assert isinstance(result["retrieved_docs"], str)
+
+    async def test_retrieved_docs_contains_header(self, make_rag_retriever, make_config):
+        result = await vector_search_node(
+            {"messages": [HumanMessage(content="What are the lease conditions?")]},
+            make_config(rag_retriever=make_rag_retriever()),
+        )
+        assert "[DOCUMENT SEARCH RESULTS" in result["retrieved_docs"]
 
     async def test_result_structure(self, make_rag_retriever, make_config):
         result = await vector_search_node(
-            {"messages": [HumanMessage(
-                content="What are the lease conditions?")]},
+            {"messages": [HumanMessage(content="What are the lease conditions?")]},
             make_config(rag_retriever=make_rag_retriever()),
         )
-        content = parsed(result)
+        content = _parse_docs(result)
         assert content["source"] == "vector_db"
         assert "result_count" in content
         assert "results" in content
@@ -36,7 +46,7 @@ class TestVectorSearchSuccess:
             {"messages": [HumanMessage(content="What is the bond?")]},
             make_config(rag_retriever=make_rag_retriever(nodes=nodes)),
         )
-        item = parsed(result)["results"][0]
+        item = _parse_docs(result)["results"][0]
         assert "text" in item
         assert "score" in item
         assert "metadata" in item
@@ -47,7 +57,7 @@ class TestVectorSearchSuccess:
             {"messages": [HumanMessage(content="What is the bond?")]},
             make_config(rag_retriever=make_rag_retriever(nodes=nodes)),
         )
-        item = parsed(result)["results"][0]
+        item = _parse_docs(result)["results"][0]
         assert item["text"] == "Bond is 4 weeks rent."
         assert item["score"] == 0.91
 
@@ -58,7 +68,7 @@ class TestVectorSearchSuccess:
             {"messages": [HumanMessage(content="strata?")]},
             make_config(rag_retriever=make_rag_retriever(nodes=nodes)),
         )
-        item = parsed(result)["results"][0]
+        item = _parse_docs(result)["results"][0]
         assert item["metadata"]["property_id"] == "prop_42"
         assert item["metadata"]["doc_type"] == "strata"
 
@@ -67,7 +77,7 @@ class TestVectorSearchSuccess:
             {"messages": [HumanMessage(content="Very obscure question")]},
             make_config(rag_retriever=make_rag_retriever(nodes=[])),
         )
-        content = parsed(result)
+        content = _parse_docs(result)
         assert content["result_count"] == 0
         assert content["results"] == []
 
@@ -80,8 +90,6 @@ class TestVectorSearchSuccess:
         )
         rag.aretrieve.assert_called_once_with(question)
 
-
-# ── Guard paths ────────────────────────────────────────────────────────────────
 
 class TestVectorSearchGuards:
     async def test_no_human_message_returns_empty(self, make_rag_retriever, make_config):
