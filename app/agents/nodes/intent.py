@@ -59,6 +59,14 @@ _INTENT_KEYWORDS: dict[UserIntent, frozenset[str]] = {
 # If more than one of these match → compound intent → "general"
 _COMPOUND_INTENTS = frozenset(["search", "booking", "cancellation"])
 
+# Patterns that indicate a location was provided in a search query
+_LOCATION_PATTERN = re.compile(
+    r'\b(in|at|near|around|within)\s+\w+'       # "in Sydney", "near the CBD"
+    r'|\b(sydney|melbourne|brisbane|perth|adelaide|hobart|darwin|canberra'
+    r'|nsw|vic|qld|wa|sa|tas|nt|act)\b',         # city / state names
+    re.IGNORECASE,
+)
+
 
 async def intent_node(state: RealEstateAgentState) -> dict[str, Any]:
     """
@@ -73,6 +81,19 @@ async def intent_node(state: RealEstateAgentState) -> dict[str, Any]:
         intent,
         message,
     )
+
+    # Vague search — no location provided
+    # TODO: Option 3 — promote to a dedicated clarify_node between intent_node
+    #   and listing_search_node. It would check query completeness (location,
+    #   price range, property type) and route to END with a clarifying question
+    #   if required criteria are missing, or forward to listing_search_node if
+    #   sufficient. Cleaner separation of concerns and easier to extend with
+    #   more validation rules without growing intent_node further.
+    if intent == "search" and not _has_location(message):
+        return {
+            "user_intent": "search",
+            "early_response": "Which suburb or area are you looking in?",
+        }
 
     # Compound intent handling
     if intent == "general" and _is_compound(message):
@@ -142,6 +163,11 @@ def _is_search_and_book(message: str) -> bool:
         _matches_keywords(msg_lower, _INTENT_KEYWORDS["search"]) and
         _matches_keywords(msg_lower, _INTENT_KEYWORDS["booking"])
     )
+
+
+def _has_location(message: str) -> bool:
+    """Returns True if the message contains a recognisable location indicator."""
+    return bool(_LOCATION_PATTERN.search(message))
 
 
 def _matches_keywords(msg_lower: str, keywords: frozenset[str]) -> bool:

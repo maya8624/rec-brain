@@ -33,13 +33,6 @@ logger = logging.getLogger(__name__)
 # Only these intents need tool calling
 _TOOL_INTENTS = frozenset(["booking", "cancellation"])
 
-# Stale search-result SystemMessages — injected once per turn, useless after agent formats them
-# TODO: revisit this approach: maybe better way
-_RESULT_PREFIXES = (
-    "[PROPERTY SEARCH RESULTS",
-    "[DOCUMENT SEARCH RESULTS",
-    "[HYBRID SEARCH RESULTS",
-)
 
 # Intent-aware history depth: booking/cancellation need more turns to collect contact details
 _HISTORY_BY_INTENT = {
@@ -70,7 +63,14 @@ async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
     intent = state.get("user_intent", "general")
     history_limit = _HISTORY_BY_INTENT.get(intent, 6)
     history = _trim_history(list(state["messages"]))[-history_limit:]
-    messages = [SystemMessage(content=REAL_ESTATE_AGENT_SYSTEM), *history]
+
+    # Build prompt: system + history + current-turn search results (if any).
+    # retrieved_docs is injected here and never written to state["messages"],
+    # so it cannot accumulate across turns or be mistaken for history.
+    prompt: list = [SystemMessage(content=REAL_ESTATE_AGENT_SYSTEM), *history]
+    retrieved_docs = state.get("retrieved_docs")
+    if retrieved_docs:
+        prompt.append(SystemMessage(content=retrieved_docs))
 
     logger.info(
         "agent_node | intent=%s | needs_tools=%s | history=%d/%d | errors=%d",
@@ -82,7 +82,7 @@ async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
     )
 
     try:
-        response = await llm.ainvoke(messages)
+        response = await llm.ainvoke(prompt)
     except RateLimitError as exc:
         logger.error("agent_node | Groq rate limit hit: %s", exc)
         raise
@@ -97,7 +97,8 @@ async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
             [tc["name"] for tc in response.tool_calls],
         )
 
-    return {"messages": [response]}
+    # Clear retrieved_docs so the next turn starts clean.
+    return {"messages": [response], "retrieved_docs": None}
 
 
 def _get_plain_llm():
@@ -125,18 +126,10 @@ def _needs_tools(state: RealEstateAgentState) -> bool:
 
 
 def _trim_history(messages: list) -> list:
-    """Drop stale search-result SystemMessages; keep current turn's (not yet formatted).
+    """Return messages as-is.
 
-    A search result is stale when an AIMessage follows it — the agent already
-    formatted it into a response. Any search result after the last AIMessage
-    has not been formatted yet and belongs to the current turn.
+    Search results are no longer written to state["messages"] — they live in
+    state["retrieved_docs"] and are injected ephemerally per turn. No stripping
+    needed here; this function is kept as a hook for any future filtering.
     """
-    last_ai_idx = next(
-        (i for i in range(len(messages) - 1, -1, -1) if isinstance(messages[i], AIMessage)),
-        -1,
-    )
-    return [
-        m for i, m in enumerate(messages)
-        if not (isinstance(m, SystemMessage) and m.content.startswith(_RESULT_PREFIXES))
-        or i > last_ai_idx
-    ]
+    return messages

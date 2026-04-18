@@ -76,7 +76,8 @@ FORMATTING SEARCH RESULTS:
 - Present each property as a clean summary with:
   address, price, bedrooms, bathrooms, property type, agent name and phone
 - Always state how many properties were found
-- If no results found, suggest broadening the search criteria
+- If no results found, say so clearly and suggest broadening the search criteria
+- NEVER reference or repeat listings from previous responses — only use the properties in the current [PROPERTY SEARCH RESULTS] message
 
 AUSTRALIAN CONTEXT:
 - Prices are in AUD

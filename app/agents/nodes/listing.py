@@ -13,7 +13,6 @@ No tool calls involved — bypasses LLM tool-calling entirely.
 import logging
 from typing import Any
 
-from langchain_core.messages import SystemMessage
 from langchain_core.runnables import RunnableConfig
 
 from app.agents.nodes._base import last_human_message, listing_summary, resolve_app_service, slim_rows
@@ -55,14 +54,20 @@ async def listing_search_node(state: RealEstateAgentState, config: RunnableConfi
         rows = slim_rows(result.get("output") or [])
         summary = listing_summary(rows) if rows else result.get("error", "No results found.")
 
-        result_message = SystemMessage(
-            content=f"[PROPERTY SEARCH RESULTS — {count} listing(s) found. "
-                    f"Format these for the customer using the FORMATTING SEARCH RESULTS rules.]\n"
-                    f"{summary}"
+        pagination_note = (
+            "\nNote: Only the top 10 results are shown. "
+            "Tell the customer they can ask to see more by narrowing their search criteria."
+            if count == 10 else ""
+        )
+        retrieved_docs = (
+            f"[PROPERTY SEARCH RESULTS — {count} listing(s) found. "
+            f"Format these for the customer using the FORMATTING SEARCH RESULTS rules.]\n"
+            f"{summary}"
+            f"{pagination_note}"
         )
 
         return {
-            "messages": [result_message],
+            "retrieved_docs": retrieved_docs,
             "search_results": rows,
         }
 

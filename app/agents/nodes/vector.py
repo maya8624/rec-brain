@@ -16,7 +16,6 @@ Never calls the LLM — agent_node handles synthesis.
 import json
 import logging
 
-from langchain_core.messages import SystemMessage
 from langchain_core.runnables import RunnableConfig
 
 from app.agents.nodes._base import last_human_message, resolve_app_service
@@ -69,12 +68,12 @@ async def vector_search_node(
             "result_count": count,
             "source": "vector_db",
         })
-        result_message = SystemMessage(
-            content=f"[DOCUMENT SEARCH RESULTS — {count} relevant excerpt(s) found. "
-                    f"Answer the customer's question using only this retrieved content.]\n{payload}"
+        retrieved_docs = (
+            f"[DOCUMENT SEARCH RESULTS — {count} relevant excerpt(s) found. "
+            f"Answer the customer's question using only this retrieved content.]\n{payload}"
         )
 
-        return {"messages": [result_message]}
+        return {"retrieved_docs": retrieved_docs}
 
     except Exception as exc:
         logger.exception("vector_search_node | failed | %s", exc)

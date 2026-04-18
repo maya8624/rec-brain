@@ -155,6 +155,12 @@ class RealEstateAgentState(TypedDict):
     # for the frontend to render as property cards. Reset each search turn.
     search_results: list[dict]
 
+    # Current-turn search/RAG content — plain assignment, so always holds only
+    # the latest turn's data. agent_node injects this directly into the LLM
+    # prompt (never appended to messages), then clears it to None.
+    # Prevents old search results from accumulating in conversation history.
+    retrieved_docs: str | None
+
     # ── Flow control ──────────────────────────────────────────────────────────
     requires_human: bool                # True → escalate to human agent
     error_count: int                    # consecutive tool failures this session
@@ -185,6 +191,7 @@ def initial_state() -> RealEstateAgentState:
             last_result_count=0,
         ),
         search_results=[],
+        retrieved_docs=None,
         requires_human=False,
         error_count=0,
     )

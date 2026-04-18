@@ -19,7 +19,6 @@ import json
 import logging
 from typing import Any
 
-from langchain_core.messages import SystemMessage
 from langchain_core.runnables import RunnableConfig
 
 from app.agents.nodes._base import last_human_message, listing_summary, resolve_app_service, slim_rows
@@ -72,16 +71,16 @@ async def hybrid_search_node(state: RealEstateAgentState, config: RunnableConfig
     summary = listing_summary(rows) if rows else "No listings found."
     vector_payload = json.dumps({"vector_results": vector}, default=str)
 
-    result_message = SystemMessage(
-        content=f"[HYBRID SEARCH RESULTS — {sql_count} property listing(s) and "
-                f"{vector_count} document excerpt(s) found. "
-                f"Answer the customer using both sources.]\n"
-                f"LISTINGS:\n{summary}\n\n"
-                f"DOCUMENTS:\n{vector_payload}"
+    retrieved_docs = (
+        f"[HYBRID SEARCH RESULTS — {sql_count} property listing(s) and "
+        f"{vector_count} document excerpt(s) found. "
+        f"Answer the customer using both sources.]\n"
+        f"LISTINGS:\n{summary}\n\n"
+        f"DOCUMENTS:\n{vector_payload}"
     )
 
     return {
-        "messages": [result_message],
+        "retrieved_docs": retrieved_docs,
         "search_results": rows,
     }
 
