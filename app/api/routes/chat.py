@@ -209,6 +209,7 @@ def _build_response(thread_id: str, result: dict) -> ChatResponse:
 
     booking_status = result.get("booking_status", {})
     booking_context = result.get("booking_context", {})
+    search_results = result.get("search_results", [])
 
     return ChatResponse(
         reply=reply,
@@ -219,8 +220,9 @@ def _build_response(thread_id: str, result: dict) -> ChatResponse:
         booking_cancelled=booking_status.get("cancelled", False),
         confirmation_id=booking_context.get("confirmation_id"),
         requires_human=result.get("requires_human", False),
-        listings=_extract_listings(result.get("search_results", [])),
+        listings=_extract_listings(search_results),
         sources=_extract_sources(result.get("messages", [])),
+        property_id=search_results[0].get("listing_id") if len(search_results) == 1 else None,
     )
 
 

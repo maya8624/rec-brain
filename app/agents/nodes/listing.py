@@ -46,7 +46,7 @@ async def listing_search_node(state: RealEstateAgentState, config: RunnableConfi
     try:
         ctx = state.get("search_context") or {}
 
-        if ctx.get("location"):
+        if ctx.get("location") or ctx.get("address"):
             # Fast path — entities already extracted by intent_node, no LLM call
             result = await sql_service.search_from_context(ctx)
             logger.info(

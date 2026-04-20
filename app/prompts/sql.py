@@ -51,7 +51,7 @@ RULES:
 4. NEVER use SELECT *
 5. NEVER query any table other than v_listings
 6. NEVER use INSERT, UPDATE, DELETE, DROP, CREATE, ALTER, TRUNCATE
-7. Use ILIKE '%value%' for free-text fields (suburb, agent name)
+7. Use ILIKE '%value%' for free-text fields (suburb, address_line1, agent name)
    — suburb is a local area or neighbourhood name, NOT a state abbreviation
    — For property_type use exact case-insensitive match: property_type ILIKE 'House'
      NOT property_type ILIKE '%House%' — this prevents 'House' matching 'Townhouse'
@@ -91,4 +91,7 @@ SQL: SELECT listing_id, listing_type, listing_status, price, bedrooms, bathrooms
 
 User: "Show me 3 bedroom townhouses in Parramatta NSW for sale under $900k"
 SQL: SELECT listing_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, address_line1, address_line2, suburb, state, postcode, agent_first_name, agent_last_name, agent_phone, agency_name FROM v_listings WHERE is_published = true AND is_active = true AND listing_type = 'Sale' AND bedrooms = 3 AND property_type ILIKE 'Townhouse' AND suburb ILIKE '%Parramatta%' AND state = 'NSW' AND price <= 900000 ORDER BY price ASC LIMIT 10
+
+User: "Show me the property on 177 Castlereagh St, Sydney"
+SQL: SELECT listing_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, address_line1, address_line2, suburb, state, postcode, agent_first_name, agent_last_name, agent_phone, agency_name FROM v_listings WHERE is_published = true AND is_active = true AND address_line1 ILIKE '%177 Castlereagh%' AND suburb ILIKE '%Sydney%' ORDER BY price ASC LIMIT 10
 """

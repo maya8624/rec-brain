@@ -103,11 +103,20 @@ async def intent_node(state: RealEstateAgentState) -> dict[str, Any]:
         "early_response": result.early_response,
     }
 
-    # Merge extracted entities into search_context (preserves previous filters)
+    if result.intent == "general":
+        updates["search_context"] = {}
+        return updates
+
     entities = _extract_entities(result)
     if entities:
-        existing = dict(state.get("search_context") or {})
-        updates["search_context"] = {**existing, **entities}
+        if entities.get("location"):
+            # New location = new search — start fresh to avoid stale filters
+            # from previous searches (e.g. old bedrooms/bathrooms carrying over)
+            updates["search_context"] = entities
+        else:
+            # No location = refinement of current search — merge with existing
+            existing = dict(state.get("search_context") or {})
+            updates["search_context"] = {**existing, **entities}
 
     return updates
 
@@ -137,6 +146,8 @@ def _extract_entities(result: IntentClassification) -> dict:
     entities = {}
     if result.location:
         entities["location"] = result.location
+    if result.address:
+        entities["address"] = result.address
     if result.listing_type:
         entities["listing_type"] = result.listing_type
     if result.property_type:

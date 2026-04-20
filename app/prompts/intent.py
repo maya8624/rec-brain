@@ -26,6 +26,7 @@ For search, hybrid_search, and search_then_book intents, extract whatever is
 explicitly stated or clearly implied. Leave all others null — do not guess.
 
 - location:       suburb, city, or area name (e.g. "Sydney", "Parramatta")
+- address:        street address only, no suburb (e.g. "177 Castlereagh St") — null if not mentioned
 - listing_type:   "Sale" or "Rent" only — null if not mentioned
 - property_type:  exactly one of: House, Apartment, Townhouse, Villa, Studio
                   Note: "Unit" does not exist — map it to "Apartment"
@@ -46,6 +47,8 @@ RULES:
 2. Follow-up questions ("what about his number?", "show me similar ones",
    "make it townhouses instead") MUST be resolved using history — never
    classify them in isolation
+3. Simple greetings ("hello", "hi", "hey", "thanks", "ok") are ALWAYS
+   "general" — never inherit a previous intent from history
 3. "search + booking" in the same message → search_then_book (not general)
 4. Any other compound → general with early_response asking to pick one action
 5. Rental prices are weekly in Australia (e.g. "$550 per week")

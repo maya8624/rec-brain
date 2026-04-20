@@ -129,6 +129,13 @@ class ChatResponse(BaseModel):
         description="Structured property listings from SQL search — render as property cards",
     )
 
+    # Property ID — populated when a single property is in context (eg. direct address lookup)
+    # lets .NET show the "Book Inspection" button for that specific property
+    property_id: str | None = Field(
+        default=None,
+        description="listing_id of the property in context, if unambiguous",
+    )
+
     # RAG sources — lets frontend show "Sources" section
     sources: list[SourceDocument] = Field(
         default_factory=list,

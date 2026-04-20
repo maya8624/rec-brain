@@ -123,6 +123,10 @@ class SqlViewService:
             loc = ctx["location"].replace("'", "")
             conditions.append(f"suburb ILIKE '%{loc}%'")
 
+        if ctx.get("address"):
+            addr = ctx["address"].replace("'", "")
+            conditions.append(f"address_line1 ILIKE '%{addr}%'")
+
         if ctx.get("listing_type") in ("Sale", "Rent"):
             conditions.append(f"listing_type = '{ctx['listing_type']}'")
 

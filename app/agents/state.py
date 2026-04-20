@@ -115,8 +115,9 @@ class SearchContext(TypedDict, total=False):
     across separate messages — this accumulates those filters.
     """
     location: str                   # suburb or area name
+    address: str                    # street address (e.g. "177 Castlereagh St")
     listing_type: str               # "Sale" or "Rent"
-    property_type: str              # House | Apartment | Townhouse | Unit | Villa | Studio
+    property_type: str              # House | Apartment | Townhouse | Villa | Studio
     bedrooms: int
     bathrooms: int
     max_price: float                # AUD
@@ -137,8 +138,9 @@ class IntentClassification(BaseModel):
     early_response: str | None = None
     # Search entities — null means not mentioned, do not guess
     location: str | None = None
+    address: str | None = None          # street address (e.g. "177 Castlereagh St")
     listing_type: str | None = None     # "Sale" or "Rent"
-    # House | Apartment | Townhouse | Unit | Villa | Studio
+    # House | Apartment | Townhouse | Villa | Studio
     property_type: str | None = None
     bedrooms: int | None = None
     bathrooms: int | None = None
