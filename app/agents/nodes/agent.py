@@ -23,6 +23,7 @@ from typing import Any
 from groq import APIStatusError, RateLimitError
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from app.agents.nodes._base import listing_summary
 from app.agents.state import RealEstateAgentState
 from app.infrastructure.llm import get_llm
 from app.prompts.agent import REAL_ESTATE_AGENT_SYSTEM
@@ -71,6 +72,10 @@ async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
     retrieved_docs = state.get("retrieved_docs")
     if retrieved_docs:
         prompt.append(SystemMessage(content=retrieved_docs))
+
+    if intent in _TOOL_INTENTS and state.get("search_results"):
+        summary = listing_summary(state["search_results"])
+        prompt.append(SystemMessage(content=f"[PROPERTY SEARCH RESULTS]\n{summary}"))
 
     logger.info(
         "agent_node | intent=%s | needs_tools=%s | history=%d/%d | errors=%d",

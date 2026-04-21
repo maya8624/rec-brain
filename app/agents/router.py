@@ -93,8 +93,18 @@ def route_agent_output(state: RealEstateAgentState) -> str:
 
 
 def route_after_search(state: RealEstateAgentState) -> str:
-    """Returns to agent so LLM can format search results into a response."""
+    """
+    Routes after listing_search_node / vector_search_node / hybrid_search_node.
+
+    listing_search_node appends an AIMessage directly — skip agent_node.
+    vector/hybrid search nodes set retrieved_docs — agent_node must format them.
+    """
     if _requires_human(state, "route_after_search"):
+        return Node.END
+
+    last = state["messages"][-1] if state["messages"] else None
+    if isinstance(last, AIMessage):
+        logger.info("route_after_search | reply already built → end")
         return Node.END
 
     logger.info("route_after_search | → agent")

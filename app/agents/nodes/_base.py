@@ -76,6 +76,7 @@ def slim_rows(rows: list[dict]) -> list[dict]:
     """Strip unused columns — keeps only what the LLM and frontend need."""
     return [
         {
+            "property_id":     row.get("property_id", ""),
             "listing_id":     row.get("listing_id", ""),
             "address":        row.get("address_line1", ""),
             "suburb":         row.get("suburb", ""),
@@ -99,9 +100,28 @@ def slim_rows(rows: list[dict]) -> list[dict]:
 def listing_summary(rows: list[dict]) -> str:
     """Compact one-line-per-listing text for LLM — saves tokens vs full JSON."""
     return "\n".join(
-        f"{i+1}. {row['address']}, {row['suburb']} {row['state']} — "
+        f"{i+1}. [property_id={row['property_id']}] {row['address']}, {row['suburb']} {row['state']} — "
         f"${row['price']:,.0f} | {row['bedrooms']}bed {row['bathrooms']}bath | "
         f"{row['property_type']} | {row['listing_type']} | "
         f"Agent: {row['agent_name']} {row['agent_phone']}"
         for i, row in enumerate(rows)
     )
+
+
+def format_search_reply(rows: list[dict], count: int) -> str:
+    """User-facing markdown reply built in code — no LLM involved."""
+    header = f"Found {count} {'property' if count == 1 else 'properties'}:\n"
+    blocks = []
+    for row in rows:
+        price = f"${row['price']:,.0f}/week" if row["listing_type"] == "Rent" else f"${row['price']:,.0f}"
+        blocks.append(
+            f"**{row['address']}, {row['suburb']} {row['state']}**\n"
+            f"{price} | {row['bedrooms']} bed | {row['bathrooms']} bath | "
+            f"{row['property_type']} | {row['listing_type']}\n"
+            f"Agent: {row['agent_name']} {row['agent_phone']}"
+        )
+    suffix = (
+        "\n\n_Showing top 10 results. Narrow your search criteria to see more specific results._"
+        if count == 10 else ""
+    )
+    return header + "\n\n".join(blocks) + suffix

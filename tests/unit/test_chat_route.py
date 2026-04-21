@@ -113,6 +113,23 @@ class TestBuildResponse:
         response = _build_response("t", self._make_result())
         assert response.sources == []
 
+    def test_property_id_set_when_single_search_result(self):
+        result = self._make_result(search_results=[{"property_id": "abc-123"}])
+        response = _build_response("t", result)
+        assert response.property_id == "abc-123"
+
+    def test_property_id_none_when_multiple_search_results(self):
+        result = self._make_result(search_results=[
+            {"property_id": "abc-123"},
+            {"property_id": "def-456"},
+        ])
+        response = _build_response("t", result)
+        assert response.property_id is None
+
+    def test_property_id_none_when_no_search_results(self):
+        response = _build_response("t", self._make_result())
+        assert response.property_id is None
+
 
 # ── _extract_tools_used ────────────────────────────────────────────────────────
 

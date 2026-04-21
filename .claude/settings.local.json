@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm:*)",
+      "Bash(python -m pytest tests/unit/test_intent.py tests/unit/test_router.py tests/unit/test_safety_node.py tests/unit/test_sql_service.py -v --tb=short)",
+      "Bash(python -m pytest tests/unit/ -v --tb=short)",
+      "Bash(claude --version)",
+      "Bash(npm list:*)",
+      "Bash(npm show:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(python -m pytest tests/integration/test_graph.py::TestGraphFlows::test_general_intent_flow -v)",
+      "Bash(python -m pytest tests/integration/test_graph.py::TestGraphFlows::test_general_intent_flow -v -s)",
+      "Bash(python:*)",
+      "Bash(pip show:*)",
+      "Bash(pip install:*)",
+      "Bash(grep:*)",
+      "WebSearch",
+      "WebFetch(domain:reference.langchain.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/unit/ -v)",
+      "WebFetch(domain:langchain-ai.github.io)",
+      "WebFetch(domain:docs.langchain.com)",
+      "WebFetch(domain:python.langchain.com)",
+      "WebFetch(domain:forum.langchain.com)",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/unit/test_agent_node.py -v)",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/unit/test_chat_route.py -v)"
+    ]
+  }
+}

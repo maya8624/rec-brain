@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 # Fixed SELECT columns — mirrors SQL_GENERATION_PROMPT rule 1
 _SELECT_COLS = (
-    "SELECT listing_id, listing_type, listing_status, price, bedrooms, bathrooms, "
+    "SELECT listing_id, property_id, listing_type, listing_status, price, bedrooms, bathrooms, "
     "car_spaces, property_type, title, address_line1, address_line2, suburb, state, "
     "postcode, agent_first_name, agent_last_name, agent_phone, agency_name"
 )
@@ -118,6 +118,10 @@ class SqlViewService:
         or contains criteria this template cannot express (e.g. "near good schools").
         """
         conditions = ["is_published = true", "is_active = true"]
+
+        if ctx.get("property_id"):
+            pid = ctx["property_id"].replace("'", "")
+            conditions.append(f"property_id = '{pid}'")
 
         if ctx.get("location"):
             loc = ctx["location"].replace("'", "")

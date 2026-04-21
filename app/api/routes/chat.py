@@ -44,7 +44,6 @@ async def chat(
         if request.is_new_conversation:
             input_state = initial_state()
             input_state["messages"] = [HumanMessage(content=request.message)]
-
         else:
             # LangGraph reload existing state from checkpointer automatically
             input_state = {"messages": [HumanMessage(content=request.message)]}
@@ -222,7 +221,9 @@ def _build_response(thread_id: str, result: dict) -> ChatResponse:
         requires_human=result.get("requires_human", False),
         listings=_extract_listings(search_results),
         sources=_extract_sources(result.get("messages", [])),
-        property_id=search_results[0].get("listing_id") if len(search_results) == 1 else None,
+        # TODO: refactor property_id below
+        property_id=str(pid) if (pid := (search_results[0].get(
+            "property_id") if len(search_results) == 1 else None)) else None,
     )
 
 

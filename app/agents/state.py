@@ -114,8 +114,10 @@ class SearchContext(TypedDict, total=False):
     The user might say "in Parramatta" then "under $600k" then "3 bedrooms"
     across separate messages — this accumulates those filters.
     """
+    property_id: str                # specific property ID passed from .NET (eg. from property page)
     location: str                   # suburb or area name
-    address: str                    # street address (e.g. "177 Castlereagh St")
+    # street address (e.g. "177 Castlereagh St")
+    address: str
     listing_type: str               # "Sale" or "Rent"
     property_type: str              # House | Apartment | Townhouse | Villa | Studio
     bedrooms: int
@@ -138,7 +140,8 @@ class IntentClassification(BaseModel):
     early_response: str | None = None
     # Search entities — null means not mentioned, do not guess
     location: str | None = None
-    address: str | None = None          # street address (e.g. "177 Castlereagh St")
+    # street address (e.g. "177 Castlereagh St")
+    address: str | None = None
     listing_type: str | None = None     # "Sale" or "Rent"
     # House | Apartment | Townhouse | Villa | Studio
     property_type: str | None = None
@@ -216,6 +219,7 @@ def initial_state() -> RealEstateAgentState:
         search_context=SearchContext(
             keywords=[],
             last_result_count=0,
+            property_id=None,
         ),
         search_results=[],
         retrieved_docs=None,

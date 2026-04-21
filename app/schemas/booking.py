@@ -6,7 +6,7 @@ These mirror the .NET backend contract for availability,
 booking, and cancellation endpoints.
 """
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, TypeAdapter, computed_field, field_validator
 from app.core.config import DATETIME_FORMAT
 
 
@@ -36,10 +36,25 @@ class BookingRequest(BaseModel):
 
 
 class AvailableSlot(BaseModel):
-    """A single available inspection time slot from .NET."""
-    datetime: str = Field(description="YYYY-MM-DD HH:MM format")
+    """Maps .NET InspectionSlotDto — field aliases handle camelCase from the API."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    slot_id:    str = Field("", alias="id")
+    start_at:   str = Field("", alias="startAtUtc")
+    end_at:     str = Field("", alias="endAtUtc")
+    agent_id:   str = Field("", alias="agentId")
     agent_name: str = ""
-    available: bool = True
+    capacity:   int = Field(0, alias="capacity")
+    status:     str = Field("", alias="status")
+    notes:      str = Field("", alias="notes")
+
+    @computed_field
+    @property
+    def available(self) -> bool:
+        return str(self.status).lower() == "open" and self.capacity > 0
+
+
+AvailableSlotList = TypeAdapter(list[AvailableSlot])
 
 
 class AvailabilityResult(BaseModel):

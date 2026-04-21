@@ -94,6 +94,10 @@ class Settings(BaseSettings):
         "",
         description="API key for authenticating with .NET API",
     )
+    BACKEND_VERIFY_SSL: bool = Field(
+        False,
+        description="Set to true in production — dev/staging often use self-signed certs",
+    )
 
     # ------------------------------------
     # Groq and LLM settings

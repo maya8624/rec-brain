@@ -8,7 +8,7 @@ from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 from app.core.constants import AppStateKeys
 from app.core.exceptions import BookingServiceError
-from app.schemas.booking import AvailabilityResult, AvailableSlot
+from app.schemas.booking import AvailabilityResult
 from app.services.booking_service import BookingService
 
 logger = logging.getLogger(__name__)
@@ -25,27 +25,14 @@ async def check_availability(property_id: str, config: RunnableConfig) -> dict:
     logger.info("check_availability | property_id=%s", property_id)
 
     try:
-        slots = await booking_service.get_availability(property_id)
-        avaliable_slots = [
-            AvailableSlot(
-                datetime=slot["datetime"],
-                agent_name=slot.get("agent_name", ""),
-                available=slot.get("available", True),
-            )
-            for slot in slots if slot.get("datetime")
-        ]
+        result = await booking_service.get_availability(property_id)
 
         logger.info(
             "check_availability | found %d slots for %s",
-            len(avaliable_slots), property_id,
+            result.get("slot_count", 0), property_id,
         )
 
-        return AvailabilityResult(
-            success=True,
-            property_id=property_id,
-            available_slots=avaliable_slots,
-            slot_count=len(avaliable_slots),
-        ).model_dump()
+        return result
 
     except BookingServiceError as exc:
         logger.error("check_availability | BookingServiceError: %s", exc)

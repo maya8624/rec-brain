@@ -59,6 +59,7 @@ class BackendClient:
                 "X-Service": "python-ai-service",
             },
             timeout=httpx.Timeout(10.0, connect=5.0),
+            verify=settings.BACKEND_VERIFY_SSL,
         )
 
         logger.info(

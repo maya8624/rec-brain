@@ -79,6 +79,15 @@ class TestBuildSqlFromContext:
         assert "OBrien" in sql
         assert "'O'" not in sql
 
+    def test_property_id_filter(self):
+        sql = SqlViewService.build_sql_from_context({"property_id": "f85bef59-8ccd-4783-a70d-3c9af7359732"})
+        assert "property_id = 'f85bef59-8ccd-4783-a70d-3c9af7359732'" in sql
+
+    def test_property_id_quote_stripped(self):
+        sql = SqlViewService.build_sql_from_context({"property_id": "abc'123"})
+        assert "abc123" in sql
+        assert "'" not in sql.split("property_id = ")[1].split("'")[1] if "property_id" in sql else True
+
     def test_empty_context_still_valid_sql(self):
         sql = SqlViewService.build_sql_from_context({})
         assert sql.upper().startswith("SELECT")
