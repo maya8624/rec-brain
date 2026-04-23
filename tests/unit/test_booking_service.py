@@ -9,7 +9,7 @@ import pytest
 
 from app.services.booking_service import BookingService
 from app.core.exceptions import BackendClientError, BookingServiceError, BookingValidationError
-from app.schemas.booking import BookingRequest, ContactInfo, CancellationRequest
+from app.schemas.booking import BookingRequest
 
 
 def make_backend_client(
@@ -22,6 +22,7 @@ def make_backend_client(
     if raise_error:
         mock.get.side_effect = raise_error
         mock.post.side_effect = raise_error
+        mock.patch.side_effect = raise_error
     else:
         mock.get.return_value = get_return or {}
         mock.post.return_value = post_return or {}
@@ -37,7 +38,7 @@ def _future_slot() -> str:
 
 
 class TestGetAvailability:
-    async def test_success_returns_availability_result_dict(self):
+    async def test_success_returns_availability_result(self):
         client = make_backend_client(get_return={
             "availableSlots": [
                 {
@@ -49,9 +50,9 @@ class TestGetAvailability:
 
         result = await BookingService(client).get_availability("prop_123")
 
-        assert result["success"] is True
-        assert result["slot_count"] == 1
-        assert result["property_id"] == "prop_123"
+        assert result.success is True
+        assert result.slot_count == 1
+        assert result.property_id == "prop_123"
 
     async def test_available_slots_are_parsed_correctly(self):
         client = make_backend_client(get_return={
@@ -69,8 +70,8 @@ class TestGetAvailability:
 
         result = await BookingService(client).get_availability("prop_123")
 
-        assert result["slot_count"] == 2
-        assert result["available_slots"][0]["agent_name"] == "Jane"
+        assert result.slot_count == 2
+        assert result.available_slots[0].agent_name == "Jane"
 
     async def test_unavailable_slots_are_filtered_out(self):
         client = make_backend_client(get_return={
@@ -88,7 +89,7 @@ class TestGetAvailability:
 
         result = await BookingService(client).get_availability("prop_123")
 
-        assert result["slot_count"] == 1
+        assert result.slot_count == 1
 
     async def test_empty_property_id_raises_validation_error(self):
         svc = make_service()
@@ -116,18 +117,22 @@ class TestBook:
 
     async def test_success_returns_confirmation_dict(self):
         client = make_backend_client(post_return={
-            "confirmationId": "CONF-42",
-            "propertyAddress": "123 Main St",
-            "confirmedDatetime": _future_slot(),
-            "agentName": "Jane Smith",
+            "id": "CONF-42",
+            "propertyId": "prop_123",
+            "status": "confirmed",
+            "agentFirstName": "Jane",
+            "agentLastName": "Smith",
             "agentPhone": "0400 000 000",
+            "startAtUtc": "2027-04-12T10:00:00Z",
+            "endAtUtc": "2027-04-12T11:00:00Z",
         })
 
         result = await BookingService(client).book(self._make_request())
 
         assert result["confirmation_id"] == "CONF-42"
-        assert result["property_address"] == "123 Main St"
-        assert result["agent_name"] == "Jane Smith"
+        assert result["property_id"] == "prop_123"
+        assert result["agent_first_name"] == "Jane"
+        assert result["agent_last_name"] == "Smith"
 
     async def test_backend_error_raises_booking_service_error(self):
         client = make_backend_client(
@@ -138,61 +143,32 @@ class TestBook:
             await BookingService(client).book(self._make_request())
 
     async def test_post_called_once(self):
-        client = make_backend_client(post_return={
-            "confirmationId": "C1", "propertyAddress": "", "confirmedDatetime": _future_slot(),
-        })
+        client = make_backend_client(post_return={"id": "C1"})
 
         await BookingService(client).book(self._make_request())
         client.post.assert_called_once()
 
 
 class TestCancel:
-    async def test_success_returns_confirmation_dict(self):
-        client = make_backend_client(post_return={})
+    async def test_success_returns_cancellation_confirmation(self):
+        client = make_backend_client()
 
-        result = await BookingService(client).cancel(
-            CancellationRequest(confirmation_id="CONF-12345")
-        )
+        result = await BookingService(client).cancel("CONF-12345", "user-abc")
 
-        assert result["confirmation_id"] == "CONF-12345"
+        assert result.id == "CONF-12345"
+        assert result.success is True
 
-    async def test_reason_included_in_payload_when_provided(self):
-        client = make_backend_client(post_return={})
+    async def test_patch_called_with_user_id(self):
+        client = make_backend_client()
 
-        await BookingService(client).cancel(
-            CancellationRequest(
-                confirmation_id="CONF-12345",
-                reason="Change of plans"
-            )
-        )
+        await BookingService(client).cancel("CONF-12345", "user-abc")
 
-        call_kwargs = client.post.call_args
-
-        # second positional arg or json kwarg contains the payload
-        payload = call_kwargs.args[1] if len(
-            call_kwargs.args) > 1 else call_kwargs.kwargs.get("json", {})
-
-        assert payload.get("reason") == "Change of plans"
-
-    async def test_reason_omitted_when_none(self):
-        client = make_backend_client(post_return={})
-
-        await BookingService(client).cancel(
-            CancellationRequest(confirmation_id="CONF-12345", reason=None)
-        )
-        call_kwargs = client.post.call_args
-
-        payload = call_kwargs.args[1] if len(
-            call_kwargs.args) > 1 else call_kwargs.kwargs.get("json", {})
-
-        assert "reason" not in payload
+        client.patch.assert_called_once()
+        payload = client.patch.call_args.kwargs.get("json", {})
+        assert payload.get("UserId") == "user-abc"
 
     async def test_backend_error_raises_booking_service_error(self):
-        client = make_backend_client(
-            raise_error=BackendClientError("404", 404)
-        )
+        client = make_backend_client(raise_error=BackendClientError("404", 404))
 
         with pytest.raises(BookingServiceError):
-            await BookingService(client).cancel(
-                CancellationRequest(confirmation_id="CONF-12345")
-            )
+            await BookingService(client).cancel("CONF-12345", "user-abc")

@@ -6,13 +6,21 @@ Constants used across the codebase, e.g. API endpoints, config keys, etc.
 from langgraph.graph import END
 
 
-class InspectionBookingEndpoints:
-    """
-    Constants for the .NET backend API.
-    """
-    AVAILABLE = "/api/inspection-slots/available"
-    BOOK = "/api/inspection-bookings/book"
-    CANCEL = "/api/inspection-bookings/{id}/cancel"
+class InternalRoutes:
+    AVAILABLE = "/api/internal/inspection-bookings/available"
+    BOOK = "/api/internal/inspection-bookings"
+
+    @staticmethod
+    def cancel(booking_id: str) -> str:
+        return f"/api/internal/inspection-bookings/{booking_id}/cancel"
+
+# class InspectionBookingEndpoints:
+#     """
+#     Constants for the .NET backend API.
+#     """
+#     AVAILABLE = "/api/internal/inspection-bookings/available"
+#     BOOK = "/api/internal/inspection-bookings"
+#     CANCEL = "/api/internal/inspection-bookings/{id}/cancel"
 
 
 class ToolNames:
@@ -54,6 +62,7 @@ class AppStateKeys:
     SQL_VIEW_SERVICE = "sql_view_service"
     RAG_RETRIEVER = "rag_retriever"
     BOOKING_SERVICE = "booking_service"
+    USER_ID = "user_id"
 
 
 class Node:

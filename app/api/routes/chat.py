@@ -35,6 +35,7 @@ async def chat(
         config = {
             "configurable": {
                 "thread_id":        request.thread_id,
+                "user_id":          request.user_id,
                 "booking_service":  http_request.app.state.booking_service,
                 "sql_view_service": http_request.app.state.sql_view_service,
                 "rag_retriever":    http_request.app.state.rag_retriever,
@@ -118,6 +119,7 @@ async def _event_generator(request: ChatRequest, http_request: Request, agent):
         config = {
             "configurable": {
                 "thread_id":        request.thread_id,
+                "user_id":          request.user_id,
                 "booking_service":  http_request.app.state.booking_service,
                 "sql_view_service": http_request.app.state.sql_view_service,
                 "rag_retriever":    http_request.app.state.rag_retriever,

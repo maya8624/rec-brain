@@ -8,7 +8,7 @@ from langchain_core.tools import tool
 
 from app.core.constants import AppStateKeys
 from app.core.exceptions import BookingServiceError, BookingValidationError
-from app.schemas.booking import CancellationRequest, CancellationResult
+from app.schemas.booking import CancellationResult
 from app.services.booking_service import BookingService
 
 logger = logging.getLogger(__name__)
@@ -20,6 +20,7 @@ async def cancel_inspection(confirmation_id: str, config: RunnableConfig, reason
     Cancel an existing property inspection booking.
     """
     booking_service: BookingService = config["configurable"][AppStateKeys.BOOKING_SERVICE]
+    user_id: str = config["configurable"][AppStateKeys.USER_ID]
 
     logger.info(
         "cancel_inspection | confirmation_id=%s | reason=%s",
@@ -27,40 +28,28 @@ async def cancel_inspection(confirmation_id: str, config: RunnableConfig, reason
     )
 
     try:
-        await booking_service.cancel(
-            CancellationRequest(
-                confirmation_id=confirmation_id,
-                reason=reason
-            )
-        )
+        result = await booking_service.cancel(confirmation_id, user_id)
 
         logger.info("cancel_inspection | cancelled | id=%s", confirmation_id)
 
-        return CancellationResult(
-            success=True,
-            confirmation_id=confirmation_id,
-            message=(
-                f"Inspection {confirmation_id} has been successfully cancelled. "
-                "A cancellation confirmation has been sent to your email."
-            ),
-        ).model_dump()
+        return result.model_dump()
 
     except BookingValidationError as exc:
         logger.warning("cancel_inspection | validation error: %s", exc)
         return CancellationResult(
-            success=False, confirmation_id=confirmation_id, error=str(exc)
+            success=False, id=confirmation_id, error=str(exc)
         ).model_dump()
 
     except BookingServiceError as exc:
         logger.error("cancel_inspection | service error: %s", exc)
         return CancellationResult(
-            success=False, confirmation_id=confirmation_id, error=str(exc)
+            success=False, id=confirmation_id, error=str(exc)
         ).model_dump()
 
     except Exception as exc:
         logger.exception("cancel_inspection | unexpected error: %s", exc)
         return CancellationResult(
             success=False,
-            confirmation_id=confirmation_id,
+            id=confirmation_id,
             error="Cancellation failed. Please contact the agency directly.",
         ).model_dump()

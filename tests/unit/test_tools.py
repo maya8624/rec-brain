@@ -9,11 +9,10 @@ from app.tools.book_inspection import book_inspection
 from app.tools.cancel_inspection import cancel_inspection
 from app.core.constants import AppStateKeys
 from app.core.exceptions import BookingServiceError, BookingValidationError
-from app.schemas.booking import CancellationRequest
 
 
 def _cfg(svc):
-    return {"configurable": {AppStateKeys.BOOKING_SERVICE: svc}}
+    return {"configurable": {AppStateKeys.BOOKING_SERVICE: svc, AppStateKeys.USER_ID: "test-user"}}
 
 
 class TestCheckAvailability:
@@ -97,7 +96,7 @@ class TestCancelInspection:
             {"confirmation_id": "CONF-12345", "reason": "Change of plans"}, config=_cfg(svc)
         )
         assert result["success"] is True
-        assert result["confirmation_id"] == "CONF-12345"
+        assert result["id"] == "CONF-12345"
 
     async def test_calls_service_cancel_once(self, make_booking_service):
         svc = make_booking_service()
@@ -106,25 +105,12 @@ class TestCancelInspection:
         )
         svc.cancel.assert_called_once()
 
-    async def test_passes_cancellation_request_object(self, make_booking_service):
-        """cancel() must receive a CancellationRequest, not raw kwargs."""
+    async def test_calls_service_with_correct_args(self, make_booking_service):
         svc = make_booking_service()
         await cancel_inspection.ainvoke(
             {"confirmation_id": "CONF-12345", "reason": "No longer needed"}, config=_cfg(svc)
         )
-
-        call_arg = svc.cancel.call_args.args[0]
-        assert isinstance(call_arg, CancellationRequest)
-        assert call_arg.confirmation_id == "CONF-12345"
-        assert call_arg.reason == "No longer needed"
-
-    async def test_no_reason_sends_none(self, make_booking_service):
-        svc = make_booking_service()
-        await cancel_inspection.ainvoke(
-            {"confirmation_id": "CONF-12345"}, config=_cfg(svc)
-        )
-        call_arg = svc.cancel.call_args.args[0]
-        assert call_arg.reason is None
+        svc.cancel.assert_called_once_with("CONF-12345", "test-user")
 
     async def test_not_found_returns_failure(self, make_booking_service):
         svc = make_booking_service(raise_error=BookingValidationError("Booking CONF-99999 not found"))
@@ -132,7 +118,7 @@ class TestCancelInspection:
             {"confirmation_id": "CONF-99999"}, config=_cfg(svc)
         )
         assert result["success"] is False
-        assert result["confirmation_id"] == "CONF-99999"
+        assert result["id"] == "CONF-99999"
 
     async def test_service_error_returns_failure(self, make_booking_service):
         svc = make_booking_service(raise_error=BookingServiceError("Backend unavailable"))

@@ -20,10 +20,6 @@ from app.core.constants import ToolNames, StateKeys
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# Public node
-# ---------------------------------------------------------------------------
-
 def context_update_node(state: RealEstateAgentState) -> dict[str, Any]:
     """
     Inspect the latest batch of ToolMessages and update typed context fields.
@@ -120,10 +116,6 @@ _TOOL_HANDLERS: dict[str, Any] = {
     ToolNames.CANCEL_INSPECTION:  _handle_cancel_inspection,
 }
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 def _extract_recent_tool_results(messages: list[AIMessage | ToolMessage]) -> list[tuple[str, dict]]:
     """

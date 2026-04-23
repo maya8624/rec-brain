@@ -22,17 +22,15 @@ async def check_availability(property_id: str, config: RunnableConfig) -> dict:
     """
     booking_service: BookingService = config["configurable"][AppStateKeys.BOOKING_SERVICE]
 
-    logger.info("check_availability | property_id=%s", property_id)
-
     try:
         result = await booking_service.get_availability(property_id)
 
         logger.info(
             "check_availability | found %d slots for %s",
-            result.get("slot_count", 0), property_id,
+            result.slot_count, property_id,
         )
 
-        return result
+        return result.model_dump()
 
     except BookingServiceError as exc:
         logger.error("check_availability | BookingServiceError: %s", exc)

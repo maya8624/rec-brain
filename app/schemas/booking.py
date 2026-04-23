@@ -17,22 +17,9 @@ class ContactInfo(BaseModel):
 
 
 class BookingRequest(BaseModel):
-    property_id: str = Field(min_length=1)
-    datetime_slot: str  # validated below
-    contact: ContactInfo
-
-    @field_validator("datetime_slot")
-    @classmethod
-    def slot_must_be_future(cls, value: str) -> str:
-        try:
-            dt = datetime.strptime(value, DATETIME_FORMAT)
-        except ValueError:
-            raise ValueError(f"Expected YYYY-MM-DD HH:MM, got '{value}'")
-
-        if dt <= datetime.now():
-            raise ValueError("Inspection datetime must be in the future")
-
-        return value
+    slot_id: str = Field(..., min_length=1)
+    user_id: str = Field(..., min_length=1)
+    notes: str = Field("", max_length=1000)
 
 
 class AvailableSlot(BaseModel):
@@ -47,6 +34,11 @@ class AvailableSlot(BaseModel):
     capacity:   int = Field(0, alias="capacity")
     status:     str = Field("", alias="status")
     notes:      str = Field("", alias="notes")
+
+    @field_validator("notes", mode="before")
+    @classmethod
+    def _notes_none_to_empty(cls, v: object) -> object:
+        return v if v is not None else ""
 
     @computed_field
     @property
@@ -69,10 +61,13 @@ class AvailabilityResult(BaseModel):
 class BookingConfirmation(BaseModel):
     """Confirmation details returned after a successful booking."""
     confirmation_id: str
-    property_address: str
-    confirmed_datetime: str
-    agent_name: str = ""
-    agent_phone: str = ""
+    property_id: str = ""
+    status: str = ""
+    agent_first_name: str = ""
+    agent_last_name: str = ""
+    agent_phone: str | None = None
+    start_at_utc: datetime | None = None
+    end_at_utc: datetime | None = None
 
 
 class BookingResult(BaseModel):
@@ -87,22 +82,18 @@ class BookingResult(BaseModel):
     error: str | None = None
 
 
-class CancellationRequest(BaseModel):
-    confirmation_id: str = Field(min_length=1)
-    reason: str | None = None
-
-
 class CancellationConfirmation(BaseModel):
     """Confirmation returned after a successful cancellation."""
-    confirmation_id: str
-    message: str = "Booking successfully cancelled"
+    id: str
+    success: bool
+    message: str = "Your inspection booking has been successfully cancelled."
 
 
 class CancellationResult(BaseModel):
     """Tool return for cancel_inspection."""
-    success: bool
-    confirmation_id: str = ""
+    id: str = ""
     message: str = ""
+    success: bool
     error: str | None = None
 
 

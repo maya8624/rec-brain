@@ -72,17 +72,12 @@ def make_sql_service():
 
 @pytest.fixture
 def make_booking_service():
-    """
-    Factory for a mock BookingService.
-
-    get_availability returns a list of slot dicts — this matches what
-    the check_availability tool iterates over (the tool wraps them into
-    AvailableSlot objects itself).
-    """
+    """Factory for a mock BookingService."""
     from app.services.booking_service import BookingService
+    from app.schemas.booking import AvailabilityResult, AvailableSlot, CancellationConfirmation
 
     def _factory(
-        availability: list | None = None,
+        availability: AvailabilityResult | None = None,
         booking_result: dict | None = None,
         raise_error: Exception | None = None,
     ):
@@ -92,25 +87,26 @@ def make_booking_service():
             mock.book.side_effect = raise_error
             mock.cancel.side_effect = raise_error
         else:
-            mock.get_availability.return_value = (
-                availability if availability is not None else [
-                    {"datetime": "2026-04-12 10:00",
-                        "agent_name": "Jane Smith", "available": True},
-                    {"datetime": "2026-04-12 14:00",
-                        "agent_name": "Jane Smith", "available": True},
-                ]
+            mock.get_availability.return_value = availability or AvailabilityResult(
+                success=True,
+                property_id="prop_123",
+                available_slots=[
+                    AvailableSlot(agent_name="Jane Smith", startAtUtc="2026-04-12T10:00:00Z", status="open", capacity=1),
+                    AvailableSlot(agent_name="Jane Smith", startAtUtc="2026-04-12T14:00:00Z", status="open", capacity=1),
+                ],
+                slot_count=2,
             )
             mock.book.return_value = booking_result or {
                 "confirmation_id": "CONF-12345",
-                "property_address": "123 Main St, Sydney NSW 2000",
-                "confirmed_datetime": "2026-04-12 10:00",
-                "agent_name": "Jane Smith",
+                "property_id": "prop_123",
+                "agent_first_name": "Jane",
+                "agent_last_name": "Smith",
                 "agent_phone": "0412 345 678",
             }
-            mock.cancel.return_value = {
-                "confirmation_id": "CONF-12345",
-                "message": "Booking successfully cancelled",
-            }
+            mock.cancel.return_value = CancellationConfirmation(
+                id="CONF-12345",
+                success=True,
+            )
         return mock
     return _factory
 
