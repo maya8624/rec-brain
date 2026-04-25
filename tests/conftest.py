@@ -6,7 +6,7 @@ All factories follow the "fixture-as-factory" pattern:
     with custom arguments while still getting pytest's dependency injection.
 """
 import json
-
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 import pytest
 from langchain_core.messages import HumanMessage
@@ -79,13 +79,29 @@ def make_booking_service():
     def _factory(
         availability: AvailabilityResult | None = None,
         booking_result: BookingConfirmation | None = None,
+        lookup_result: BookingConfirmation | None = None,
+        my_bookings: list[BookingConfirmation] | None = None,
         raise_error: Exception | None = None,
     ):
         mock = AsyncMock(spec=BookingService)
+
+        _default_confirmation = BookingConfirmation(
+            confirmation_id="CONF-12345",
+            property_id="prop_123",
+            property_address="42 Main St, Sydney",
+            agent_first_name="Jane",
+            agent_last_name="Smith",
+            agent_phone="0412 345 678",
+            start_at_utc=datetime(2027, 4, 12, 10, 0, tzinfo=timezone.utc),
+            end_at_utc=datetime(2027, 4, 12, 11, 0, tzinfo=timezone.utc),
+        )
+
         if raise_error:
             mock.check_availability.side_effect = raise_error
             mock.book.side_effect = raise_error
             mock.cancel.side_effect = raise_error
+            mock.get_booking.side_effect = raise_error
+            mock.get_my_bookings.side_effect = raise_error
         else:
             mock.check_availability.return_value = availability if availability is not None else AvailabilityResult(
                 success=True,
@@ -96,16 +112,11 @@ def make_booking_service():
                 ],
                 slot_count=2,
             )
-            mock.book.return_value = booking_result or BookingConfirmation(
-                confirmation_id="CONF-12345",
-                property_id="prop_123",
-                agent_first_name="Jane",
-                agent_last_name="Smith",
-                agent_phone="0412 345 678",
-            )
-            mock.cancel.return_value = CancellationConfirmation(
-                id="CONF-12345",
-                success=True,
+            mock.book.return_value = booking_result or _default_confirmation
+            mock.cancel.return_value = CancellationConfirmation(id="CONF-12345", success=True)
+            mock.get_booking.return_value = lookup_result or _default_confirmation
+            mock.get_my_bookings.return_value = (
+                my_bookings if my_bookings is not None else [_default_confirmation]
             )
         return mock
     return _factory

@@ -4,31 +4,17 @@ via BookingService. Always call this BEFORE book_inspection
 so the user can choose from real available slots.
 """
 import logging
-from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
+import uuid
 
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 from app.core.constants import AppStateKeys
-from app.core.exceptions import BookingServiceError
+from app.core.exceptions import BookingServiceError, BookingValidationError
 from app.schemas.booking import AvailabilityResult
 from app.services.booking_service import BookingService
+from app.tools._utils import fmt_dt_sydney
 
 logger = logging.getLogger(__name__)
-
-_SYDNEY = ZoneInfo("Australia/Sydney")
-
-
-def _fmt_dt(dt_str: str) -> str:
-    if not dt_str:
-        return "TBD"
-    try:
-        dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone(_SYDNEY).strftime("%a %d %b %Y at %I:%M %p %Z")
-    except ValueError:
-        return dt_str
 
 
 @tool
@@ -40,6 +26,12 @@ async def check_availability(property_id: str, config: RunnableConfig) -> dict:
     booking_service: BookingService = config["configurable"][AppStateKeys.BOOKING_SERVICE]
 
     try:
+        uuid.UUID(property_id)
+    except ValueError as exc:
+        raise BookingValidationError(
+            f"property_id must be a valid UUID: {exc}") from exc
+
+    try:
         result = await booking_service.check_availability(property_id)
 
         logger.info(
@@ -48,8 +40,8 @@ async def check_availability(property_id: str, config: RunnableConfig) -> dict:
         )
 
         for slot in result.available_slots:
-            slot.start_at = _fmt_dt(slot.start_at)
-            slot.end_at = _fmt_dt(slot.end_at)
+            slot.start_at = fmt_dt_sydney(slot.start_at)
+            slot.end_at = fmt_dt_sydney(slot.end_at)
 
         return result.model_dump()
 

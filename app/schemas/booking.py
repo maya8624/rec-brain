@@ -62,6 +62,7 @@ class BookingConfirmation(BaseModel):
     """Confirmation details returned after a successful booking."""
     confirmation_id: str
     property_id: str = ""
+    property_address: str = ""
     status: str = ""
     agent_first_name: str = ""
     agent_last_name: str = ""
@@ -95,6 +96,21 @@ class CancellationResult(BaseModel):
     success: bool
     id: str = ""
     message: str = ""
+    error: str | None = None
+
+
+class BookingLookupResult(BaseModel):
+    """Tool return for get_booking."""
+    success: bool
+    confirmation_id: str = ""
+    property_id: str = ""
+    property_address: str = ""
+    status: str = ""
+    agent_name: str = ""
+    agent_phone: str | None = None
+    start_at: str = ""
+    end_at: str = ""
+    bookings: list[dict] = []   # populated when returning all user bookings
     error: str | None = None
 
 

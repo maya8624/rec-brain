@@ -31,12 +31,6 @@ class BookingService:
         Fetch available inspection slots for a property.
         """
         try:
-            uuid.UUID(property_id)
-        except ValueError as exc:
-            raise BookingValidationError(
-                f"property_id must be a valid UUID: {exc}") from exc
-
-        try:
             url = f"{InternalRoutes.AVAILABLE}/{property_id}"
             data = await self._client.get(url)
         except BackendClientError as exc:
@@ -63,7 +57,6 @@ class BookingService:
                 "UserId": request.user_id,
                 "Notes": request.notes,
             }
-
             data = await self._client.post(InternalRoutes.BOOK, json=payload)
         except BackendClientError as exc:
             raise BookingServiceError(f"Booking failed: {exc}") from exc
@@ -71,6 +64,31 @@ class BookingService:
         response = self._parse_booking_response(data)
 
         return response
+
+    async def get_booking(self, confirmation_id: str, user_id: str) -> BookingConfirmation:
+        """Fetch a single booking by confirmation ID."""
+        try:
+            url = InternalRoutes.get_booking(confirmation_id)
+            data = await self._client.get(url, params={"userId": user_id})
+        except BackendClientError as exc:
+            raise BookingServiceError(
+                f"Failed to fetch booking: {exc}") from exc
+
+        return self._parse_booking_response(data)
+
+    async def get_my_bookings(self, user_id: str) -> list[BookingConfirmation]:
+        """Fetch all bookings for the current user."""
+        try:
+            data = await self._client.get(f"{InternalRoutes.MY_BOOKINGS}/{user_id}")
+        except BackendClientError as exc:
+            raise BookingServiceError(
+                f"Failed to fetch bookings: {exc}") from exc
+
+        if not isinstance(data, list):
+            raise BookingServiceError(
+                "Unexpected response format from bookings endpoint")
+
+        return [self._parse_booking_response(item) for item in data]
 
     async def cancel(self, confirmation_id: str, user_id: str) -> CancellationConfirmation:
         """Cancel an existing booking."""
@@ -96,6 +114,7 @@ class BookingService:
         return BookingConfirmation(
             confirmation_id=data.get("id", ""),
             property_id=data.get("propertyId", ""),
+            property_address=data.get("propertyAddress", ""),
             status=data.get("status", ""),
             agent_first_name=data.get("agentFirstName", ""),
             agent_last_name=data.get("agentLastName", ""),

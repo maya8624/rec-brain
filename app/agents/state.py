@@ -31,6 +31,7 @@ UserIntent = Literal[
     "hybrid_search",    # user wants property listings + document context together
     "booking",          # user wants to inspect a property
     "cancellation",     # user wants to cancel an existing inspection
+    "booking_lookup",   # user wants to check details of an existing booking
     "search_then_book",  # user wants to search first, then book — run search, prompt to pick
     "general",          # general question about the agency / process
     "unknown",          # intent not yet determined

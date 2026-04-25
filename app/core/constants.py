@@ -9,6 +9,11 @@ from langgraph.graph import END
 class InternalRoutes:
     AVAILABLE = "/api/internal/inspection-bookings/available"
     BOOK = "/api/internal/inspection-bookings"
+    MY_BOOKINGS = "/api/internal/inspection-bookings/my"
+
+    @staticmethod
+    def get_booking(booking_id: str) -> str:
+        return f"/api/internal/inspection-bookings/{booking_id}"
 
     @staticmethod
     def cancel(booking_id: str) -> str:
@@ -30,6 +35,7 @@ class ToolNames:
     CHECK_AVAILABILITY = "check_availability"
     BOOK_INSPECTION = "book_inspection"
     CANCEL_INSPECTION = "cancel_inspection"
+    GET_BOOKING = "get_booking"
 
 
 class TableNames:
@@ -68,6 +74,7 @@ class AppStateKeys:
 HISTORY_BY_INTENT: dict[str, int] = {
     "booking": 10,
     "cancellation": 10,
+    "booking_lookup": 6,
     "search": 6,
     "hybrid_search": 6,
     "document_query": 4,

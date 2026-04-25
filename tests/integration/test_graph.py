@@ -30,8 +30,19 @@ async def graph():
 
 
 def make_booking_service():
+    from datetime import datetime, timezone
     from app.schemas.booking import AvailabilityResult, AvailableSlot, BookingConfirmation, CancellationConfirmation
 
+    _default_confirmation = BookingConfirmation(
+        confirmation_id="CONF-12345",
+        property_id="prop_123",
+        property_address="42 Main St, Sydney NSW 2000",
+        agent_first_name="Jane",
+        agent_last_name="Smith",
+        agent_phone="0412 345 678",
+        start_at_utc=datetime(2027, 4, 12, 10, 0, tzinfo=timezone.utc),
+        end_at_utc=datetime(2027, 4, 12, 11, 0, tzinfo=timezone.utc),
+    )
     mock = AsyncMock()
     mock.check_availability.return_value = AvailabilityResult(
         success=True,
@@ -42,17 +53,10 @@ def make_booking_service():
         ],
         slot_count=2,
     )
-    mock.book.return_value = BookingConfirmation(
-        confirmation_id="CONF-12345",
-        property_id="prop_123",
-        agent_first_name="Jane",
-        agent_last_name="Smith",
-        agent_phone="0412 345 678",
-    )
-    mock.cancel.return_value = CancellationConfirmation(
-        id="CONF-12345",
-        success=True,
-    )
+    mock.book.return_value = _default_confirmation
+    mock.cancel.return_value = CancellationConfirmation(id="CONF-12345", success=True)
+    mock.get_booking.return_value = _default_confirmation
+    mock.get_my_bookings.return_value = [_default_confirmation]
     return mock
 
 
@@ -118,6 +122,16 @@ class TestGraphFlows:
         )
 
         assert result["user_intent"] == "booking"
+
+    async def test_booking_lookup_by_confirmation_id_flow(self, graph):
+        request = make_request_mock(booking_service=make_booking_service())
+        result = await graph.ainvoke(
+            {"messages": [HumanMessage(content="Check my booking CONF-12345")]},
+            config=get_config(request, "integ-lookup-conf"),
+        )
+        assert result["user_intent"] == "booking_lookup"
+        last = result["messages"][-1]
+        assert last.content
 
     async def test_cancellation_intent_flow(self, graph):
         request = make_request_mock(booking_service=make_booking_service())

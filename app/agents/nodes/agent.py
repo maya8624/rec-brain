@@ -33,7 +33,7 @@ from app.tools import get_all_tools
 logger = logging.getLogger(__name__)
 
 # Only these intents need tool calling
-_TOOL_INTENTS = frozenset(["booking", "cancellation"])
+_TOOL_INTENTS = frozenset(["booking", "cancellation", "booking_lookup"])
 
 
 

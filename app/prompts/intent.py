@@ -20,6 +20,9 @@ INTENTS:
 - hybrid_search    — user wants BOTH property listings AND document/agency info
 - booking          — user wants to book or schedule a property inspection
 - cancellation     — user wants to cancel an existing inspection booking
+- booking_lookup   — user wants to view, check, or retrieve details of an existing
+                     booking (e.g. "can I see my booking?", "I booked an inspection,
+                     can I see it?", "what time is my inspection?")
 - search_then_book — user wants to search for a property AND book an inspection
                      in the same message
 - general          — greeting, unclear, out-of-scope, or unclassifiable
@@ -55,5 +58,5 @@ RULES:
 4. "search + booking" in the same message → search_then_book (not general)
 5. Any other compound → general with early_response asking to pick one action
 6. Rental prices are weekly in Australia (e.g. "$550 per week")
-7. Never extract entities for booking, cancellation, document_query, or general
+7. Never extract entities for booking, cancellation, booking_lookup, document_query, or general
 """

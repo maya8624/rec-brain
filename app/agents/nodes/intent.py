@@ -45,6 +45,15 @@ _BOOKING_KEYWORDS = frozenset([
     "schedule", "arrange", "open for inspection", "open home",
 ])
 
+_LOOKUP_KEYWORDS = frozenset([
+    "my booking", "my inspection", "check my booking", "check booking",
+    "booking details", "booking status", "when is my inspection",
+    "what time is my", "show my booking", "my confirmation",
+    "look up my booking", "find my booking",
+    "see my booking", "see my inspection", "view my booking", "view my inspection",
+    "booked an inspection", "booked a viewing", "i booked",
+])
+
 _SEARCH_KEYWORDS = frozenset([
     "find", "search", "show", "list", "looking for",
     "properties", "house", "apartment", "unit", "townhouse",
@@ -127,6 +136,9 @@ def _obvious_intent(msg_lower: str) -> UserIntent | None:
     if (_matches_keywords(msg_lower, _CANCELLATION_KEYWORDS) and
             not _matches_keywords(msg_lower, _SEARCH_KEYWORDS)):
         return "cancellation"
+
+    if _matches_keywords(msg_lower, _LOOKUP_KEYWORDS):
+        return "booking_lookup"
 
     if (_matches_keywords(msg_lower, _BOOKING_KEYWORDS) and
             not _matches_keywords(msg_lower, _SEARCH_KEYWORDS)):

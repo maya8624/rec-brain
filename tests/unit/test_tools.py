@@ -7,6 +7,7 @@ import pytest
 from app.tools.check_availability import check_availability
 from app.tools.book_inspection import book_inspection
 from app.tools.cancel_inspection import cancel_inspection
+from app.tools.get_booking import get_booking
 from app.core.constants import AppStateKeys
 from app.core.exceptions import BookingServiceError, BookingValidationError
 
@@ -147,3 +148,61 @@ class TestCancelInspection:
             {"confirmation_id": "CONF-12345"}, config=_cfg(svc)
         )
         assert "confirmation email" in result["message"].lower()
+
+
+_CONF_ID = "CONF-12345"
+
+
+class TestGetBooking:
+    async def test_by_confirmation_id_returns_success(self, make_booking_service):
+        svc = make_booking_service()
+        result = await get_booking.ainvoke({"confirmation_id": _CONF_ID}, config=_cfg(svc))
+        assert result["success"] is True
+        assert result["confirmation_id"] == _CONF_ID
+
+    async def test_by_confirmation_id_calls_service_with_user_id(self, make_booking_service):
+        svc = make_booking_service()
+        await get_booking.ainvoke({"confirmation_id": _CONF_ID}, config=_cfg(svc))
+        svc.get_booking.assert_called_once_with(_CONF_ID, "test-user")
+
+    async def test_empty_bookings_list_returns_failure(self, make_booking_service):
+        svc = make_booking_service(my_bookings=[])
+        result = await get_booking.ainvoke({}, config=_cfg(svc))
+        assert result["success"] is False
+
+    async def test_no_args_returns_all_bookings(self, make_booking_service):
+        svc = make_booking_service()
+        result = await get_booking.ainvoke({}, config=_cfg(svc))
+        assert result["success"] is True
+        assert len(result["bookings"]) == 1
+        assert result["bookings"][0]["confirmation_id"] == _CONF_ID
+
+    async def test_no_args_empty_account_returns_failure(self, make_booking_service):
+        svc = make_booking_service(my_bookings=[])
+        result = await get_booking.ainvoke({}, config=_cfg(svc))
+        assert result["success"] is False
+        assert result["error"]
+
+    async def test_service_error_returns_failure(self, make_booking_service):
+        svc = make_booking_service(raise_error=BookingServiceError("Backend down"))
+        result = await get_booking.ainvoke({"confirmation_id": _CONF_ID}, config=_cfg(svc))
+        assert result["success"] is False
+        assert "Backend down" in result["error"]
+
+    async def test_unexpected_exception_returns_failure(self, make_booking_service):
+        svc = make_booking_service(raise_error=RuntimeError("crash"))
+        result = await get_booking.ainvoke({"confirmation_id": _CONF_ID}, config=_cfg(svc))
+        assert result["success"] is False
+
+    async def test_datetimes_formatted_as_sydney_time(self, make_booking_service):
+        svc = make_booking_service()
+        result = await get_booking.ainvoke({"confirmation_id": _CONF_ID}, config=_cfg(svc))
+        assert result["start_at"]
+        assert "Z" not in result["start_at"]          # not raw UTC
+        assert " at " in result["start_at"]           # human-readable separator
+        assert "AEST" in result["start_at"] or "AEDT" in result["start_at"]
+
+    async def test_agent_name_joined_correctly(self, make_booking_service):
+        svc = make_booking_service()
+        result = await get_booking.ainvoke({"confirmation_id": _CONF_ID}, config=_cfg(svc))
+        assert result["agent_name"] == "Jane Smith"

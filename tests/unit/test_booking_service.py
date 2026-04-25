@@ -16,7 +16,7 @@ _PROPERTY_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 
 
 def make_backend_client(
-    get_return: list | None = None,
+    get_return: list | dict | None = None,
     post_return: dict | None = None,
     raise_error: Exception | None = None,
 ):
@@ -150,6 +150,87 @@ class TestBook:
         payload = client.post.call_args.kwargs.get("json", {})
         assert payload["InspectionSlotId"] == "slot-001"
         assert payload["UserId"] == "user-123"
+
+
+def _booking_dto(conf_id: str = "CONF-42") -> dict:
+    return {
+        "id": conf_id,
+        "propertyId": _PROPERTY_ID,
+        "propertyAddress": "42 Main St, Sydney",
+        "status": "confirmed",
+        "agentFirstName": "Jane",
+        "agentLastName": "Smith",
+        "agentPhone": "0400 000 000",
+        "startAtUtc": "2027-04-12T10:00:00Z",
+        "endAtUtc": "2027-04-12T11:00:00Z",
+    }
+
+
+class TestGetBooking:
+    async def test_success_returns_booking_confirmation(self):
+        client = make_backend_client(get_return=_booking_dto())
+        result = await BookingService(client).get_booking("CONF-42", "user-123")
+        assert result.confirmation_id == "CONF-42"
+        assert result.property_id == _PROPERTY_ID
+
+    async def test_property_address_is_parsed(self):
+        client = make_backend_client(get_return=_booking_dto())
+        result = await BookingService(client).get_booking("CONF-42", "user-123")
+        assert result.property_address == "42 Main St, Sydney"
+
+    async def test_agent_names_parsed(self):
+        client = make_backend_client(get_return=_booking_dto())
+        result = await BookingService(client).get_booking("CONF-42", "user-123")
+        assert result.agent_first_name == "Jane"
+        assert result.agent_last_name == "Smith"
+
+    async def test_get_called_with_user_id_param(self):
+        client = make_backend_client(get_return=_booking_dto())
+        await BookingService(client).get_booking("CONF-42", "user-123")
+        client.get.assert_called_once()
+        params = client.get.call_args.kwargs.get("params", {})
+        assert params.get("userId") == "user-123"
+
+    async def test_backend_error_raises_booking_service_error(self):
+        client = make_backend_client(raise_error=BackendClientError("404", 404))
+        with pytest.raises(BookingServiceError):
+            await BookingService(client).get_booking("CONF-42", "user-123")
+
+
+class TestGetMyBookings:
+    async def test_success_returns_list(self):
+        client = make_backend_client(get_return=[_booking_dto("CONF-1"), _booking_dto("CONF-2")])
+        results = await BookingService(client).get_my_bookings("user-123")
+        assert len(results) == 2
+        assert results[0].confirmation_id == "CONF-1"
+        assert results[1].confirmation_id == "CONF-2"
+
+    async def test_empty_list_returns_empty(self):
+        client = make_backend_client(get_return=[])
+        results = await BookingService(client).get_my_bookings("user-123")
+        assert results == []
+
+    async def test_get_called_with_user_id_param(self):
+        client = make_backend_client(get_return=[])
+        await BookingService(client).get_my_bookings("user-123")
+        client.get.assert_called_once()
+        params = client.get.call_args.kwargs.get("params", {})
+        assert params.get("userId") == "user-123"
+
+    async def test_non_list_response_raises_booking_service_error(self):
+        client = make_backend_client(get_return=_booking_dto())
+        with pytest.raises(BookingServiceError, match="Unexpected response format"):
+            await BookingService(client).get_my_bookings("user-123")
+
+    async def test_backend_error_raises_booking_service_error(self):
+        client = make_backend_client(raise_error=BackendClientError("500", 500))
+        with pytest.raises(BookingServiceError):
+            await BookingService(client).get_my_bookings("user-123")
+
+    async def test_property_address_parsed_per_item(self):
+        client = make_backend_client(get_return=[_booking_dto()])
+        results = await BookingService(client).get_my_bookings("user-123")
+        assert results[0].property_address == "42 Main St, Sydney"
 
 
 class TestCancel:

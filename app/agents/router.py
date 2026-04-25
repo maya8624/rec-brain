@@ -19,9 +19,10 @@ from app.core.constants import ToolNames, Node
 logger = logging.getLogger(__name__)
 
 TOOL_ROUTES: dict[str, str] = {
-    ToolNames.CHECK_AVAILABILITY: Node.TOOLS,
-    ToolNames.BOOK_INSPECTION:    Node.TOOLS,
-    ToolNames.CANCEL_INSPECTION:  Node.TOOLS,
+    ToolNames.CHECK_AVAILABILITY:  Node.TOOLS,
+    ToolNames.BOOK_INSPECTION:     Node.TOOLS,
+    ToolNames.CANCEL_INSPECTION:   Node.TOOLS,
+    ToolNames.GET_BOOKING: Node.TOOLS,
 }
 
 
@@ -51,6 +52,7 @@ def route_intent_output(state: RealEstateAgentState) -> str:
         "hybrid_search":    Node.HYBRID_SEARCH,
         "booking":          Node.AGENT,
         "cancellation":     Node.AGENT,
+        "booking_lookup":   Node.AGENT,
         "general":          Node.AGENT,
     }.get(intent, Node.AGENT)
 
