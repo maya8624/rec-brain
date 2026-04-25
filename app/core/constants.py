@@ -65,6 +65,16 @@ class AppStateKeys:
     USER_ID = "user_id"
 
 
+HISTORY_BY_INTENT: dict[str, int] = {
+    "booking": 10,
+    "cancellation": 10,
+    "search": 6,
+    "hybrid_search": 6,
+    "document_query": 4,
+    "general": 4,
+}
+
+
 class Node:
     """
     Constants for graph node names.

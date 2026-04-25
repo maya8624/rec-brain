@@ -29,10 +29,13 @@ class TestCheckAvailability:
         await check_availability.ainvoke(
             {"property_id": "prop_999"}, config=_cfg(svc)
         )
-        svc.get_availability.assert_called_once_with("prop_999")
+        svc.check_availability.assert_called_once_with("prop_999")
 
     async def test_no_slots_returns_success_with_zero_count(self, make_booking_service):
-        svc = make_booking_service(availability=[])
+        from app.schemas.booking import AvailabilityResult
+        svc = make_booking_service(availability=AvailabilityResult(
+            success=True, property_id="prop_123", available_slots=[], slot_count=0
+        ))
         result = await check_availability.ainvoke(
             {"property_id": "prop_123"}, config=_cfg(svc)
         )
@@ -54,14 +57,20 @@ class TestCheckAvailability:
         )
         assert result["success"] is False
 
+    async def test_slot_times_converted_to_sydney_time(self, make_booking_service):
+        svc = make_booking_service()
+        result = await check_availability.ainvoke(
+            {"property_id": "prop_123"}, config=_cfg(svc)
+        )
+        slot = result["available_slots"][0]
+        assert "T" not in slot["start_at"]
+        assert "Z" not in slot["start_at"]
+        assert "AEST" in slot["start_at"] or "AEDT" in slot["start_at"]
+        assert "T" not in slot["end_at"]
+        assert "AEST" in slot["end_at"] or "AEDT" in slot["end_at"]
 
-_BOOK_ARGS = {
-    "property_id": "prop_123",
-    "datetime_slot": "2027-04-12 10:00",
-    "contact_name": "John Smith",
-    "contact_email": "john@email.com",
-    "contact_phone": "0412 345 678",
-}
+
+_BOOK_ARGS = {"slot_id": "slot-001"}
 
 
 class TestBookInspection:
@@ -87,6 +96,11 @@ class TestBookInspection:
         svc = make_booking_service(raise_error=BookingServiceError("Backend unavailable"))
         result = await book_inspection.ainvoke(_BOOK_ARGS, config=_cfg(svc))
         assert result["success"] is False
+
+    async def test_success_message_includes_email_confirmation(self, make_booking_service):
+        svc = make_booking_service()
+        result = await book_inspection.ainvoke(_BOOK_ARGS, config=_cfg(svc))
+        assert "confirmation email" in result["message"].lower()
 
 
 class TestCancelInspection:
@@ -126,3 +140,10 @@ class TestCancelInspection:
             {"confirmation_id": "CONF-12345"}, config=_cfg(svc)
         )
         assert result["success"] is False
+
+    async def test_success_message_includes_email_confirmation(self, make_booking_service):
+        svc = make_booking_service()
+        result = await cancel_inspection.ainvoke(
+            {"confirmation_id": "CONF-12345"}, config=_cfg(svc)
+        )
+        assert "confirmation email" in result["message"].lower()

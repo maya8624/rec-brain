@@ -43,19 +43,6 @@ search results (see app/agents/nodes/agent.py):
       search / hybrid_search  →  6 turns
       document_query / general →  4 turns
 
-TODO:
-- [ ] human_escalation_node — requires_human=True currently exits via every
-      router's _requires_human() guard with no AIMessage. The escalation reply
-      is handled for now in _build_response (app/api/routes/chat.py) as a
-      formatting fallback. Promote to a dedicated graph node when escalation
-      needs side effects: webhook calls, CRM notifications, staff alerts, etc.
-      Implementation: insert human_escalation_node between safety_node (or any
-      _requires_human guard) and END; it appends a canned AIMessage and can
-      trigger external calls. All _requires_human guards in router.py route to
-      it instead of END.
-- [ ] multi-step tool calling for compound intents
-- [ ] Use state["search_context"] entities in listing_search_node to build SQL
-      from structured data instead of re-parsing the raw message via sql_service
 """
 import logging
 

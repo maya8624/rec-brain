@@ -29,9 +29,7 @@ async def cancel_inspection(confirmation_id: str, config: RunnableConfig, reason
 
     try:
         result = await booking_service.cancel(confirmation_id, user_id)
-
         logger.info("cancel_inspection | cancelled | id=%s", confirmation_id)
-
         return result.model_dump()
 
     except BookingValidationError as exc:
@@ -39,13 +37,11 @@ async def cancel_inspection(confirmation_id: str, config: RunnableConfig, reason
         return CancellationResult(
             success=False, id=confirmation_id, error=str(exc)
         ).model_dump()
-
     except BookingServiceError as exc:
         logger.error("cancel_inspection | service error: %s", exc)
         return CancellationResult(
             success=False, id=confirmation_id, error=str(exc)
         ).model_dump()
-
     except Exception as exc:
         logger.exception("cancel_inspection | unexpected error: %s", exc)
         return CancellationResult(

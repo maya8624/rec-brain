@@ -30,30 +30,29 @@ async def graph():
 
 
 def make_booking_service():
+    from app.schemas.booking import AvailabilityResult, AvailableSlot, BookingConfirmation, CancellationConfirmation
+
     mock = AsyncMock()
-    mock.get_availability.return_value = [
-        {
-            "datetime": "2027-04-12 10:00",
-            "agent_name": "Jane Smith",
-            "available": True
-        },
-        {
-            "datetime": "2027-04-12 14:00",
-            "agent_name": "Jane Smith",
-            "available": True
-        },
-    ]
-
-    mock.book.return_value = {
-        "confirmation_id": "CONF-12345",
-        "property_address": "123 Main St, Sydney NSW 2000",
-        "confirmed_datetime": "2027-04-12 10:00",
-        "agent_name": "Jane Smith",
-        "agent_phone": "0412 345 678",
-    }
-
-    mock.cancel.return_value = {"success": True}
-
+    mock.check_availability.return_value = AvailabilityResult(
+        success=True,
+        property_id="prop_123",
+        available_slots=[
+            AvailableSlot(startAtUtc="2027-04-12T10:00:00Z", endAtUtc="2027-04-12T10:30:00Z", status="open", capacity=1),
+            AvailableSlot(startAtUtc="2027-04-12T14:00:00Z", endAtUtc="2027-04-12T14:30:00Z", status="open", capacity=1),
+        ],
+        slot_count=2,
+    )
+    mock.book.return_value = BookingConfirmation(
+        confirmation_id="CONF-12345",
+        property_id="prop_123",
+        agent_first_name="Jane",
+        agent_last_name="Smith",
+        agent_phone="0412 345 678",
+    )
+    mock.cancel.return_value = CancellationConfirmation(
+        id="CONF-12345",
+        success=True,
+    )
     return mock
 
 

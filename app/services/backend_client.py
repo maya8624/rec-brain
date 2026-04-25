@@ -99,11 +99,11 @@ class BackendClient:
     async def get(self, path: str, params: dict | None = None) -> Any:
         return await self._request("GET", path, params=params)
 
-    async def post(self, path: str, body: dict) -> Any:
-        return await self._request("POST", path, json=body)
+    async def post(self, path: str, json: dict) -> Any:
+        return await self._request("POST", path, json=json)
 
-    async def patch(self, path: str, body: dict) -> Any:
-        return await self._request("PATCH", path, json=body)
+    async def patch(self, path: str, json: dict) -> Any:
+        return await self._request("PATCH", path, json=json)
 
 
 # Singleton — initialized at app startup via lifespan

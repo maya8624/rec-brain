@@ -26,6 +26,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.agents.nodes._base import last_human_message
 from app.agents.state import IntentClassification, RealEstateAgentState, UserIntent
+from app.core.constants import HISTORY_BY_INTENT
 from app.infrastructure.llm import get_llm
 from app.prompts.intent import INTENT_CLASSIFICATION_PROMPT
 
@@ -51,8 +52,8 @@ _SEARCH_KEYWORDS = frozenset([
     "under", "rent for", "for rent", "to rent", "buy", "purchase",
 ])
 
-# History depth for LLM path — enough to resolve follow-up references
-_LLM_HISTORY_LIMIT = 4
+# Intent isn't known yet — use the minimum depth across all intents
+_LLM_HISTORY_LIMIT = min(HISTORY_BY_INTENT.values())
 
 
 async def intent_node(state: RealEstateAgentState) -> dict[str, Any]:
@@ -67,16 +68,22 @@ async def intent_node(state: RealEstateAgentState) -> dict[str, Any]:
         return {"user_intent": "general"}
 
     #  Fast path: keyword-based intent classification
-    obvious = _obvious_intent(message)
+    msg_lower = message.lower()
+    obvious = _obvious_intent(msg_lower)
     if obvious:
-        logger.info(
-            "intent_node | fast-path | intent=%s | message=%.60s", obvious, message)
         return {"user_intent": obvious}
 
-    #  LLM path: everything else — returns intent + extracted search entities.
+    #  Booking continuation: slots are shown, user is selecting one
+    booking_ctx = state.get("booking_context") or {}
+    if (booking_ctx.get("available_slots")
+            and not _matches_keywords(msg_lower, _SEARCH_KEYWORDS)
+            and not _matches_keywords(msg_lower, _CANCELLATION_KEYWORDS)):
+        return {"user_intent": "booking"}
+
     # Only HumanMessages are sent — AIMessages contain full listing/RAG responses
     # that add noise and tokens the intent classifier doesn't need.
-    history = [m for m in state["messages"] if isinstance(m, HumanMessage)][-_LLM_HISTORY_LIMIT:]
+    history = [m for m in state["messages"] if isinstance(
+        m, HumanMessage)][-_LLM_HISTORY_LIMIT:]
     prompt = [SystemMessage(content=INTENT_CLASSIFICATION_PROMPT), *history]
 
     try:
@@ -85,18 +92,6 @@ async def intent_node(state: RealEstateAgentState) -> dict[str, Any]:
     except Exception as exc:
         logger.error("intent_node | LLM classification failed: %s", exc)
         return {"user_intent": "general"}
-
-    logger.info(
-        "intent_node | llm-path | intent=%s | early_response=%s | "
-        "location=%s | property_type=%s | bedrooms=%s | max_price=%s | message=%.60s",
-        result.intent,
-        bool(result.early_response),
-        result.location,
-        result.property_type,
-        result.bedrooms,
-        result.max_price,
-        message,
-    )
 
     updates: dict[str, Any] = {
         "user_intent": result.intent,
@@ -121,14 +116,13 @@ async def intent_node(state: RealEstateAgentState) -> dict[str, Any]:
     return updates
 
 
-def _obvious_intent(message: str) -> UserIntent | None:
+def _obvious_intent(msg_lower: str) -> UserIntent | None:
     """
     Returns a high-confidence intent without an LLM call, or None if ambiguous.
 
     Cancellation: very distinctive vocabulary, never overlaps with other intents.
     Booking:      only when no search keywords present — avoids missing search_then_book.
     """
-    msg_lower = message.lower()
 
     if (_matches_keywords(msg_lower, _CANCELLATION_KEYWORDS) and
             not _matches_keywords(msg_lower, _SEARCH_KEYWORDS)):

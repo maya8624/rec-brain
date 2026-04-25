@@ -25,6 +25,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.agents.nodes._base import listing_summary
 from app.agents.state import RealEstateAgentState
+from app.core.constants import HISTORY_BY_INTENT
 from app.infrastructure.llm import get_llm
 from app.prompts.agent import REAL_ESTATE_AGENT_SYSTEM
 from app.tools import get_all_tools
@@ -35,15 +36,6 @@ logger = logging.getLogger(__name__)
 _TOOL_INTENTS = frozenset(["booking", "cancellation"])
 
 
-# Intent-aware history depth: booking/cancellation need more turns to collect contact details
-_HISTORY_BY_INTENT = {
-    "booking": 10,
-    "cancellation": 10,
-    "search": 6,
-    "hybrid_search": 6,
-    "document_query": 4,
-    "general": 4,
-}
 
 
 async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
@@ -62,7 +54,7 @@ async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
     llm = _get_tool_llm() if needs_tools else _get_plain_llm()
 
     intent = state.get("user_intent", "general")
-    history_limit = _HISTORY_BY_INTENT.get(intent, 6)
+    history_limit = HISTORY_BY_INTENT.get(intent, 6)
     history = list(state["messages"])[-history_limit:]
 
     # Build prompt: system + history + current-turn search results (if any).

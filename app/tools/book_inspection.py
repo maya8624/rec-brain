@@ -10,61 +10,42 @@ from langchain_core.tools import tool
 
 from app.core.constants import AppStateKeys
 from app.core.exceptions import BookingServiceError, BookingValidationError
-from app.schemas.booking import BookingRequest, BookingResult, ContactInfo
+from app.schemas.booking import BookingRequest, BookingResult
 from app.services.booking_service import BookingService
 
 logger = logging.getLogger(__name__)
 
 
 @tool
-async def book_inspection(
-    property_id: str,
-    datetime_slot: str,
-    contact_name: str,
-    contact_email: str,
-    contact_phone: str,
-    config: RunnableConfig,
-) -> dict:
+async def book_inspection(slot_id: str, config: RunnableConfig) -> dict:
     """
     Book a property inspection via the .NET backend.
     """
     booking_service: BookingService = config["configurable"][AppStateKeys.BOOKING_SERVICE]
-
-    logger.info(
-        "book_inspection | property_id=%s | slot=%s | contact=%s",
-        property_id, datetime_slot, contact_email,
-    )
+    user_id = config["configurable"][AppStateKeys.USER_ID]
+    logger.info("book_inspection | slot_id=%s | user_id=%s", slot_id, user_id)
 
     try:
-        contact = ContactInfo(
-            name=contact_name,
-            email=contact_email,
-            phone=contact_phone
-        )
-
         result = await booking_service.book(
-            BookingRequest(
-                property_id=property_id,
-                datetime_slot=datetime_slot,
-                contact=contact
-            )
+            BookingRequest(slot_id=slot_id, user_id=user_id, notes="")
         )
 
         logger.info(
-            "book_inspection | confirmed | id=%s", result["confirmation_id"]
+            "book_inspection | confirmed | id=%s | user_id=%s", result.confirmation_id, user_id
         )
 
         return BookingResult(
             success=True,
-            confirmation_id=result["confirmation_id"],
-            property_address=result["property_address"],
-            confirmed_datetime=result["confirmed_datetime"],
-            agent_name=result["agent_name"],
-            agent_phone=result["agent_phone"],
+            confirmation_id=result.confirmation_id,
+            # property_address=result.property_address,
+            start_at_utc=result.start_at_utc,
+            end_at_utc=result.end_at_utc,
+            agent_name=f"{result.agent_first_name} {result.agent_last_name}".strip(),
+            agent_phone=result.agent_phone,
             message=(
-                f"Inspection booked for {result['confirmed_datetime']}. "
-                f"Confirmation sent to {contact_email}. "
-                f"Reference: {result['confirmation_id']}."
+                f"Inspection booked for {result.start_at_utc} to {result.end_at_utc}. "
+                f"Reference: {result.confirmation_id}. "
+                "A confirmation email will be sent to you shortly."
             ),
         ).model_dump()
 

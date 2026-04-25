@@ -131,7 +131,6 @@ app.openapi = custom_openapi
 # Middleware
 # ------------------------------------
 # X-Request-ID on every request — enables tracing across .NET → Python
-# TODO: Double Check this
 app.add_middleware(RequestLoggingMiddleware)
 
 app.add_middleware(

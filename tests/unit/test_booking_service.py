@@ -12,8 +12,11 @@ from app.core.exceptions import BackendClientError, BookingServiceError, Booking
 from app.schemas.booking import BookingRequest
 
 
+_PROPERTY_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+
+
 def make_backend_client(
-    get_return: dict | None = None,
+    get_return: list | None = None,
     post_return: dict | None = None,
     raise_error: Exception | None = None,
 ):
@@ -24,7 +27,7 @@ def make_backend_client(
         mock.post.side_effect = raise_error
         mock.patch.side_effect = raise_error
     else:
-        mock.get.return_value = get_return or {}
+        mock.get.return_value = get_return or []
         mock.post.return_value = post_return or {}
     return mock
 
@@ -33,92 +36,83 @@ def make_service(client=None, **client_kwargs) -> BookingService:
     return BookingService(client=client or make_backend_client(**client_kwargs))
 
 
-def _future_slot() -> str:
-    return "2027-06-15 10:00"
+def _available_slot(slot_id: str = "slot-001", start: str = "2027-06-15T10:00:00Z") -> dict:
+    return {
+        "id": slot_id,
+        "startAtUtc": start,
+        "endAtUtc": "2027-06-15T11:00:00Z",
+        "agentId": "agent-1",
+        "capacity": 5,
+        "status": "open",
+        "notes": "",
+    }
+
+
+def _unavailable_slot(slot_id: str = "slot-002") -> dict:
+    return {
+        "id": slot_id,
+        "startAtUtc": "2027-06-15T14:00:00Z",
+        "endAtUtc": "2027-06-15T15:00:00Z",
+        "agentId": "agent-1",
+        "capacity": 0,
+        "status": "closed",
+        "notes": "",
+    }
 
 
 class TestGetAvailability:
     async def test_success_returns_availability_result(self):
-        client = make_backend_client(get_return={
-            "availableSlots": [
-                {
-                    "datetime": "2027-04-12 10:00",
-                    "available": True, "agentName": "Jane Smith"
-                },
-            ]
-        })
+        client = make_backend_client(get_return=[_available_slot()])
 
-        result = await BookingService(client).get_availability("prop_123")
+        result = await BookingService(client).check_availability(_PROPERTY_ID)
 
         assert result.success is True
         assert result.slot_count == 1
-        assert result.property_id == "prop_123"
+        assert result.property_id == _PROPERTY_ID
 
     async def test_available_slots_are_parsed_correctly(self):
-        client = make_backend_client(get_return={
-            "availableSlots": [
-                {
-                    "datetime": "2027-04-12 10:00",
-                    "available": True, "agentName": "Jane"
-                },
-                {
-                    "datetime": "2027-04-12 14:00",
-                    "available": True, "agentName": "Jane"
-                },
-            ]
-        })
+        client = make_backend_client(get_return=[
+            _available_slot("slot-001", "2027-04-12T10:00:00Z"),
+            _available_slot("slot-002", "2027-04-12T14:00:00Z"),
+        ])
 
-        result = await BookingService(client).get_availability("prop_123")
+        result = await BookingService(client).check_availability(_PROPERTY_ID)
 
         assert result.slot_count == 2
-        assert result.available_slots[0].agent_name == "Jane"
+        assert result.available_slots[0].slot_id == "slot-001"
+        assert result.available_slots[1].slot_id == "slot-002"
 
     async def test_unavailable_slots_are_filtered_out(self):
-        client = make_backend_client(get_return={
-            "availableSlots": [
-                {
-                    "datetime": "2027-04-12 10:00",
-                    "available": False, "agentName": "Jane"
-                },
-                {
-                    "datetime": "2027-04-12 14:00",
-                    "available": True, "agentName": "Jane"
-                },
-            ]
-        })
+        client = make_backend_client(get_return=[
+            _unavailable_slot("slot-001"),
+            _available_slot("slot-002"),
+        ])
 
-        result = await BookingService(client).get_availability("prop_123")
+        result = await BookingService(client).check_availability(_PROPERTY_ID)
 
         assert result.slot_count == 1
+        assert result.available_slots[0].slot_id == "slot-002"
 
-    async def test_empty_property_id_raises_validation_error(self):
+    async def test_invalid_property_id_raises_validation_error(self):
         svc = make_service()
         with pytest.raises(BookingValidationError, match="property_id"):
-            await svc.get_availability("")
+            await svc.check_availability("not-a-uuid")
 
     async def test_backend_client_error_raises_booking_service_error(self):
         client = make_backend_client(
             raise_error=BackendClientError("503 unavailable", 503))
         with pytest.raises(BookingServiceError):
-            await BookingService(client).get_availability("prop_123")
+            await BookingService(client).check_availability(_PROPERTY_ID)
 
 
 class TestBook:
-    def _make_request(self, slot: str = None) -> BookingRequest:
-        return BookingRequest(
-            property_id="prop_123",
-            datetime_slot=slot or _future_slot(),
-            contact=ContactInfo(
-                name="John Smith",
-                email="john@example.com",
-                phone="0412 345 678",
-            ),
-        )
+    def _make_request(self) -> BookingRequest:
+        return BookingRequest(slot_id="slot-001", user_id="user-123")
 
-    async def test_success_returns_confirmation_dict(self):
+    async def test_success_returns_booking_confirmation(self):
         client = make_backend_client(post_return={
             "id": "CONF-42",
-            "propertyId": "prop_123",
+            "propertyId": _PROPERTY_ID,
             "status": "confirmed",
             "agentFirstName": "Jane",
             "agentLastName": "Smith",
@@ -129,10 +123,10 @@ class TestBook:
 
         result = await BookingService(client).book(self._make_request())
 
-        assert result["confirmation_id"] == "CONF-42"
-        assert result["property_id"] == "prop_123"
-        assert result["agent_first_name"] == "Jane"
-        assert result["agent_last_name"] == "Smith"
+        assert result.confirmation_id == "CONF-42"
+        assert result.property_id == _PROPERTY_ID
+        assert result.agent_first_name == "Jane"
+        assert result.agent_last_name == "Smith"
 
     async def test_backend_error_raises_booking_service_error(self):
         client = make_backend_client(
@@ -147,6 +141,15 @@ class TestBook:
 
         await BookingService(client).book(self._make_request())
         client.post.assert_called_once()
+
+    async def test_post_payload_contains_slot_and_user(self):
+        client = make_backend_client(post_return={"id": "C1"})
+
+        await BookingService(client).book(self._make_request())
+
+        payload = client.post.call_args.kwargs.get("json", {})
+        assert payload["InspectionSlotId"] == "slot-001"
+        assert payload["UserId"] == "user-123"
 
 
 class TestCancel:

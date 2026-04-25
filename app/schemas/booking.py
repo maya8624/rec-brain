@@ -30,10 +30,10 @@ class AvailableSlot(BaseModel):
     start_at:   str = Field("", alias="startAtUtc")
     end_at:     str = Field("", alias="endAtUtc")
     agent_id:   str = Field("", alias="agentId")
-    agent_name: str = ""
-    capacity:   int = Field(0, alias="capacity")
-    status:     str = Field("", alias="status")
-    notes:      str = Field("", alias="notes")
+    # agent_name: str = ""
+    capacity:   int = 0
+    status:     str = ""
+    notes:      str = ""
 
     @field_validator("notes", mode="before")
     @classmethod
@@ -75,7 +75,8 @@ class BookingResult(BaseModel):
     success: bool
     confirmation_id: str = ""
     property_address: str = ""
-    confirmed_datetime: str = ""
+    start_at_utc: datetime | None = None
+    end_at_utc: datetime | None = None
     agent_name: str = ""
     agent_phone: str = ""
     message: str = ""
@@ -86,14 +87,14 @@ class CancellationConfirmation(BaseModel):
     """Confirmation returned after a successful cancellation."""
     id: str
     success: bool
-    message: str = "Your inspection booking has been successfully cancelled."
+    message: str = "Your inspection booking has been successfully cancelled. A confirmation email will be sent to you shortly."
 
 
 class CancellationResult(BaseModel):
     """Tool return for cancel_inspection."""
+    success: bool
     id: str = ""
     message: str = ""
-    success: bool
     error: str | None = None
 
 

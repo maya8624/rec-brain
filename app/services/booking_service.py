@@ -26,7 +26,10 @@ class BookingService:
     def __init__(self, client: BackendClient):
         self._client = client
 
-    async def get_availability(self, property_id: str) -> AvailabilityResult:
+    async def check_availability(self, property_id: str) -> AvailabilityResult:
+        """
+        Fetch available inspection slots for a property.
+        """
         try:
             uuid.UUID(property_id)
         except ValueError as exc:
@@ -34,22 +37,14 @@ class BookingService:
                 f"property_id must be a valid UUID: {exc}") from exc
 
         try:
-            data = await self._client.get(
-                InternalRoutes.AVAILABLE,
-                params={"propertyId": property_id},
-            )
+            url = f"{InternalRoutes.AVAILABLE}/{property_id}"
+            data = await self._client.get(url)
         except BackendClientError as exc:
             raise BookingServiceError(
-                f"Failed to fetch availability: {exc}"
-            ) from exc
+                f"Failed to fetch availability: {exc}") from exc
 
         available_slots = self._parse_availability(data)
         count = len(available_slots)
-
-        logger.info(
-            "get_availability | property_id=%s slots=%d",
-            property_id, count
-        )
 
         return AvailabilityResult(
             success=True,
@@ -58,37 +53,32 @@ class BookingService:
             slot_count=count,
         )
 
-    async def book(self, request: BookingRequest) -> dict:
+    async def book(self, request: BookingRequest) -> BookingConfirmation:
         """
         Create a confirmed inspection booking.
-        Returns BookingConfirmation as dict.
         """
-
-        payload = {
-            "InspectionSlotId": request.slot_id,
-            "UserId": request.user_id,
-            "Notes": request.notes,
-        }
-
         try:
+            payload = {
+                "InspectionSlotId": request.slot_id,
+                "UserId": request.user_id,
+                "Notes": request.notes,
+            }
+
             data = await self._client.post(InternalRoutes.BOOK, json=payload)
         except BackendClientError as exc:
             raise BookingServiceError(f"Booking failed: {exc}") from exc
 
-        confirmation = self._parse_booking_response(data)
-        logger.info("book | confirmed | id=%s", confirmation.confirmation_id)
+        response = self._parse_booking_response(data)
 
-        return confirmation.model_dump()
+        return response
 
     async def cancel(self, confirmation_id: str, user_id: str) -> CancellationConfirmation:
         """Cancel an existing booking."""
         try:
-            payload: dict = {"UserId": user_id}
+            payload = {"UserId": user_id}
             await self._client.patch(InternalRoutes.cancel(confirmation_id), json=payload)
         except BackendClientError as exc:
             raise BookingServiceError(f"Cancellation failed: {exc}") from exc
-
-        logger.info("cancel | cancelled | id=%s", confirmation_id)
 
         return CancellationConfirmation(
             id=confirmation_id,
@@ -109,7 +99,7 @@ class BookingService:
             status=data.get("status", ""),
             agent_first_name=data.get("agentFirstName", ""),
             agent_last_name=data.get("agentLastName", ""),
-            agent_phone=data.get("agentPhone"),
+            agent_phone=data.get("agentPhone", ""),
             start_at_utc=data.get("startAtUtc"),
             end_at_utc=data.get("endAtUtc"),
         )

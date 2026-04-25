@@ -4,6 +4,9 @@ via BookingService. Always call this BEFORE book_inspection
 so the user can choose from real available slots.
 """
 import logging
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
+
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 from app.core.constants import AppStateKeys
@@ -12,6 +15,20 @@ from app.schemas.booking import AvailabilityResult
 from app.services.booking_service import BookingService
 
 logger = logging.getLogger(__name__)
+
+_SYDNEY = ZoneInfo("Australia/Sydney")
+
+
+def _fmt_dt(dt_str: str) -> str:
+    if not dt_str:
+        return "TBD"
+    try:
+        dt = datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(_SYDNEY).strftime("%a %d %b %Y at %I:%M %p %Z")
+    except ValueError:
+        return dt_str
 
 
 @tool
@@ -23,12 +40,16 @@ async def check_availability(property_id: str, config: RunnableConfig) -> dict:
     booking_service: BookingService = config["configurable"][AppStateKeys.BOOKING_SERVICE]
 
     try:
-        result = await booking_service.get_availability(property_id)
+        result = await booking_service.check_availability(property_id)
 
         logger.info(
             "check_availability | found %d slots for %s",
             result.slot_count, property_id,
         )
+
+        for slot in result.available_slots:
+            slot.start_at = _fmt_dt(slot.start_at)
+            slot.end_at = _fmt_dt(slot.end_at)
 
         return result.model_dump()
 
