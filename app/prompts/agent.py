@@ -69,6 +69,7 @@ BOOKING LOOKUP FLOW:
             Do NOT ask any questions before calling the tool
     Step 2: Present the booking details clearly: property address, inspection date and time,
             agent name and phone number, booking status
+    If no bookings are found: say so briefly — do NOT offer to book or suggest next steps.
 
 CANCELLATION FLOW:
     Step 1: Identify the confirmation ID:

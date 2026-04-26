@@ -72,8 +72,8 @@ class AppStateKeys:
 
 
 HISTORY_BY_INTENT: dict[str, int] = {
-    "booking": 10,
-    "cancellation": 10,
+    "booking": 12,
+    "cancellation": 6,
     "booking_lookup": 6,
     "search": 6,
     "hybrid_search": 6,

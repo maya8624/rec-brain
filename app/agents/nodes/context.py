@@ -84,6 +84,8 @@ def _handle_book_inspection(state: RealEstateAgentState, result: dict) -> dict[s
         {"confirmation_id": result.get("confirmation_id", ""),
          "confirmed_datetime": result.get("confirmed_datetime", "")}
     )
+    # slots are stale once booking is confirmed
+    merged.pop("available_slots", None)
 
     return {
         StateKeys.BOOKING_CONTEXT: BookingContext(**merged),
@@ -92,6 +94,8 @@ def _handle_book_inspection(state: RealEstateAgentState, result: dict) -> dict[s
             confirmed=True,
             cancelled=False,
         ),
+        "intent_completed": True,
+        "last_intent": state.get("user_intent"),
     }
 
 
@@ -107,6 +111,16 @@ def _handle_cancel_inspection(state: RealEstateAgentState, result: dict) -> dict
             confirmed=False,
             cancelled=True,
         ),
+        "intent_completed": True,
+        "last_intent": state.get("user_intent"),
+    }
+
+
+def _handle_get_booking(_state: RealEstateAgentState, _result: dict) -> dict[str, Any]:
+    """Mark booking_lookup as complete — regardless of whether results were found."""
+    return {
+        "intent_completed": True,
+        "last_intent": "booking_lookup",
     }
 
 
@@ -114,6 +128,7 @@ _TOOL_HANDLERS: dict[str, Any] = {
     ToolNames.CHECK_AVAILABILITY: _handle_check_availability,
     ToolNames.BOOK_INSPECTION:    _handle_book_inspection,
     ToolNames.CANCEL_INSPECTION:  _handle_cancel_inspection,
+    ToolNames.GET_BOOKING:        _handle_get_booking,
 }
 
 

@@ -36,8 +36,6 @@ logger = logging.getLogger(__name__)
 _TOOL_INTENTS = frozenset(["booking", "cancellation", "booking_lookup"])
 
 
-
-
 async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
     """
     Primary LLM node.
@@ -67,7 +65,8 @@ async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
 
     if intent in _TOOL_INTENTS and state.get("search_results"):
         summary = listing_summary(state["search_results"])
-        prompt.append(SystemMessage(content=f"[PROPERTY SEARCH RESULTS]\n{summary}"))
+        prompt.append(SystemMessage(
+            content=f"[PROPERTY SEARCH RESULTS]\n{summary}"))
 
     logger.info(
         "agent_node | intent=%s | needs_tools=%s | history=%d/%d | errors=%d",
@@ -95,7 +94,17 @@ async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
         )
 
     # Clear retrieved_docs so the next turn starts clean.
-    return {"messages": [response], "retrieved_docs": None}
+    # Track intent completion for the next turn's classifier.
+    is_formatting_pass = not needs_tools and intent in _TOOL_INTENTS
+    intent_completed = is_formatting_pass
+
+    # Clear retrieved_docs so the next turn starts clean.
+    return {
+        "messages": [response],
+        "retrieved_docs": None,
+        "intent_completed": intent_completed,
+        "last_intent": intent if intent_completed else state.get("last_intent"),
+    }
 
 
 def _get_plain_llm():

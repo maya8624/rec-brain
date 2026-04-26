@@ -195,6 +195,8 @@ class RealEstateAgentState(TypedDict):
     # ── Flow control ──────────────────────────────────────────────────────────
     requires_human: bool                # True → escalate to human agent
     error_count: int                    # consecutive tool failures this session
+    intent_completed: bool              # True → last intent's tool flow finished
+    last_intent: UserIntent | None      # intent from the just-completed flow
 
 
 # ------------------------------------
@@ -226,4 +228,6 @@ def initial_state() -> RealEstateAgentState:
         retrieved_docs=None,
         requires_human=False,
         error_count=0,
+        intent_completed=False,
+        last_intent=None,
     )

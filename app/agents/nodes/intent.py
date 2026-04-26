@@ -26,7 +26,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.agents.nodes._base import last_human_message
 from app.agents.state import IntentClassification, RealEstateAgentState, UserIntent
-from app.core.constants import HISTORY_BY_INTENT
+
 from app.infrastructure.llm import get_llm
 from app.prompts.intent import INTENT_CLASSIFICATION_PROMPT
 
@@ -61,8 +61,9 @@ _SEARCH_KEYWORDS = frozenset([
     "under", "rent for", "for rent", "to rent", "buy", "purchase",
 ])
 
-# Intent isn't known yet — use the minimum depth across all intents
-_LLM_HISTORY_LIMIT = min(HISTORY_BY_INTENT.values())
+# Depth for the intent classifier — independent of HISTORY_BY_INTENT
+# (which controls agent_node response generation, not intent classification).
+_LLM_HISTORY_LIMIT = 4
 
 
 async def intent_node(state: RealEstateAgentState) -> dict[str, Any]:
@@ -89,11 +90,30 @@ async def intent_node(state: RealEstateAgentState) -> dict[str, Any]:
             and not _matches_keywords(msg_lower, _CANCELLATION_KEYWORDS)):
         return {"user_intent": "booking"}
 
-    # Only HumanMessages are sent — AIMessages contain full listing/RAG responses
-    # that add noise and tokens the intent classifier doesn't need.
-    history = [m for m in state["messages"] if isinstance(
-        m, HumanMessage)][-_LLM_HISTORY_LIMIT:]
-    prompt = [SystemMessage(content=INTENT_CLASSIFICATION_PROMPT), *history]
+    # ── LLM path ──────────────────────────────────────────────────────────────
+    # Read completion state from previous turn
+    intent_completed = state.get("intent_completed", False)
+    last_intent = state.get("last_intent")
+
+    # If last intent just completed, current message is a fresh request —
+    # send only the current message to avoid history pollution.
+    # Otherwise keep recent history for follow-up context resolution.
+    if intent_completed:
+        history = state["messages"][-1:]
+    else:
+        history = [m for m in state["messages"] if isinstance(m, HumanMessage)][-_LLM_HISTORY_LIMIT:]
+
+    # Inject structured state hint so LLM knows completion status
+    state_hint = ""
+    if last_intent:
+        state_hint = (
+            f"\n[STATE] Previous intent: {last_intent}, "
+            f"Completed: {intent_completed}. "
+            f"If Completed is True, treat the current message as a fresh request."
+        )
+
+    prompt = [SystemMessage(
+        content=INTENT_CLASSIFICATION_PROMPT + state_hint), *history]
 
     try:
         llm = get_llm().with_structured_output(IntentClassification)
@@ -105,6 +125,8 @@ async def intent_node(state: RealEstateAgentState) -> dict[str, Any]:
     updates: dict[str, Any] = {
         "user_intent": result.intent,
         "early_response": result.early_response,
+        "last_intent": result.intent,
+        "intent_completed": False,  # reset after reading — next turn starts clean
     }
 
     if result.intent == "general":
@@ -132,7 +154,6 @@ def _obvious_intent(msg_lower: str) -> UserIntent | None:
     Cancellation: very distinctive vocabulary, never overlaps with other intents.
     Booking:      only when no search keywords present — avoids missing search_then_book.
     """
-
     if (_matches_keywords(msg_lower, _CANCELLATION_KEYWORDS) and
             not _matches_keywords(msg_lower, _SEARCH_KEYWORDS)):
         return "cancellation"
