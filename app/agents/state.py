@@ -32,7 +32,7 @@ UserIntent = Literal[
     "booking",          # user wants to inspect a property
     "cancellation",     # user wants to cancel an existing inspection
     "booking_lookup",   # user wants to check details of an existing booking
-    "search_then_book",  # user wants to search first, then book — run search, prompt to pick
+    "search_then_book",  # user wants to search first, then book — run search, then auto-proceed to check_availability
     "general",          # general question about the agency / process
     "unknown",          # intent not yet determined
 ]
@@ -127,6 +127,7 @@ class SearchContext(TypedDict, total=False):
     min_price: float                # AUD
     keywords: list[str]             # ["pool", "garage", "pet friendly"]
     last_result_count: int          # how many results the last search returned
+    limit: int                      # max rows to return — user-specified, capped at 10
 
 
 # ------------------------------------
@@ -150,6 +151,7 @@ class IntentClassification(BaseModel):
     bathrooms: int | None = None
     max_price: float | None = None
     min_price: float | None = None
+    limit: int | None = None             # explicit count requested by the user (e.g. "show me 3")
 
 
 # ── Main agent state ──────────────────────────────────────────────────────────

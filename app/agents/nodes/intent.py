@@ -187,6 +187,8 @@ def _extract_entities(result: IntentClassification) -> dict:
         entities["max_price"] = result.max_price
     if result.min_price is not None:
         entities["min_price"] = result.min_price
+    if result.limit is not None:
+        entities["limit"] = min(result.limit, 10)
     return entities
 
 

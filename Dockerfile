@@ -3,10 +3,15 @@
 # Then run: docker compose up --build
 
 # Use the pre-built base image with all dependencies already installed
-FROM rec-brain-base
+ARG BASE_IMAGE=rec-brain-base
+FROM ${BASE_IMAGE}
 
 # Set the working directory
 WORKDIR /app
+
+# Install lighter dependencies — rebuilt whenever requirements.txt changes
+COPY requirements.txt .
+RUN pip install --no-cache-dir --timeout 120 --retries 5 -r requirements.txt
 
 COPY . .
 

@@ -19,7 +19,6 @@ from langchain_core.runnables import RunnableConfig
 from app.agents.nodes._base import (
     format_search_reply,
     last_human_message,
-    listing_summary,
     resolve_app_service,
     slim_rows,
 )
@@ -72,12 +71,27 @@ async def listing_search_node(state: RealEstateAgentState, config: RunnableConfi
         count = result.get("result_count", 0)
         rows = slim_rows(result.get("output") or [])
 
+        # For search_then_book: hand off to agent_node for check_availability
+        # instead of ending. Only when results exist — no results falls through
+        # to the normal "nothing found" reply so the user isn't left in silence.
+        if state.get("user_intent") == "search_then_book" and rows:
+            logger.info(
+                "listing_search_node | search_then_book | found=%d → booking",
+                count,
+            )
+            return {
+                "search_results": rows,
+                "retrieved_docs": None,
+                "user_intent": "booking",
+            }
+
         if rows:
             reply = format_search_reply(rows, count)
         else:
             reply = "No properties matched your search. Try broadening your criteria — for example, a nearby suburb or a higher price range."
 
-        logger.info("listing_search_node | reply built in code | count=%d", count)
+        logger.info(
+            "listing_search_node | reply built in code | count=%d", count)
 
         return {
             "messages": [AIMessage(content=reply)],

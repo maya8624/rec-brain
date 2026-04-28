@@ -1,5 +1,5 @@
 # Base image — installs heavy ML dependencies as separate cached layers
-# Only rebuild when requirements.base.txt or requirements.txt changes
+# Only rebuild when requirements.base.txt changes
 # Build with: docker build -f Dockerfile.base -t rec-brain-base .
 
 FROM python:3.11-slim
@@ -15,6 +15,3 @@ RUN pip install --upgrade pip
 COPY requirements.base.txt .
 RUN pip install --no-cache-dir --timeout 120 --retries 5 -r requirements.base.txt
 
-# Step 2 — install remaining dependencies (separate layer)
-COPY requirements.txt .
-RUN pip install --no-cache-dir --timeout 120 --retries 5 -r requirements.txt

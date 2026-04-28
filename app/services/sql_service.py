@@ -154,7 +154,8 @@ class SqlViewService:
             conditions.append(f"price >= {float(ctx['min_price'])}")
 
         where = " AND ".join(conditions)
-        return f"{_SELECT_COLS} FROM v_listings WHERE {where} ORDER BY price ASC LIMIT 10"
+        limit = min(int(ctx.get("limit") or 10), 10)
+        return f"{_SELECT_COLS} FROM v_listings WHERE {where} ORDER BY price ASC LIMIT {limit}"
 
     @staticmethod
     def _validate_sql(sql: str) -> None:

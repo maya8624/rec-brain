@@ -19,6 +19,10 @@ class InternalRoutes:
     def cancel(booking_id: str) -> str:
         return f"/api/internal/inspection-bookings/{booking_id}/cancel"
 
+    @staticmethod
+    def property_detail(property_id: str) -> str:
+        return f"/api/properties/{property_id}"
+
 # class InspectionBookingEndpoints:
 #     """
 #     Constants for the .NET backend API.

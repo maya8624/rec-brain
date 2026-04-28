@@ -112,10 +112,10 @@ def format_search_reply(rows: list[dict], count: int) -> str:
     """User-facing markdown reply built in code — no LLM involved."""
     header = f"Found {count} {'property' if count == 1 else 'properties'}:\n"
     blocks = []
-    for row in rows:
+    for i, row in enumerate(rows, start=1):
         price = f"${row['price']:,.0f}/week" if row["listing_type"] == "Rent" else f"${row['price']:,.0f}"
         blocks.append(
-            f"**{row['address']}, {row['suburb']} {row['state']}**\n"
+            f"**{i}. {row['address']}, {row['suburb']} {row['state']}**\n"
             f"{price} | {row['bedrooms']} bed | {row['bathrooms']} bath | "
             f"{row['property_type']} | {row['listing_type']}\n"
             f"Agent: {row['agent_name']} {row['agent_phone']}"

@@ -13,6 +13,8 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from app.agents.state import initial_state
 from app.api.dependencies import get_agent, verify_internal_key, CompiledStateGraph
+from app.core.config import settings
+from app.core.constants import InternalRoutes
 from app.schemas.chat import ChatErrorResponse, ChatRequest, ChatResponse, Listing, SourceDocument
 
 logger = logging.getLogger(__name__)
@@ -230,10 +232,13 @@ def _build_response(thread_id: str, result: dict) -> ChatResponse:
 
 def _extract_listings(rows: list[dict]) -> list[Listing]:
     """Convert slim state rows into Listing response models."""
+    base = settings.BACKEND_BASE_URL.rstrip("/")
     listings = []
     for r in rows:
         try:
-            listings.append(Listing(**r))
+            property_id = r.get("property_id")
+            listing_url = f"{base}{InternalRoutes.property_detail(property_id)}" if property_id else None
+            listings.append(Listing(**r, listing_url=listing_url))
         except Exception:
             pass
     return listings

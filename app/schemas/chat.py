@@ -62,6 +62,7 @@ class Listing(BaseModel):
     agent_name: str = ""
     agent_phone: str = ""
     agency_name: str = ""
+    listing_url: str | None = None
 
 
 class SourceDocument(BaseModel):
