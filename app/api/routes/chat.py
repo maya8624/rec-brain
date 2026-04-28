@@ -1,7 +1,6 @@
 """
 All traffic arrives from .NET backend at this /api/chat endpoint.
-No AI logic here — only HTTP concerns:
-    parsing, routing to agent, formatting response, error handling.
+No AI logic here — only HTTP concerns
 """
 
 import json
@@ -9,13 +8,13 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage
 
 from app.agents.state import initial_state
 from app.api.dependencies import get_agent, verify_internal_key, CompiledStateGraph
 from app.core.config import settings
 from app.core.constants import InternalRoutes
-from app.schemas.chat import ChatErrorResponse, ChatRequest, ChatResponse, Listing, SourceDocument
+from app.schemas.chat import ChatErrorResponse, ChatRequest, ChatResponse, PropertyListing
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -29,9 +28,6 @@ async def chat(
     """
     Main chat endpoint — called by .NET backend for every user message.
     """
-
-    logger.info("chat | thread_id=%s | user=%s | new=%s",
-                request.thread_id, request.user_id, request.is_new_conversation)
 
     try:
         config = {
@@ -53,7 +49,6 @@ async def chat(
 
         result = await agent.ainvoke(input_state, config=config)
         chat_response = _build_response(request.thread_id, result)
-
         return chat_response
 
     except Exception as exc:
@@ -109,15 +104,6 @@ async def _event_generator(request: ChatRequest, http_request: Request, agent):
     Mirrors the pattern from your original stream_agent() approach.
     """
     try:
-        # Before: passed the whole http_request into the graph.
-        # config = {
-        #     "configurable": {
-        #         "thread_id": request.thread_id,
-        #         "request":   http_request,        ← entire FastAPI Request object
-        #     }
-        # }
-        #
-        # Now: extract only the services the graph needs and pass them directly.
         config = {
             "configurable": {
                 "thread_id":        request.thread_id,
@@ -210,77 +196,33 @@ def _build_response(thread_id: str, result: dict) -> ChatResponse:
         )
     )
 
-    booking_status = result.get("booking_status", {})
-    booking_context = result.get("booking_context", {})
     search_results = result.get("search_results", [])
 
     return ChatResponse(
         reply=reply,
         thread_id=thread_id,
-        tools_used=_extract_tools_used(result.get("messages", [])),
-        intent=result.get("user_intent", "unknown"),
-        booking_confirmed=booking_status.get("confirmed", False),
-        booking_cancelled=booking_status.get("cancelled", False),
-        confirmation_id=booking_context.get("confirmation_id"),
-        requires_human=result.get("requires_human", False),
         listings=_extract_listings(search_results),
-        sources=_extract_sources(result.get("messages", [])),
-        property_id=str(pid) if (pid := (search_results[0].get(
-            "property_id") if len(search_results) == 1 else None)) else None,
+        property_id=_extract_single_property_id(search_results),
     )
 
 
-def _extract_listings(rows: list[dict]) -> list[Listing]:
+def _extract_single_property_id(search_results: list[dict]) -> str | None:
+    """Return the property_id only when exactly one result exists — used to trigger the Book button."""
+    if len(search_results) == 1:
+        pid = search_results[0].get("property_id")
+        return str(pid) if pid else None
+
+    return None
+
+
+def _extract_listings(rows: list[dict]) -> list[PropertyListing]:
     """Convert slim state rows into Listing response models."""
-    base = settings.BACKEND_BASE_URL.rstrip("/")
+    base = str(settings.BACKEND_BASE_URL).rstrip("/")
     listings = []
-    for r in rows:
-        try:
-            property_id = r.get("property_id")
-            listing_url = f"{base}{InternalRoutes.property_detail(property_id)}" if property_id else None
-            listings.append(Listing(**r, listing_url=listing_url))
-        except Exception:
-            pass
+
+    for row in rows:
+        property_id = row.get("property_id")
+        property_url = f"{base}{InternalRoutes.property_detail(property_id)}" if property_id else None
+        listings.append(PropertyListing(**row, property_url=property_url))
+
     return listings
-
-
-def _extract_tools_used(messages: list) -> list[str]:
-    """Collect unique tool names the agent called this turn."""
-
-    tools: list[str] = []
-
-    for msg in messages:
-        if isinstance(msg, AIMessage):
-            for tool_call in getattr(msg, "tool_calls", []):
-                name = tool_call.get("name", "")
-                if name and name not in tools:
-                    tools.append(name)
-    return tools
-
-
-def _extract_sources(messages: list) -> list[SourceDocument]:
-    """Extract RAG source documents from search_documents tool result."""
-
-    for message in reversed(messages):
-        if isinstance(message, ToolMessage) and message.name == "search_documents":
-            try:
-                content = (
-                    json.loads(message.content)
-                    if isinstance(message.content, str)
-                    else message.content
-                )
-
-                return [
-                    SourceDocument(
-                        document=source.get("document", ""),
-                        doc_type=source.get("doc_type", ""),
-                        page=str(source.get("page", "")),
-                        relevance_score=float(
-                            source.get("relevance_score", 0)),
-                    )
-
-                    for source in content.get("sources", [])
-                ]
-            except (json.JSONDecodeError, TypeError, KeyError):
-                pass
-    return []

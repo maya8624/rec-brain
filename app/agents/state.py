@@ -32,7 +32,8 @@ UserIntent = Literal[
     "booking",          # user wants to inspect a property
     "cancellation",     # user wants to cancel an existing inspection
     "booking_lookup",   # user wants to check details of an existing booking
-    "search_then_book",  # user wants to search first, then book — run search, then auto-proceed to check_availability
+    # user wants to search first, then book — run search, then auto-proceed to check_availability
+    "search_then_book",
     "general",          # general question about the agency / process
     "unknown",          # intent not yet determined
 ]
@@ -151,7 +152,8 @@ class IntentClassification(BaseModel):
     bathrooms: int | None = None
     max_price: float | None = None
     min_price: float | None = None
-    limit: int | None = None             # explicit count requested by the user (e.g. "show me 3")
+    # explicit count requested by the user (e.g. "show me 3")
+    limit: int | None = None
 
 
 # ── Main agent state ──────────────────────────────────────────────────────────

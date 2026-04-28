@@ -76,8 +76,8 @@ def slim_rows(rows: list[dict]) -> list[dict]:
     """Strip unused columns — keeps only what the LLM and frontend need."""
     return [
         {
-            "property_id":     row.get("property_id", ""),
-            "listing_id":     row.get("listing_id", ""),
+            "property_id":     str(row["property_id"]) if row.get("property_id") else "",
+            "listing_id":      str(row["listing_id"]) if row.get("listing_id") else "",
             "address":        row.get("address_line1", ""),
             "suburb":         row.get("suburb", ""),
             "state":          row.get("state", ""),
