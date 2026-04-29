@@ -23,13 +23,15 @@ from app.agents.nodes._base import (
     slim_rows,
 )
 from app.agents.state import RealEstateAgentState
-from app.core.constants import AppStateKeys, Node
+from app.core.constants import AppStateKeys, Node, StateKeys
 from app.services.sql_service import SqlViewService
 
 logger = logging.getLogger(__name__)
 
 
-async def listing_search_node(state: RealEstateAgentState, config: RunnableConfig) -> dict[str, Any]:
+async def listing_search_node(
+        state: RealEstateAgentState,
+        config: RunnableConfig) -> dict[str, Any]:
     """
     Direct listing search — no tool calls, no LLM formatting.
 
@@ -51,7 +53,7 @@ async def listing_search_node(state: RealEstateAgentState, config: RunnableConfi
         return {}
 
     try:
-        ctx = state.get("search_context") or {}
+        ctx = state.get(StateKeys.SEARCH_CONTEXT) or {}
 
         if ctx.get("property_id") or ctx.get("location") or ctx.get("address"):
             # Fast path — entities already extracted by intent_node, no LLM call
@@ -74,15 +76,15 @@ async def listing_search_node(state: RealEstateAgentState, config: RunnableConfi
         # For search_then_book: hand off to agent_node for check_availability
         # instead of ending. Only when results exist — no results falls through
         # to the normal "nothing found" reply so the user isn't left in silence.
-        if state.get("user_intent") == "search_then_book" and rows:
+        if state.get(StateKeys.USER_INTENT) == "search_then_book" and rows:
             logger.info(
                 "listing_search_node | search_then_book | found=%d → booking",
                 count,
             )
             return {
-                "search_results": rows,
-                "retrieved_docs": None,
-                "user_intent": "booking",
+                StateKeys.SEARCH_RESULTS: rows,
+                StateKeys.RETRIEVED_DOCS: None,
+                StateKeys.USER_INTENT:    "booking",
             }
 
         if rows:
@@ -95,8 +97,8 @@ async def listing_search_node(state: RealEstateAgentState, config: RunnableConfi
 
         return {
             "messages": [AIMessage(content=reply)],
-            "search_results": rows,
-            "retrieved_docs": None,
+            StateKeys.SEARCH_RESULTS: rows,
+            StateKeys.RETRIEVED_DOCS: None,
         }
 
         # --- OLD LLM-based path (kept for reference) ---

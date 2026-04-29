@@ -97,9 +97,6 @@ def build_graph(checkpointer: BaseCheckpointSaver) -> CompiledStateGraph:
     graph.add_node(Node.CONTEXT_UPDATE,  context_update_node)
     graph.add_node(Node.SAFETY,          safety_node)
 
-    # ------------------------
-    # Entry point
-    # ------------------------
     graph.set_entry_point(Node.INTENT)
 
     # ------------------------

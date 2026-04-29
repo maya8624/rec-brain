@@ -44,7 +44,7 @@ def context_update_node(state: RealEstateAgentState) -> dict[str, Any]:
 
     # Any successful tool resets the error counter so safety_node starts fresh
     if any(tool_result.get("success") for _, tool_result in recent_tool_results):
-        context_result["error_count"] = 0
+        context_result[StateKeys.ERROR_COUNT] = 0
 
     return context_result
 
@@ -94,8 +94,8 @@ def _handle_book_inspection(state: RealEstateAgentState, result: dict) -> dict[s
             confirmed=True,
             cancelled=False,
         ),
-        "intent_completed": True,
-        "last_intent": state.get("user_intent"),
+        StateKeys.INTENT_COMPLETED: True,
+        StateKeys.LAST_INTENT: state.get(StateKeys.USER_INTENT),
     }
 
 
@@ -111,16 +111,16 @@ def _handle_cancel_inspection(state: RealEstateAgentState, result: dict) -> dict
             confirmed=False,
             cancelled=True,
         ),
-        "intent_completed": True,
-        "last_intent": state.get("user_intent"),
+        StateKeys.INTENT_COMPLETED: True,
+        StateKeys.LAST_INTENT: state.get(StateKeys.USER_INTENT),
     }
 
 
 def _handle_get_booking(_state: RealEstateAgentState, _result: dict) -> dict[str, Any]:
     """Mark booking_lookup as complete — regardless of whether results were found."""
     return {
-        "intent_completed": True,
-        "last_intent": "booking_lookup",
+        StateKeys.INTENT_COMPLETED: True,
+        StateKeys.LAST_INTENT: "booking_lookup",
     }
 
 

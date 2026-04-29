@@ -25,7 +25,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.agents.nodes._base import listing_summary
 from app.agents.state import RealEstateAgentState
-from app.core.constants import HISTORY_BY_INTENT
+from app.core.constants import HISTORY_BY_INTENT, StateKeys
 from app.infrastructure.llm import get_llm
 from app.prompts.agent import REAL_ESTATE_AGENT_SYSTEM
 from app.tools import get_all_tools
@@ -51,7 +51,7 @@ async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
     needs_tools = _needs_tools(state)
     llm = _get_tool_llm() if needs_tools else _get_plain_llm()
 
-    intent = state.get("user_intent", "general")
+    intent = state.get(StateKeys.USER_INTENT, "general")
     history_limit = HISTORY_BY_INTENT.get(intent, 6)
     history = list(state["messages"])[-history_limit:]
 
@@ -59,12 +59,12 @@ async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
     # retrieved_docs is injected here and never written to state["messages"],
     # so it cannot accumulate across turns or be mistaken for history.
     prompt: list = [SystemMessage(content=REAL_ESTATE_AGENT_SYSTEM), *history]
-    retrieved_docs = state.get("retrieved_docs")
+    retrieved_docs = state.get(StateKeys.RETRIEVED_DOCS)
     if retrieved_docs:
         prompt.append(SystemMessage(content=retrieved_docs))
 
-    if intent in _TOOL_INTENTS and state.get("search_results"):
-        summary = listing_summary(state["search_results"])
+    if intent in _TOOL_INTENTS and state.get(StateKeys.SEARCH_RESULTS):
+        summary = listing_summary(state[StateKeys.SEARCH_RESULTS])
         prompt.append(SystemMessage(
             content=f"[PROPERTY SEARCH RESULTS]\n{summary}"))
 
@@ -74,7 +74,7 @@ async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
         needs_tools,
         len(history),
         len(state["messages"]),
-        state.get("error_count", 0),
+        state.get(StateKeys.ERROR_COUNT, 0),
     )
 
     try:
@@ -101,9 +101,9 @@ async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
     # Clear retrieved_docs so the next turn starts clean.
     return {
         "messages": [response],
-        "retrieved_docs": None,
-        "intent_completed": intent_completed,
-        "last_intent": intent if intent_completed else state.get("last_intent"),
+        StateKeys.RETRIEVED_DOCS:   None,
+        StateKeys.INTENT_COMPLETED: intent_completed,
+        StateKeys.LAST_INTENT:      intent if intent_completed else state.get(StateKeys.LAST_INTENT),
     }
 
 
@@ -121,7 +121,7 @@ def _needs_tools(state: RealEstateAgentState) -> bool:
         - intent is "booking" or "cancellation"
         - last message is HumanMessage (first call, not formatting pass)
     """
-    intent = state.get("user_intent", "general")
+    intent = state.get(StateKeys.USER_INTENT, "general")
     if intent not in _TOOL_INTENTS:
         return False
 

@@ -1,8 +1,5 @@
 """
 Shared utilities for all agent nodes.
-
-Kept internal to this package (underscore-prefixed) — import from the
-node modules, not directly from here.
 """
 
 import json

@@ -60,9 +60,17 @@ class StateKeys:
     """
     Constants for state keys used in the AI agent.
     """
+    USER_INTENT = "user_intent"
+    LAST_INTENT = "last_intent"
+    INTENT_COMPLETED = "intent_completed"
+    EARLY_RESPONSE = "early_response"
     SEARCH_CONTEXT = "search_context"
+    SEARCH_RESULTS = "search_results"
+    RETRIEVED_DOCS = "retrieved_docs"
     BOOKING_CONTEXT = "booking_context"
     BOOKING_STATUS = "booking_status"
+    ERROR_COUNT = "error_count"
+    REQUIRES_HUMAN = "requires_human"
 
 
 class AppStateKeys:

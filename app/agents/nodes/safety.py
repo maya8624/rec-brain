@@ -11,6 +11,7 @@ from typing import Any
 
 from app.agents.state import RealEstateAgentState
 from app.core.config import settings
+from app.core.constants import StateKeys
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,7 @@ def safety_node(state: RealEstateAgentState) -> dict[str, Any]:
 
     Returns partial state: { error_count } or { error_count, requires_human }.
     """
-    current_errors = state.get("error_count", 0)
+    current_errors = state.get(StateKeys.ERROR_COUNT, 0)
     new_error_count = current_errors + 1
 
     logger.warning(
@@ -39,8 +40,8 @@ def safety_node(state: RealEstateAgentState) -> dict[str, Any]:
         )
 
         return {
-            "error_count": min(new_error_count, settings.MAX_ERRORS_BEFORE_ESCALATION),
-            "requires_human": True,
+            StateKeys.ERROR_COUNT:   min(new_error_count, settings.MAX_ERRORS_BEFORE_ESCALATION),
+            StateKeys.REQUIRES_HUMAN: True,
         }
 
-    return {"error_count": new_error_count}
+    return {StateKeys.ERROR_COUNT: new_error_count}

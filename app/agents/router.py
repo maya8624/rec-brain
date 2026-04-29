@@ -14,7 +14,7 @@ import json
 import logging
 from langchain_core.messages import AIMessage, ToolMessage
 from app.agents.state import RealEstateAgentState
-from app.core.constants import ToolNames, Node
+from app.core.constants import ToolNames, Node, StateKeys
 
 logger = logging.getLogger(__name__)
 
@@ -39,11 +39,10 @@ def route_intent_output(state: RealEstateAgentState) -> str:
         "general"         → agent_node           (LLM plain response)
         compound intent   → END                  (early_response set by intent_node, bypasses LLM)
     """
-    if state.get("early_response"):
-        logger.info("route_intent_output | early_response set → end")
+    if state.get(StateKeys.EARLY_RESPONSE):
         return Node.END
 
-    intent = state.get("user_intent", "general")
+    intent = state.get(StateKeys.USER_INTENT, "general")
 
     route = {
         "search":           Node.LISTING_SEARCH,
@@ -168,7 +167,7 @@ def route_after_safety(state: RealEstateAgentState) -> str:
 # ---------------------------------------------------------------------------
 
 def _requires_human(state: RealEstateAgentState, caller: str) -> bool:
-    if state.get("requires_human"):
+    if state.get(StateKeys.REQUIRES_HUMAN):
         logger.warning("%s | requires_human=True → end", caller)
         return True
 

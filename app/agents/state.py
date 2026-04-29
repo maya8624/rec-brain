@@ -22,26 +22,24 @@ from langchain_core.messages import BaseMessage
 from pydantic import BaseModel
 
 # ------------------------------------
-# Intent literals)
-# Explicit Literal keeps the LLM honest — only these values are valid
+# Intent literals — only these values are valid
 # ------------------------------------
 UserIntent = Literal[
-    "search",           # user wants to find properties
-    "document_query",   # user asking about leases, contracts, strata
+    "search",
+    "document_query",
     "hybrid_search",    # user wants property listings + document context together
-    "booking",          # user wants to inspect a property
-    "cancellation",     # user wants to cancel an existing inspection
-    "booking_lookup",   # user wants to check details of an existing booking
-    # user wants to search first, then book — run search, then auto-proceed to check_availability
+    "booking",
+    "cancellation",
+    "booking_lookup",
     "search_then_book",
-    "general",          # general question about the agency / process
-    "unknown",          # intent not yet determined
+    "general",
+    "unknown"
 ]
-
 
 # ------------------------------------
 #  Nested context types
 # ------------------------------------
+
 
 class PropertyContext(TypedDict, total=False):
     """
