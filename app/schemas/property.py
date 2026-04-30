@@ -31,3 +31,12 @@ class PropertySearchResult(BaseModel):
     result_count: int = 0
     query_used: str = ""
     error: Optional[str] = None
+
+
+class SearchResult(BaseModel):
+    """Return type for SqlViewService search methods."""
+    success: bool
+    output: list[dict] | None = None
+    result_count: int = 0
+    sql_used: str | None = None
+    error: str | None = None

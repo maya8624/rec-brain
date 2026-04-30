@@ -64,7 +64,7 @@ def make_request_mock(booking_service=None, sql_view_service=None):
     mock = AsyncMock()
     mock.app.state.sql_view_service = sql_view_service
     mock.app.state.booking_service = booking_service
-    mock.app.state.rag_retriever = None
+    mock.app.state.rag_service = None
     return mock
 
 
@@ -74,7 +74,7 @@ def get_config(request, thread_id: str = "integ-thread") -> dict:
             "thread_id":        thread_id,
             "booking_service":  request.app.state.booking_service,
             "sql_view_service": request.app.state.sql_view_service,
-            "rag_retriever":    request.app.state.rag_retriever,
+            "rag_service":      request.app.state.rag_service,
         }
     }
 
@@ -91,12 +91,12 @@ class TestGraphFlows:
         assert len(result["messages"]) > 0
 
     async def test_agency_info_intent_flow(self, graph):
-        rag_retriever = RagRetriever(
+        rag_service = RagRetriever(
             vector_store_service=PgVectorStoreService(),
             embedding_service=EmbeddingService(),
         )
         request = make_request_mock()
-        request.app.state.rag_retriever = rag_retriever
+        request.app.state.rag_service = rag_service
 
         result = await graph.ainvoke(
             {
@@ -231,12 +231,12 @@ class TestGraphFlows:
         assert result["user_intent"] == "search"
 
     async def test_document_query_intent_flow(self, graph):
-        rag_retriever = RagRetriever(
+        rag_service = RagRetriever(
             vector_store_service=PgVectorStoreService(),
             embedding_service=EmbeddingService(),
         )
         request = make_request_mock()
-        request.app.state.rag_retriever = rag_retriever
+        request.app.state.rag_service = rag_service
 
         result = await graph.ainvoke(
             {

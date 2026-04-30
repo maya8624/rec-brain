@@ -77,10 +77,12 @@ class AppStateKeys:
     """
     Keys for services stored on FastAPI app.state, accessed via RunnableConfig.
     """
-    SQL_VIEW_SERVICE = "sql_view_service"
-    RAG_RETRIEVER = "rag_retriever"
-    BOOKING_SERVICE = "booking_service"
+    CONFIGURABLE = "configurable"
+    THREAD_ID = "thread_id"
     USER_ID = "user_id"
+    BOOKING_SERVICE = "booking_service"
+    SQL_VIEW_SERVICE = "sql_view_service"
+    RAG_SERVICE = "rag_service"
 
 
 HISTORY_BY_INTENT: dict[str, int] = {

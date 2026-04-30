@@ -10,6 +10,7 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 
 from app.agents.state import RealEstateAgentState
+from app.core.constants import AppStateKeys
 
 logger = logging.getLogger(__name__)
 
@@ -39,10 +40,9 @@ def resolve_app_service(config: RunnableConfig, attr: str, caller: str) -> Any |
     decide how to handle the missing service.
     """
     try:
-        service = config.get("configurable", {}).get(attr)
+        service = config.get(AppStateKeys.CONFIGURABLE, {}).get(attr)
         if service is None:
             raise ValueError(f"'{attr}' not found in configurable")
-
         return service
 
     except Exception as exc:
@@ -67,6 +67,25 @@ def build_tool_message(tool_call_id: str, name: str, content: dict) -> ToolMessa
 def error_content(error: Exception) -> dict:
     """Standard error payload shape shared by all search nodes."""
     return {"success": False, "error": str(error)}
+
+
+def nodes_to_dicts(nodes: list) -> list[dict]:
+    return [
+        {
+            "text": n.node.get_content(),
+            "score": n.score,
+            "metadata": n.node.metadata,
+        }
+        for n in nodes
+    ]
+
+
+def vector_payload(nodes: list) -> dict:
+    return {
+        "results": nodes_to_dicts(nodes),
+        "result_count": len(nodes),
+        "source": "vector_db",
+    }
 
 
 def slim_rows(rows: list[dict]) -> list[dict]:

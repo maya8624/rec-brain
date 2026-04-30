@@ -166,7 +166,7 @@ class Settings(BaseSettings):
 
     # ── LLM provider switch ───────────────────────────────────────────────────
     LLM_PROVIDER: str = Field(
-        "groq",
+        "openai",
         description="LLM provider: 'groq' or 'openai'",
     )
 

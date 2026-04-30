@@ -68,7 +68,7 @@ async def lifespan(_app: FastAPI):
         _app.state.booking_service = BookingService(_app.state.backend_client)
         _app.state.sql_view_service = SqlViewService(llm=get_llm())
 
-        _app.state.rag_retriever = RagRetriever(
+        _app.state.rag_service = RagRetriever(
             vector_store_service=PgVectorStoreService(),
             embedding_service=EmbeddingService(),
         )

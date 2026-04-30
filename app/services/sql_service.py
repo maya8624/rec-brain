@@ -17,8 +17,13 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from app.infrastructure.database import engine
 from app.prompts.sql import SQL_GENERATION_PROMPT
 from app.agents.state import SearchContext
+from app.schemas.property import SearchResult
 
 logger = logging.getLogger(__name__)
+
+_SEARCH_ERROR = SearchResult(
+    success=False, error="Property search is temporarily unavailable."
+)
 
 # Fixed SELECT columns — mirrors SQL_GENERATION_PROMPT rule 1
 _SELECT_COLS = (
@@ -32,10 +37,6 @@ class SqlValidationError(Exception):
     """Raised when generated SQL fails safety validation."""
 
 
-# ---------------------------------------------------------------------------
-# Service
-# ---------------------------------------------------------------------------
-
 class SqlViewService:
     """
     Executes LLM-generated SQL queries against v_listings.
@@ -45,43 +46,36 @@ class SqlViewService:
     def __init__(self, llm) -> None:
         self._llm = llm
 
-    async def search_listings(self, question: str) -> dict:
+    async def search_listings(self, question: str) -> SearchResult:
         """Generate and execute a SQL query from a natural language question."""
-        logger.info("SqlViewService.search_listings | question=%.80s", question)
-
         try:
             sql = await self._generate_sql(question)
-            logger.debug("SqlViewService | generated sql=%s", sql)
             rows = self._execute_sql(sql)
-            logger.info("SqlViewService | complete | count=%d", len(rows))
-            return {"success": True, "output": rows, "result_count": len(rows), "sql_used": sql}
+            return SearchResult(success=True, output=rows, result_count=len(rows), sql_used=sql)
 
         except SqlValidationError as exc:
             logger.error("SqlViewService | validation failed | %s", exc)
-            return {"success": False, "output": None, "result_count": 0, "error": "Property search is temporarily unavailable."}
+            return _SEARCH_ERROR
 
         except Exception as exc:
             logger.exception("SqlViewService | failed | %s", exc)
-            return {"success": False, "output": None, "result_count": 0, "error": "Property search is temporarily unavailable."}
+            return _SEARCH_ERROR
 
-    async def search_from_context(self, ctx: SearchContext) -> dict:
+    async def search_from_context(self, ctx: SearchContext) -> SearchResult:
         """
         Execute a template-built SQL query from SearchContext — no LLM call.
         Used by listing_search_node when intent_node has already extracted entities.
         """
-        logger.info("SqlViewService.search_from_context | ctx=%s", ctx)
-
         try:
             sql = self.build_sql_from_context(ctx)
             rows = self._execute_sql(sql)
-            logger.info(
-                "SqlViewService.search_from_context | count=%d", len(rows))
-            return {"success": True, "output": rows, "result_count": len(rows), "sql_used": sql}
+            return SearchResult(success=True, output=rows, result_count=len(rows), sql_used=sql)
 
         except Exception as exc:
             logger.exception(
-                "SqlViewService.search_from_context | failed | %s", exc)
-            return {"success": False, "output": None, "result_count": 0, "error": "Property search is temporarily unavailable."}
+                "SqlViewService.search_from_context | failed | %s", exc
+            )
+            return _SEARCH_ERROR
 
     def _execute_sql(self, sql: str) -> list[dict]:
         """Validate and run a SELECT query. Returns rows as a list of dicts."""

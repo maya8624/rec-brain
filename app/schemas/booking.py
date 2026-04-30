@@ -112,11 +112,3 @@ class BookingLookupResult(BaseModel):
     end_at: str = ""
     bookings: list[dict] = []   # populated when returning all user bookings
     error: str | None = None
-
-
-class SearchListingResult(BaseModel):
-    """Tool return for search_listings."""
-    success: bool
-    output: str | None = None
-    result_count: int = 0
-    error: str | None = None

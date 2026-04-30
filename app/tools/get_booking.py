@@ -36,8 +36,8 @@ async def get_booking(config: RunnableConfig, confirmation_id: str = "") -> dict
     - Call with confirmation_id when the user provides their reference number.
     - Call with no arguments to retrieve all of the user's bookings.
     """
-    booking_service: BookingService = config["configurable"][AppStateKeys.BOOKING_SERVICE]
-    user_id: str = config["configurable"][AppStateKeys.USER_ID]
+    booking_service: BookingService = config[AppStateKeys.CONFIGURABLE][AppStateKeys.BOOKING_SERVICE]
+    user_id: str = config[AppStateKeys.CONFIGURABLE][AppStateKeys.USER_ID]
 
     try:
         if confirmation_id:

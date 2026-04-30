@@ -3,24 +3,24 @@ agent_node — the LLM brain of the agent.
 
 Three roles depending on intent:
 
-    1. "booking" / "cancellation"  — first call
-       — uses _LLM_WITH_TOOLS
-       — LLM decides which action tool to call (check_availability,
-         book_inspection, cancel_inspection)
+    1. "booking" / "cancellation" / "booking_lookup"  — first call
+       — LLM with tools bound
+       — decides which action tool to call 
+       (check_availability, book_inspection, cancel_inspection, get_booking)
 
     2. Any intent — second call (ToolMessage in state)
-       — uses _LLM_PLAIN
+       — plain LLM, no tools
        — formats tool results into human-readable response
 
-    3. "general" / formatting pass
-       — uses _LLM_PLAIN
-       — responds directly, no tools needed
+    3. "general" / "search" / "document_query" / formatting pass
+       — plain LLM, no tools
+       — responds directly or formats retrieved context
 """
 
 import logging
 from typing import Any
 
-from groq import APIStatusError, RateLimitError
+from openai import APIStatusError, RateLimitError
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.agents.nodes._base import listing_summary
@@ -40,12 +40,12 @@ async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
     """
     Primary LLM node.
 
-    Uses _LLM_WITH_TOOLS only when:
-        - intent is "booking" or "cancellation"
+    Uses tool-bound LLM only when:
+        - intent is "booking", "cancellation", or "booking_lookup"
         - last message is HumanMessage (first call, no results yet)
 
-    Uses _LLM_PLAIN for everything else:
-        - "general", "search", "document_query"
+    Uses plain LLM for everything else:
+        - "general", "search", "document_query", "hybrid_search"
         - any second call after tool results are back
     """
     needs_tools = _needs_tools(state)
@@ -80,10 +80,10 @@ async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
     try:
         response = await llm.ainvoke(prompt)
     except RateLimitError as exc:
-        logger.error("agent_node | Groq rate limit hit: %s", exc)
+        logger.error("agent_node | OpenAI rate limit hit: %s", exc)
         raise
     except APIStatusError as exc:
-        logger.error("agent_node | Groq API error %s: %s",
+        logger.error("agent_node | OpenAI API error %s: %s",
                      exc.status_code, exc.message)
         raise
 

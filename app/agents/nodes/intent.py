@@ -85,7 +85,8 @@ async def _classify_with_llm(state: RealEstateAgentState) -> dict[str, Any]:
         history = [message for message in state["messages"] if isinstance(
             message, HumanMessage)][-_LLM_HISTORY_LIMIT:]
 
-    state_hint = _build_state_hint(state.get(StateKeys.LAST_INTENT), intent_completed)
+    state_hint = _build_state_hint(
+        state.get(StateKeys.LAST_INTENT), intent_completed)
 
     prompt = [SystemMessage(
         content=INTENT_CLASSIFICATION_PROMPT + state_hint), *history]

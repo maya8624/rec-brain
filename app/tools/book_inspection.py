@@ -21,8 +21,8 @@ async def book_inspection(slot_id: str, config: RunnableConfig) -> dict:
     """
     Book a property inspection via the .NET backend.
     """
-    booking_service: BookingService = config["configurable"][AppStateKeys.BOOKING_SERVICE]
-    user_id = config["configurable"][AppStateKeys.USER_ID]
+    booking_service: BookingService = config[AppStateKeys.CONFIGURABLE][AppStateKeys.BOOKING_SERVICE]
+    user_id = config[AppStateKeys.CONFIGURABLE][AppStateKeys.USER_ID]
     logger.info("book_inspection | slot_id=%s | user_id=%s", slot_id, user_id)
 
     try:

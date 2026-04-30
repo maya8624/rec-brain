@@ -9,11 +9,12 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.runnables import RunnableConfig
 
 from app.agents.state import initial_state
 from app.api.dependencies import get_agent, verify_internal_key, CompiledStateGraph
 from app.core.config import settings
-from app.core.constants import InternalRoutes
+from app.core.constants import AppStateKeys, InternalRoutes
 from app.schemas.chat import ChatErrorResponse, ChatRequest, ChatResponse, PropertyListing
 
 logger = logging.getLogger(__name__)
@@ -30,13 +31,13 @@ async def chat(
     """
 
     try:
-        config = {
-            "configurable": {
-                "thread_id":        request.thread_id,
-                "user_id":          request.user_id,
-                "booking_service":  http_request.app.state.booking_service,
-                "sql_view_service": http_request.app.state.sql_view_service,
-                "rag_retriever":    http_request.app.state.rag_retriever,
+        config: RunnableConfig = {
+            AppStateKeys.CONFIGURABLE: {
+                AppStateKeys.THREAD_ID:       request.thread_id,
+                AppStateKeys.USER_ID:         request.user_id,
+                AppStateKeys.BOOKING_SERVICE: http_request.app.state.booking_service,
+                AppStateKeys.SQL_VIEW_SERVICE: http_request.app.state.sql_view_service,
+                AppStateKeys.RAG_SERVICE:     http_request.app.state.rag_service,
             }
         }
 
@@ -47,8 +48,8 @@ async def chat(
             # LangGraph reload existing state from checkpointer automatically
             input_state = {"messages": [HumanMessage(content=request.message)]}
 
-        result = await agent.ainvoke(input_state, config=config)
-        chat_response = _build_response(request.thread_id, result)
+        final_state = await agent.ainvoke(input=input_state, config=config)
+        chat_response = _build_response(request.thread_id, final_state)
         return chat_response
 
     except Exception as exc:
@@ -105,12 +106,12 @@ async def _event_generator(request: ChatRequest, http_request: Request, agent):
     """
     try:
         config = {
-            "configurable": {
-                "thread_id":        request.thread_id,
-                "user_id":          request.user_id,
-                "booking_service":  http_request.app.state.booking_service,
-                "sql_view_service": http_request.app.state.sql_view_service,
-                "rag_retriever":    http_request.app.state.rag_retriever,
+            AppStateKeys.CONFIGURABLE: {
+                AppStateKeys.THREAD_ID:       request.thread_id,
+                AppStateKeys.USER_ID:         request.user_id,
+                AppStateKeys.BOOKING_SERVICE: http_request.app.state.booking_service,
+                AppStateKeys.SQL_VIEW_SERVICE: http_request.app.state.sql_view_service,
+                AppStateKeys.RAG_SERVICE:     http_request.app.state.rag_service,
             }
         }
 
@@ -171,32 +172,32 @@ def _to_sse_event(event: dict) -> dict | None:
     return None
 
 
-def _build_response(thread_id: str, result: dict) -> ChatResponse:
+def _build_response(thread_id: str, final_state: dict) -> ChatResponse:
     """
     Builds a ChatResponse from the final LangGraph state dict.
     """
 
     ai_messages = [
-        message for message in result.get("messages", [])
+        message for message in final_state.get("messages", [])
         if isinstance(message, AIMessage)
     ]
 
     reply = (
         ai_messages[-1].content
         if ai_messages
-        else result.get("early_response")
+        else final_state.get("early_response")
         or (
             # requires_human=True: graph exited via safety escalation with no AIMessage.
             # Option B: replace this with a human_escalation_node in graph.py that appends
             # an AIMessage so the graph itself owns the escalation message — worth doing
             # when escalation needs side effects (webhook, CRM notify, staff alert, etc.).
             "I'm having trouble completing this — a team member will follow up shortly."
-            if result.get("requires_human")
+            if final_state.get("requires_human")
             else "I couldn't process that request."
         )
     )
 
-    search_results = result.get("search_results", [])
+    search_results = final_state.get("search_results", [])
 
     return ChatResponse(
         reply=reply,

@@ -24,7 +24,7 @@ def make_node():
 
 
 @pytest.fixture
-def make_rag_retriever(make_node):
+def make_rag_service(make_node):
     """Factory for a mock RagRetriever (LlamaIndex BaseRetriever)."""
     def _factory(nodes: list | None = None, raise_error: Exception | None = None):
         mock = AsyncMock()
@@ -129,7 +129,7 @@ def make_config():
     """Factory for a LangGraph RunnableConfig with services in configurable directly."""
     def _factory(
         sql_service=None,
-        rag_retriever=None,
+        rag_service=None,
         booking_service=None,
         thread_id: str = "test-thread",
     ) -> dict:
@@ -137,7 +137,7 @@ def make_config():
             "configurable": {
                 "thread_id":        thread_id,
                 "sql_view_service": sql_service,
-                "rag_retriever":    rag_retriever,
+                "rag_service":      rag_service,
                 "booking_service":  booking_service,
             }
         }

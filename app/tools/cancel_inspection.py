@@ -19,8 +19,8 @@ async def cancel_inspection(confirmation_id: str, config: RunnableConfig, reason
     """
     Cancel an existing property inspection booking.
     """
-    booking_service: BookingService = config["configurable"][AppStateKeys.BOOKING_SERVICE]
-    user_id: str = config["configurable"][AppStateKeys.USER_ID]
+    booking_service: BookingService = config[AppStateKeys.CONFIGURABLE][AppStateKeys.BOOKING_SERVICE]
+    user_id: str = config[AppStateKeys.CONFIGURABLE][AppStateKeys.USER_ID]
 
     logger.info(
         "cancel_inspection | confirmation_id=%s | reason=%s",

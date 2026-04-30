@@ -29,15 +29,6 @@ TOOL_ROUTES: dict[str, str] = {
 def route_intent_output(state: RealEstateAgentState) -> str:
     """
     Routes after intent_node based on user_intent in state.
-
-    Checks early_response first — compound intents bypass everything.
-
-        "search"          → listing_search_node  (direct v_listings query)
-        "booking"         → agent_node           (LLM calls action tool)
-        "cancellation"    → agent_node           (LLM calls action tool)
-        "document_query"  → vector_search_node
-        "general"         → agent_node           (LLM plain response)
-        compound intent   → END                  (early_response set by intent_node, bypasses LLM)
     """
     if state.get(StateKeys.EARLY_RESPONSE):
         return Node.END
@@ -55,7 +46,6 @@ def route_intent_output(state: RealEstateAgentState) -> str:
         "general":          Node.AGENT,
     }.get(intent, Node.AGENT)
 
-    logger.info("route_intent_output | intent=%s → %s", intent, route)
     return route
 
 
@@ -96,19 +86,14 @@ def route_agent_output(state: RealEstateAgentState) -> str:
 def route_after_search(state: RealEstateAgentState) -> str:
     """
     Routes after listing_search_node / vector_search_node / hybrid_search_node.
-
-    listing_search_node appends an AIMessage directly — skip agent_node.
-    vector/hybrid search nodes set retrieved_docs — agent_node must format them.
     """
     if _requires_human(state, "route_after_search"):
         return Node.END
 
     last = state["messages"][-1] if state["messages"] else None
     if isinstance(last, AIMessage):
-        logger.info("route_after_search | reply already built → end")
         return Node.END
 
-    logger.info("route_after_search | → agent")
     return Node.AGENT
 
 

@@ -23,7 +23,7 @@ async def check_availability(property_id: str, config: RunnableConfig) -> dict:
     Check available inspection time slots for a property.
     Call immediately once you have the property_id.
     """
-    booking_service: BookingService = config["configurable"][AppStateKeys.BOOKING_SERVICE]
+    booking_service: BookingService = config[AppStateKeys.CONFIGURABLE][AppStateKeys.BOOKING_SERVICE]
 
     try:
         uuid.UUID(property_id)
