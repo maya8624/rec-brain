@@ -121,11 +121,6 @@ def route_after_tools(state: RealEstateAgentState) -> str:
         )
         return Node.SAFETY
 
-    logger.info(
-        "route_after_tools | %d/%d succeeded → context_update",
-        succeeded,
-        len(results),
-    )
     return Node.CONTEXT_UPDATE
 
 
@@ -133,8 +128,6 @@ def route_after_context(state: RealEstateAgentState) -> str:
     """Returns to agent so LLM can respond using updated context."""
     if _requires_human(state, "route_after_context"):
         return Node.END
-
-    logger.info("route_after_context | → agent")
     return Node.AGENT
 
 
@@ -142,8 +135,6 @@ def route_after_safety(state: RealEstateAgentState) -> str:
     """Returns to agent if safety threshold has not been reached."""
     if _requires_human(state, "route_after_safety"):
         return Node.END
-
-    logger.info("route_after_safety | under threshold → agent")
     return Node.AGENT
 
 
@@ -155,7 +146,6 @@ def _requires_human(state: RealEstateAgentState, caller: str) -> bool:
     if state.get(StateKeys.REQUIRES_HUMAN):
         logger.warning("%s | requires_human=True → end", caller)
         return True
-
     return False
 
 

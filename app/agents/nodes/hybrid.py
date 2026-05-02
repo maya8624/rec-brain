@@ -18,7 +18,7 @@ from typing import Any
 from langchain_core.runnables import RunnableConfig
 
 from app.agents.state import RealEstateAgentState
-from app.core.constants import AppStateKeys, Node, StateKeys
+from app.core.constants import AppStateKeys, Messages, Node, StateKeys
 from app.schemas.property import SearchResult
 from app.services.rag_service import RagRetriever
 from app.services.sql_service import SqlViewService
@@ -26,6 +26,7 @@ from app.agents.nodes._base import (
     last_human_message,
     listing_summary,
     resolve_app_service,
+    search_error_response,
     slim_rows,
     vector_payload,
 )
@@ -42,15 +43,12 @@ async def hybrid_search_node(state: RealEstateAgentState, config: RunnableConfig
         logger.warning("hybrid_search_node | no human message found")
         return {}
 
-    sql_service: SqlViewService | None = resolve_app_service(
+    sql_service: SqlViewService = resolve_app_service(
         config, AppStateKeys.SQL_VIEW_SERVICE, Node.HYBRID_SEARCH
     )
-    rag_service: RagRetriever | None = resolve_app_service(
+    rag_service: RagRetriever = resolve_app_service(
         config, AppStateKeys.RAG_SERVICE, Node.HYBRID_SEARCH
     )
-
-    if sql_service is None or rag_service is None:
-        return {}
 
     sql_outcome, vector_outcome = await asyncio.gather(
         sql_service.search_listings(question),
@@ -60,6 +58,11 @@ async def hybrid_search_node(state: RealEstateAgentState, config: RunnableConfig
 
     sql = _unwrap_sql(sql_outcome)
     vector = _unwrap_vector(vector_outcome)
+
+    if not sql.success and not vector.get("success"):
+        logger.error("hybrid_search_node | both searches failed")
+        return search_error_response()
+
     rows = slim_rows(sql.output or [])
     retrieved_docs = _build_retrieved_docs(sql, vector, rows)
 

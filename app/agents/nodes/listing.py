@@ -21,10 +21,11 @@ from app.agents.nodes._base import (
     format_search_reply,
     last_human_message,
     resolve_app_service,
+    search_error_response,
     slim_rows,
 )
 from app.agents.state import RealEstateAgentState
-from app.core.constants import AppStateKeys, Node, StateKeys
+from app.core.constants import AppStateKeys, Messages, Node, StateKeys
 from app.services.sql_service import SqlViewService
 
 logger = logging.getLogger(__name__)
@@ -41,12 +42,9 @@ async def listing_search_node(
         logger.warning("listing_search_node | no human message found")
         return {}
 
-    sql_service: SqlViewService | None = resolve_app_service(
+    sql_service: SqlViewService = resolve_app_service(
         config, AppStateKeys.SQL_VIEW_SERVICE, Node.LISTING_SEARCH
     )
-
-    if sql_service is None:
-        return {}
 
     try:
         ctx = state.get(StateKeys.SEARCH_CONTEXT) or {}
@@ -67,7 +65,7 @@ async def listing_search_node(
         if rows:
             reply = format_search_reply(rows, result.result_count)
         else:
-            reply = "No properties matched your search. Try broadening your criteria — for example, a nearby suburb or a higher price range."
+            reply = Messages.NO_RESULTS
 
         return {
             "messages": [AIMessage(content=reply)],
@@ -76,4 +74,4 @@ async def listing_search_node(
         }
     except Exception as exc:
         logger.exception("listing_search_node | failed | %s", exc)
-        return {}
+        return search_error_response()

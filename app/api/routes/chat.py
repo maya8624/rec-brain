@@ -14,7 +14,7 @@ from langchain_core.runnables import RunnableConfig
 from app.agents.state import initial_state
 from app.api.dependencies import get_agent, verify_internal_key, CompiledStateGraph
 from app.core.config import settings
-from app.core.constants import AppStateKeys, InternalRoutes
+from app.core.constants import AppStateKeys, InternalRoutes, Messages, StateKeys
 from app.schemas.chat import ChatErrorResponse, ChatRequest, ChatResponse, PropertyListing
 
 logger = logging.getLogger(__name__)
@@ -185,15 +185,15 @@ def _build_response(thread_id: str, final_state: dict) -> ChatResponse:
     reply = (
         ai_messages[-1].content
         if ai_messages
-        else final_state.get("early_response")
+        else final_state.get(StateKeys.EARLY_RESPONSE)
         or (
             # requires_human=True: graph exited via safety escalation with no AIMessage.
             # Option B: replace this with a human_escalation_node in graph.py that appends
             # an AIMessage so the graph itself owns the escalation message — worth doing
             # when escalation needs side effects (webhook, CRM notify, staff alert, etc.).
-            "I'm having trouble completing this — a team member will follow up shortly."
-            if final_state.get("requires_human")
-            else "I couldn't process that request."
+            Messages.ESCALATION
+            if final_state.get(StateKeys.REQUIRES_HUMAN)
+            else Messages.FALLBACK
         )
     )
 

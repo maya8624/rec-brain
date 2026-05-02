@@ -96,6 +96,14 @@ HISTORY_BY_INTENT: dict[str, int] = {
 }
 
 
+class Messages:
+    """User-facing fallback messages returned when the agent cannot complete a request."""
+    ESCALATION = "I'm having trouble completing this — a team member will follow up shortly."
+    FALLBACK = "I couldn't process that request."
+    SEARCH_ERROR = "I'm having trouble finding that information right now. Please try again."
+    NO_RESULTS = "No properties matched your search. Try broadening your criteria — for example, a nearby suburb or a higher price range."
+
+
 class Node:
     """
     Constants for graph node names.

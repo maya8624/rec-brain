@@ -10,9 +10,17 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 
 from app.agents.state import RealEstateAgentState
-from app.core.constants import AppStateKeys
+from app.core.constants import AppStateKeys, Messages, StateKeys
 
 logger = logging.getLogger(__name__)
+
+
+def search_error_response() -> dict:
+    return {
+        "messages": [AIMessage(content=Messages.SEARCH_ERROR)],
+        StateKeys.SEARCH_RESULTS: [],
+        StateKeys.RETRIEVED_DOCS: None,
+    }
 
 
 def last_human_message(state: RealEstateAgentState) -> str:
@@ -31,7 +39,7 @@ def last_ai_message(state: RealEstateAgentState) -> AIMessage | None:
     return None
 
 
-def resolve_app_service(config: RunnableConfig, attr: str, caller: str) -> Any | None:
+def resolve_app_service(config: RunnableConfig, attr: str, caller: str) -> Any:
     """
     Extract a service from RunnableConfig configurable by key name.
 
@@ -47,7 +55,7 @@ def resolve_app_service(config: RunnableConfig, attr: str, caller: str) -> Any |
 
     except Exception as exc:
         logger.error("%s | could not resolve %s: %s", caller, attr, exc)
-        return None
+        raise RuntimeError(f"{caller} | service '{attr}' not available") from exc
 
 
 def build_tool_message(tool_call_id: str, name: str, content: dict) -> ToolMessage:

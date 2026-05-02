@@ -9,18 +9,8 @@ Priority order:
     2. .env file                   (local development)
     3. Field(default=...)          (fallback)
 """
-from pathlib import Path
 from pydantic import Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-
-env_path = Path(".env")
-
-if not env_path.exists():
-    raise FileNotFoundError(
-        f"Configuration file '{env_path}' not found. "
-        "Create one from .env.example before starting the service."
-    )
 
 
 class Settings(BaseSettings):
@@ -103,8 +93,8 @@ class Settings(BaseSettings):
     # Groq and LLM settings
     # ------------------------------------
     GROQ_API_KEY: str = Field(
-        ...,
-        description="Groq API key — get from console.groq.com",
+        "",
+        description="Groq API key — required when LLM_PROVIDER=groq",
     )
     MODEL_NAME: str = Field(
         "llama-3.3-70b-versatile",
