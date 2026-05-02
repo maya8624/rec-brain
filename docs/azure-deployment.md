@@ -45,50 +45,34 @@ docker tag rec-brain-base recnexusdevacr.azurecr.io/rec-brain-base:latest
 docker push recnexusdevacr.azurecr.io/rec-brain-base:latest
 ```
 
-## Resume Here Tomorrow
+## Completed Steps
 
-### Step 2 — Set environment variables on the Container App
-The Container App needs the same env vars as `.env.docker`. Run:
-```bash
-az containerapp update --name rec-brain --resource-group rg-nexus-dev \
-  --set-env-vars \
-    GROQ_API_KEY=<your-key> \
-    MODEL_NAME=llama-3.3-70b-versatile \
-    POSTGRES_URL=<your-postgres-url> \
-    BACKEND_BASE_URL=<your-backend-url> \
-    BACKEND_API_KEY=<your-backend-key> \
-    ENVIRONMENT=development \
-    LLM_PROVIDER=groq \
-    LLM_TEMPERATURE=0.0 \
-    LLM_MAX_TOKENS=4096
-```
+### Step 2 — Set environment variables on the Container App ✓ Done
+Set via `az containerapp update` using OpenAI as the LLM provider:
+- `LLM_PROVIDER=openai`, `OPENAI_API_KEY`, `OPENAI_MODEL_NAME=gpt-4o-mini`
+- `POSTGRES_URL` → Azure PostgreSQL Flexible Server (`nexus-db-dev01.postgres.database.azure.com`) with `?sslmode=require`
+- `BACKEND_BASE_URL` → `https://nexus-api-byegb2gjfzh3hqbq.australiaeast-01.azurewebsites.net`
+- `ENVIRONMENT=development`, `LOG_LEVEL=INFO`, `LLM_TEMPERATURE=0.0`, `LLM_MAX_TOKENS=4096`
 
-### Step 3 — Grant Container App access to ACR
+### Step 3 — Grant Container App access to ACR ✓ Done
 ```bash
 az containerapp registry set \
   --name rec-brain \
   --resource-group rg-nexus-dev \
   --server recnexusdevacr.azurecr.io \
-  --username <acr-username> \
+  --username recnexusdevacr \
   --password <acr-password>
 ```
+ACR password stored as secret `recnexusdevacrazurecrio-recnexusdevacr` on the Container App.
 
-### Step 4 — Trigger first deployment
-Commit and push to `main`:
-```bash
-git add .
-git commit -m "add GitHub Actions deployment workflow"
-git push origin main
+### Step 4 — Trigger first deployment ✓ Done
+Pushed to `main` — GitHub Actions built the app image, pushed to ACR, and deployed to the Container App.
+
+### Step 5 — Verify ✓ Done
+App is live at:
 ```
-
-GitHub Actions will build the app image, push it to ACR, and deploy it to the Container App.
-
-### Step 5 — Verify
-```bash
-az containerapp show --name rec-brain --resource-group rg-nexus-dev --query "properties.latestRevisionFqdn"
+https://rec-brain.victoriousisland-e32ac3b0.australiaeast.azurecontainerapps.io
 ```
-
-This returns the public URL of your running Container App.
 
 ---
 

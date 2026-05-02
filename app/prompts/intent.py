@@ -16,7 +16,7 @@ If earlier context is not present, treat the message as a fresh request.
 INTENTS:
 - search           — user wants to find, browse, or list properties
 - document_query   — user asks about leases, contracts, strata, agency info,
-                     staff details, office hours, or contact information
+                     staff details, office hours, trading hours, fees, or contact information
 - hybrid_search    — user wants BOTH property listings AND document/agency info
 - booking          — user wants to book or schedule a property inspection
 - cancellation     — user wants to cancel an existing inspection booking
@@ -54,7 +54,9 @@ RULES:
    "make it townhouses instead", "what's the agent's number?") MUST be
    resolved using history — never classify them in isolation
 3. Simple greetings ("hello", "hi", "hey", "thanks", "ok") are ALWAYS
-   "general" — never inherit a previous intent from history
+   "general" — never inherit a previous intent from history.
+   If a greeting is combined with a substantive question in the same message
+   (e.g. "Hello! what are your trading hours?"), classify by the question, not the greeting
 4. "search + booking" in the same message → search_then_book (not general)
 5. Any other compound → general with early_response asking to pick one action
 6. Rental prices are weekly in Australia (e.g. "$550 per week")
