@@ -50,8 +50,14 @@ async def hybrid_search_node(state: RealEstateAgentState, config: RunnableConfig
         config, AppStateKeys.RAG_SERVICE, Node.HYBRID_SEARCH
     )
 
+    ctx = state.get(StateKeys.SEARCH_CONTEXT)
+    if ctx and (ctx.get("property_id") or ctx.get("location") or ctx.get("address")):
+        sql_task = sql_service.search_listings(question)
+    else:
+        sql_task = sql_service.search_from_context(ctx)
+
     sql_outcome, vector_outcome = await asyncio.gather(
-        sql_service.search_listings(question),
+        sql_task,
         rag_service.aretrieve(question),
         return_exceptions=True,
     )

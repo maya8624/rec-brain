@@ -50,7 +50,7 @@ docker push recnexusdevacr.azurecr.io/rec-brain-base:latest
 ### Step 2 — Set environment variables on the Container App ✓ Done
 Set via `az containerapp update` using OpenAI as the LLM provider:
 - `LLM_PROVIDER=openai`, `OPENAI_API_KEY`, `OPENAI_MODEL_NAME=gpt-4o-mini`
-- `POSTGRES_URL` → Azure PostgreSQL Flexible Server (`nexus-db-dev01.postgres.database.azure.com`) with `?sslmode=require`
+- `POSTGRES_URL` → Azure PostgreSQL Flexible Server (`nexus-db-dev01.postgres.database.azure.com`) database `real_estate_db` with `?sslmode=require`
 - `BACKEND_BASE_URL` → `https://nexus-api-byegb2gjfzh3hqbq.australiaeast-01.azurewebsites.net`
 - `ENVIRONMENT=development`, `LOG_LEVEL=INFO`, `LLM_TEMPERATURE=0.0`, `LLM_MAX_TOKENS=4096`
 

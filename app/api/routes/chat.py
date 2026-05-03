@@ -20,6 +20,9 @@ from app.schemas.chat import ChatErrorResponse, ChatRequest, ChatResponse, Prope
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
+# Nodes that build replies in code — no on_chat_model_stream events fire for these
+_CODE_REPLY_NODES = frozenset({"listing_search", "hybrid_search"})
+
 
 @router.post("", response_model=ChatResponse, dependencies=[Depends(verify_internal_key)])
 async def chat(
@@ -76,10 +79,12 @@ async def chat_stream(
     Connect from React using EventSource or fetch with streaming.
 
     SSE events:
-        data: {"type": "token", "content": "Hello"}
-        data: {"type": "tool_start", "tool": "search_listings"}
-        data: {"type": "tool_end", "tool": "search_listings"}
-        data: {"type": "error", "message": "..."}
+        data: {"type": "token",      "content": "..."}   — LLM token (append to buffer)
+        data: {"type": "message",    "content": "..."}   — code-built reply (render at once)
+        data: {"type": "tool_start", "tool": "..."}
+        data: {"type": "tool_end",   "tool": "..."}
+        data: {"type": "result",     "thread_id": "...", "listings": [...], "property_id": "..."}
+        data: {"type": "error",      "message": "..."}
         data: [DONE]
     """
     request_id = getattr(http_request.state, "request_id", "unknown")
@@ -99,11 +104,10 @@ async def chat_stream(
         },
     )
 
+# TODO: refactor
+
 
 async def _event_generator(request: ChatRequest, http_request: Request, agent):
-    """
-    Mirrors the pattern from your original stream_agent() approach.
-    """
     try:
         config = {
             AppStateKeys.CONFIGURABLE: {
@@ -122,13 +126,25 @@ async def _event_generator(request: ChatRequest, http_request: Request, agent):
             input_state = {"messages": [HumanMessage(content=request.message)]}
 
         emitted_tokens = False
+        final_state: dict = {}
+
         async for event in agent.astream_events(input_state, config=config, version="v2"):
-            # Capture early_response from graph end event (compound intent)
-            if event.get("event") == "on_chain_end" and event.get("name") == "LangGraph":
-                output = event.get("data", {}).get("output", {})
-                early = output.get("early_response")
-                if early and not emitted_tokens:
-                    yield f"data: {json.dumps({'type': 'token', 'content': early})}\n\n"
+            kind = event.get("event", "")
+            name = event.get("name", "")
+
+            if kind == "on_chain_end":
+                output = event.get("data", {}).get("output") or {}
+                if name == "LangGraph":
+                    final_state = output
+                    if not emitted_tokens and output.get("early_response"):
+                        yield _sse("token", content=output["early_response"])
+                        emitted_tokens = True
+                elif name in _CODE_REPLY_NODES and not emitted_tokens:
+                    ai_msgs = [m for m in (output.get(
+                        "messages") or []) if isinstance(m, AIMessage)]
+                    if ai_msgs:
+                        yield _sse("message", content=ai_msgs[-1].content)
+                        emitted_tokens = True
                 continue
 
             sse = _to_sse_event(event)
@@ -137,14 +153,28 @@ async def _event_generator(request: ChatRequest, http_request: Request, agent):
                     emitted_tokens = True
                 yield f"data: {json.dumps(sse)}\n\n"
 
+        if not emitted_tokens:
+            msg = Messages.ESCALATION if final_state.get(
+                StateKeys.REQUIRES_HUMAN) else Messages.FALLBACK
+            yield _sse("token", content=msg)
+
+        search_results = final_state.get("search_results", [])
+        yield _sse("result",
+                   thread_id=request.thread_id,
+                   listings=[lst.model_dump()
+                             for lst in _extract_listings(search_results)],
+                   property_id=_extract_single_property_id(search_results))
+
         yield "data: [DONE]\n\n"
 
     except Exception as exc:
         logger.exception(
-            "chat/stream | error | thread_id=%s | %s",
-            request.thread_id, exc,
-        )
-        yield f"data: {json.dumps({'type': 'error', 'message': 'An unexpected error occurred.'})}\n\n"
+            "chat/stream | error | thread_id=%s | %s", request.thread_id, exc)
+        yield _sse("error", message="An unexpected error occurred.")
+
+
+def _sse(type_: str, **kwargs) -> str:
+    return f"data: {json.dumps({'type': type_, **kwargs})}\n\n"
 
 
 def _to_sse_event(event: dict) -> dict | None:

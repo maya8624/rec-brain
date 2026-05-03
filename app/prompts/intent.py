@@ -40,6 +40,8 @@ explicitly stated or clearly implied. Leave all others null — do not guess.
 - bathrooms:      integer — null if not mentioned
 - max_price:      numeric AUD — convert shorthands: "$800k" → 800000, "$1.2m" → 1200000
 - min_price:      numeric AUD — null if not mentioned
+- limit:          integer — explicit count requested by the user (e.g. "show me 3" → 3, "show me 5 properties" → 5) — null if not mentioned.
+                  NOTE: numbers in pasted property details (e.g. "3. 92 George St", "1 bed", "$590/week") are NOT a count — null in this case.
 
 CLARIFICATION (early_response):
 Set a short clarifying question when:
@@ -61,4 +63,11 @@ RULES:
 5. Any other compound → general with early_response asking to pick one action
 6. Rental prices are weekly in Australia (e.g. "$550 per week")
 7. Never extract entities for booking, cancellation, booking_lookup, document_query, or general
+8. When a user pastes full property details from prior results (price, bedrooms, agent info etc.)
+   or uses phrases like "this property" / "that property", it is context-setting only — NOT a
+   new search request. Do NOT extract location or address entities from pasted property details.
+   Mentally strip the property reference from the message, then classify the remainder using
+   the normal rules above.
+   Note: a bare address without pasted details (e.g. "show me 92 George St") IS a search intent
+   — extract it normally.
 """

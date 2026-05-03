@@ -125,6 +125,14 @@ class TestIsBookingContinuation:
     def test_returns_false_when_message_has_cancellation_keywords(self):
         assert _is_booking_continuation(_state_with_slots(), "cancel") is False
 
+    def test_returns_false_when_booking_confirmed(self):
+        state = _state_with_slots(booking_status={"confirmed": True, "cancelled": False, "awaiting_confirmation": False})
+        assert _is_booking_continuation(state, "what are the trading hours") is False
+
+    def test_returns_false_when_booking_cancelled(self):
+        state = _state_with_slots(booking_status={"confirmed": False, "cancelled": True, "awaiting_confirmation": False})
+        assert _is_booking_continuation(state, "show me more properties") is False
+
 
 # ── intent_node fast path ──────────────────────────────────────────────────────
 
@@ -293,3 +301,30 @@ class TestIntentNodeLLMPath:
         state = {"messages": [HumanMessage(content="show me something nice")]}
         result = await intent_node(state)
         assert result["user_intent"] == "general"
+
+    async def test_explicit_count_stored_as_limit(self, mock_get_llm):
+        """'show me 3 properties' — limit=3 must flow into search_context."""
+        mock_get_llm.return_value = _make_llm_mock(IntentClassification(
+            intent="search",
+            location="Castle Hill",
+            listing_type="Rent",
+            limit=3,
+        ))
+        state = {"messages": [HumanMessage(
+            content="Show me 3 properties for rent in Castle Hill"
+        )]}
+        result = await intent_node(state)
+
+        assert result["search_context"]["limit"] == 3
+
+    async def test_limit_capped_at_10(self, mock_get_llm):
+        """Even if LLM hallucinates limit=50, it must be capped at 10."""
+        mock_get_llm.return_value = _make_llm_mock(IntentClassification(
+            intent="search",
+            location="Sydney",
+            limit=50,
+        ))
+        state = {"messages": [HumanMessage(content="Show me 50 properties in Sydney")]}
+        result = await intent_node(state)
+
+        assert result["search_context"]["limit"] == 10

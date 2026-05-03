@@ -129,6 +129,12 @@ def _is_booking_continuation(state: RealEstateAgentState, message: str) -> bool:
     booking_ctx = state.get(StateKeys.BOOKING_CONTEXT)
     if not booking_ctx or not booking_ctx.get("available_slots"):
         return False
+
+    # Booking already completed or cancelled — slots are no longer pending
+    booking_status = state.get(StateKeys.BOOKING_STATUS) or {}
+    if booking_status.get("confirmed") or booking_status.get("cancelled"):
+        return False
+
     return (
         not _matches_keywords(message, _SEARCH_KEYWORDS)
         and not _matches_keywords(message, _CANCELLATION_KEYWORDS)

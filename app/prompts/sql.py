@@ -49,9 +49,10 @@ RULES:
 1. ALWAYS start with: SELECT listing_id, property_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, address_line1, address_line2, suburb, state, postcode, agent_first_name, agent_last_name, agent_phone, agency_name
 2. ALWAYS filter: WHERE is_published = true AND is_active = true
 3. ALWAYS end with: ORDER BY price ASC LIMIT N
-   — N = the number the user requests (e.g. "show me 3" → LIMIT 3)
+   — N = the number the user explicitly requests (e.g. "show me 3" → LIMIT 3)
    — Default to 10 if the user does not specify a count
    — Maximum is 10 — never exceed 10, even if the user asks for more
+   — NEVER use numbers from pasted property details as N (e.g. "3. 92 George St", "1 bed", "$590/week" are NOT count requests)
 4. NEVER use SELECT *
 5. NEVER query any table other than v_listings
 6. NEVER use INSERT, UPDATE, DELETE, DROP, CREATE, ALTER, TRUNCATE

@@ -75,6 +75,34 @@ class TestHybridSearchSuccess:
         sql.search_listings.assert_called_once_with(question)
         rag.aretrieve.assert_called_once_with(question)
 
+    async def test_uses_context_path_when_location_set(
+        self, make_sql_service, make_rag_service, make_config
+    ):
+        """When search_context has a location, use search_from_context (no extra LLM call)."""
+        sql = make_sql_service()
+        rag = make_rag_service()
+        ctx = {"location": "Parramatta", "listing_type": "Rent", "limit": 3}
+        await hybrid_search_node(
+            {"messages": [HumanMessage(content=_QUESTION)], "search_context": ctx},
+            make_config(sql, rag),
+        )
+        sql.search_from_context.assert_called_once_with(ctx)
+        sql.search_listings.assert_not_called()
+
+    async def test_uses_llm_path_when_no_location(
+        self, make_sql_service, make_rag_service, make_config
+    ):
+        """When search_context has no location, fall back to LLM SQL generation."""
+        sql = make_sql_service()
+        rag = make_rag_service()
+        question = "Show apartments near the CBD and their lease terms"
+        await hybrid_search_node(
+            {"messages": [HumanMessage(content=question)], "search_context": {}},
+            make_config(sql, rag),
+        )
+        sql.search_listings.assert_called_once_with(question)
+        sql.search_from_context.assert_not_called()
+
     async def test_empty_results_from_both_services(
         self, make_sql_service, make_rag_service, make_config
     ):

@@ -47,8 +47,8 @@ async def listing_search_node(
     )
 
     try:
-        ctx = state.get(StateKeys.SEARCH_CONTEXT) or {}
-        if ctx.get("property_id") or ctx.get("location") or ctx.get("address"):
+        ctx = state.get(StateKeys.SEARCH_CONTEXT)
+        if ctx and (ctx.get("property_id") or ctx.get("location") or ctx.get("address")):
             result = await sql_service.search_from_context(ctx)
         else:
             result = await sql_service.search_listings(question)

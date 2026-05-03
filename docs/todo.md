@@ -52,6 +52,36 @@ Tracked from inline `TODO` comments across the codebase.
 
 ---
 
+## Agent State
+
+- [ ] **`property_context` is never written to**
+  `app/agents/state.py` — `PropertyContext` is defined and initialized but no node
+  ever sets it. The booking flow currently gets `property_id` from persisted
+  `search_results` injected by `agent_node`. Either populate `property_context`
+  from search results (so booking has a typed source of truth), or remove the field.
+
+---
+
+## NLU Pipeline
+
+- [ ] **Named entity extraction as a separate step**
+  Currently `intent_node` classifies intent and extracts entities in one LLM call.
+  A dedicated extraction step (separate LLM call or rule-based) would be more
+  reliable and testable — intent classification stays focused on routing only.
+
+- [ ] **Message normalisation**
+  Normalise user messages before classification: handle common typos, abbreviations
+  (e.g. "bd" → "bedroom", "apt" → "apartment"), and informal Australian shorthand
+  ("arvo", "arvo inspection") so the LLM receives cleaner input.
+
+- [ ] **Context injection done programmatically**
+  Property context, search history, and booking state are currently injected via
+  LLM prompt hints. Move this to deterministic code — build structured context
+  blocks in nodes and pass them as typed state, rather than relying on the LLM
+  to infer context from conversation history.
+
+---
+
 ## Resolved
 
 - [x] **Pre-format slot times to Sydney time in Python**

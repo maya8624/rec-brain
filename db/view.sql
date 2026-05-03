@@ -63,5 +63,5 @@ FROM listings l
 JOIN properties p           ON l.property_id    = p.id
 JOIN property_addresses pa  ON pa.property_id   = p.id
 JOIN property_types pt      ON pt.id            = p.property_type_id
-LEFT JOIN agents ag         ON l.agent_id       = ag.id
-LEFT JOIN agencies agc      ON l.agency_id      = agc.id;
+JOIN agents ag         ON l.agent_id       = ag.id
+JOIN agencies agc      ON l.agency_id      = agc.id;

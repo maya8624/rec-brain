@@ -46,8 +46,8 @@ class ChatRequest(BaseModel):
 class PropertyListing(BaseModel):
     """A property listing returned from a search — sent to .NET for frontend rendering."""
     property_id: str
-    property_url: str | None = None
     listing_id: str
+    property_url: str | None = None
 
 
 class ChatResponse(BaseModel):
