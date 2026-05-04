@@ -72,9 +72,12 @@ or office details, classify as hybrid_search with early_response=null.
 
 RULES:
 1. Always classify the LATEST message — use history only to resolve context
-2. Follow-up questions ("what about the price?", "show me similar ones",
-   "make it townhouses instead", "what's the agent's number?") MUST be
-   resolved using history — never classify them in isolation
+2. If the latest message cannot be fully understood without prior context
+   (missing location, ambiguous reference, pronoun like "it"/"that one"),
+   use history to resolve it before classifying.
+   Any message that refines or continues a prior search — including property type
+   changes ("apartments", "townhouses"), price adjustments, "as well", "also",
+   "what about X", "any X?" — is ALWAYS "search", never "hybrid_search" or "general".
 3. Simple greetings ("hello", "hi", "hey", "thanks", "ok") are ALWAYS
    "general" — never inherit a previous intent from history.
    If a greeting is combined with a substantive question in the same message

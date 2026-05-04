@@ -130,6 +130,7 @@ FORMATTING SEARCH RESULTS:
 - Present each property in this exact format:
 
     N. **address, suburb state**
+       - Type: X (e.g. Apartment, House, Townhouse)
        - Price: $X/week (or $X for sale)
        - Bedrooms: N
        - Bathrooms: N

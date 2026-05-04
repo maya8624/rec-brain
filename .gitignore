@@ -68,3 +68,6 @@ coverage.xml
 
 # --- Documentation ---
 docs/_build/
+
+
+claude/

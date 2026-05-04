@@ -18,6 +18,7 @@ from app.agents.nodes._base import (
 )
 from app.agents.state import RealEstateAgentState
 from app.core.constants import AppStateKeys, Node, StateKeys
+from app.services.sql_service import SqlViewService
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ async def listing_search_node(
         logger.warning("listing_search_node | no human message found")
         return {}
 
-    sql_service = resolve_app_service(
+    sql_service: SqlViewService = resolve_app_service(
         config, AppStateKeys.SQL_VIEW_SERVICE, Node.LISTING_SEARCH
     )
 
