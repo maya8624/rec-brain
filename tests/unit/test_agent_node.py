@@ -152,8 +152,8 @@ class TestAgentNode:
         # 1 SystemMessage + 4 history
         assert len(call_messages) == 5
 
-    async def test_booking_intent_caps_history_at_10(self, mock_get_llm, mock_llm):
-        """booking intent retains up to 10 messages for multi-turn contact collection."""
+    async def test_booking_intent_caps_history_at_12(self, mock_get_llm, mock_llm):
+        """booking intent retains up to 12 messages for multi-turn contact collection."""
         mock_get_llm.return_value = mock_llm
         long_history = [HumanMessage(content=f"msg {i}") for i in range(15)]
         state = {
@@ -163,8 +163,8 @@ class TestAgentNode:
         }
         await agent_node(state)
         call_messages = mock_llm.ainvoke.call_args.args[0]
-        # 1 SystemMessage + 10 history
-        assert len(call_messages) == 11
+        # 1 SystemMessage + 12 history
+        assert len(call_messages) == 13
 
     async def test_retrieved_docs_injected_into_prompt(self, mock_get_llm, mock_llm):
         """retrieved_docs is appended as a SystemMessage at the end of the prompt."""
@@ -200,3 +200,37 @@ class TestAgentNode:
         call_messages = mock_llm.ainvoke.call_args.args[0]
         # Only the REAL_ESTATE_AGENT_SYSTEM prompt + 1 HumanMessage
         assert len(call_messages) == 2
+
+    async def test_search_then_deposit_injects_property_search_results(self, mock_get_llm, mock_llm):
+        mock_get_llm.return_value = mock_llm
+        state = {
+            "messages": [HumanMessage(content="I need to pay the holding deposit but I'm not sure the address")],
+            "user_intent": "search_then_deposit",
+            "error_count": 0,
+            "search_results": [
+                {
+                    "listing_id": "listing-1",
+                    "property_id": "property-1",
+                    "address": "150 Bond St",
+                    "suburb": "Castle Hill",
+                    "state": "NSW",
+                    "price": 560,
+                    "bedrooms": 1,
+                    "bathrooms": 1,
+                    "property_type": "Apartment",
+                    "listing_type": "Rent",
+                    "agent_name": "Lucas Anderson",
+                    "agent_phone": "0419 012 345",
+                }
+            ],
+        }
+
+        await agent_node(state)
+
+        call_messages = mock_llm.ainvoke.call_args.args[0]
+        property_results = [
+            msg for msg in call_messages
+            if isinstance(msg, SystemMessage)
+            and "[PROPERTY SEARCH RESULTS]" in msg.content
+        ]
+        assert property_results

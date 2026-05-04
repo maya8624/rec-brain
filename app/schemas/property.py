@@ -38,5 +38,4 @@ class SearchResult(BaseModel):
     success: bool
     output: list[dict] | None = None
     result_count: int = 0
-    sql_used: str | None = None
     error: str | None = None

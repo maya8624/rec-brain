@@ -9,7 +9,7 @@ import uuid
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 from app.core.constants import AppStateKeys
-from app.core.exceptions import BookingServiceError, BookingValidationError
+from app.core.exceptions import BookingServiceError, ToolValidationError
 from app.schemas.booking import AvailabilityResult
 from app.services.booking_service import BookingService
 from app.tools._utils import fmt_dt_sydney
@@ -28,7 +28,7 @@ async def check_availability(property_id: str, config: RunnableConfig) -> dict:
     try:
         uuid.UUID(property_id)
     except ValueError as exc:
-        raise BookingValidationError(
+        raise ToolValidationError(
             f"property_id must be a valid UUID: {exc}") from exc
 
     try:

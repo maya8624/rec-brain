@@ -23,6 +23,10 @@ class InternalRoutes:
     def property_detail(property_id: str) -> str:
         return f"/api/properties/{property_id}"
 
+    @staticmethod
+    def my_deposit(listing_id: str, user_id: str) -> str:
+        return f"deposit/my/{listing_id}/{user_id}"
+
 # class InspectionBookingEndpoints:
 #     """
 #     Constants for the .NET backend API.
@@ -40,6 +44,7 @@ class ToolNames:
     BOOK_INSPECTION = "book_inspection"
     CANCEL_INSPECTION = "cancel_inspection"
     GET_BOOKING = "get_booking"
+    GET_DEPOSIT = "get_deposit"
 
 
 class TableNames:
@@ -67,6 +72,7 @@ class StateKeys:
     SEARCH_CONTEXT = "search_context"
     SEARCH_RESULTS = "search_results"
     RETRIEVED_DOCS = "retrieved_docs"
+    DEPOSIT_RESULT = "deposit_result"
     BOOKING_CONTEXT = "booking_context"
     BOOKING_STATUS = "booking_status"
     ERROR_COUNT = "error_count"
@@ -80,6 +86,7 @@ class AppStateKeys:
     CONFIGURABLE = "configurable"
     THREAD_ID = "thread_id"
     USER_ID = "user_id"
+    DEPOSIT_SERVICE = "deposit_service"
     BOOKING_SERVICE = "booking_service"
     SQL_VIEW_SERVICE = "sql_view_service"
     RAG_SERVICE = "rag_service"

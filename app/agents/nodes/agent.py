@@ -3,16 +3,16 @@ agent_node — the LLM brain of the agent.
 
 Three roles depending on intent:
 
-    1. "booking" / "cancellation" / "booking_lookup"  — first call
+    1. "booking" / "cancellation" / "booking_lookup" / "deposit_payment"  — first call
        — LLM with tools bound
        — decides which action tool to call 
-       (check_availability, book_inspection, cancel_inspection, get_booking)
+       (check_availability, book_inspection, cancel_inspection, get_booking, get_deposit)
 
     2. Any intent — second call (ToolMessage in state)
        — plain LLM, no tools
        — formats tool results into human-readable response
 
-    3. "general" / "search" / "document_query" / formatting pass
+    3. "general" / "search" / "document_query" / "search_then_deposit" / formatting pass
        — plain LLM, no tools
        — responds directly or formats retrieved context
 """
@@ -33,7 +33,7 @@ from app.tools import get_all_tools
 logger = logging.getLogger(__name__)
 
 # Only these intents need tool calling
-_TOOL_INTENTS = frozenset(["booking", "cancellation", "booking_lookup"])
+_TOOL_INTENTS = frozenset(["booking", "cancellation", "booking_lookup", "deposit_payment"])
 
 
 async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
@@ -41,12 +41,14 @@ async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
     Primary LLM node.
 
     First call (HumanMessage is last): uses tool-bound LLM for action intents
-        ("booking", "cancellation", "booking_lookup") so the LLM can invoke tools.
+        ("booking", "cancellation", "booking_lookup", "deposit_payment")
+        so the LLM can invoke tools.
 
     Second call (ToolMessage is last): uses plain LLM to format the tool result
         into a human-readable reply — no tools bound to prevent re-triggering.
 
-    Non-action intents ("general", "search", "document_query", "hybrid_search"):
+    Non-action intents ("general", "search", "document_query", "hybrid_search",
+        "search_then_deposit"):
         always use plain LLM, tools never needed.
 
     intent_completed is set True only on the formatting pass of a tool-bound flow
@@ -77,8 +79,7 @@ async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
                     tc["name"] for tc in response.tool_calls])
 
     intent_completed = not needs_tools and intent in _TOOL_INTENTS
-    last_intent = intent if intent_completed else state.get(
-        StateKeys.LAST_INTENT)
+    last_intent = intent
 
     return {
         "messages": [response],
@@ -102,7 +103,12 @@ def _build_prompt(
         prompt.append(SystemMessage(
             content=f"[RETRIEVED DOCUMENTS]\n{retrieved_docs}"))
 
-    if intent in _TOOL_INTENTS and state.get(StateKeys.SEARCH_RESULTS):
+    _search_intents = _TOOL_INTENTS | {
+        "search",
+        "hybrid_search",
+        "search_then_deposit",
+    }
+    if intent in _search_intents and state.get(StateKeys.SEARCH_RESULTS):
         summary = listing_summary(state[StateKeys.SEARCH_RESULTS])
         prompt.append(SystemMessage(
             content=f"[PROPERTY SEARCH RESULTS]\n{summary}"))
@@ -121,7 +127,7 @@ def _get_tool_llm():
 def _needs_tools(state: RealEstateAgentState) -> bool:
     """
     Returns True only when:
-        - intent is "booking", "cancellation", or "booking_lookup"
+        - intent is "booking", "cancellation", "booking_lookup", or "deposit_payment"
         - last message is HumanMessage (first call, not formatting pass)
     """
     intent = state.get(StateKeys.USER_INTENT, "general")

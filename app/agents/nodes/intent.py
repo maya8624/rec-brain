@@ -4,8 +4,12 @@ intent_node — classifies user intent before routing through the graph.
 Strategy: hybrid keyword + LLM
 
     Fast path (keyword, no LLM):
-        - Obvious cancellation  → "cancellation"
-        - Obvious booking only  → "booking"
+        - Obvious cancellation      → "cancellation"
+        - Obvious booking lookup    → "booking_lookup"
+        - Obvious booking only      → "booking"
+        - Deposit + search keywords → "search_then_deposit"
+        - Deposit only              → "deposit_payment"
+        - Slot selection in context → "booking" (continuation)
 
     LLM path (everything else):
         - Ambiguous, follow-up, compound, search queries
@@ -55,6 +59,11 @@ _SEARCH_KEYWORDS = frozenset([
     "under", "rent for", "for rent", "to rent", "buy", "purchase",
 ])
 
+_DEPOSIT_KEYWORDS = frozenset([
+    "pay deposit", "paying deposit", "holding deposit",
+    "pay the deposit", "deposit payment", "pay my deposit",
+])
+
 _LLM_HISTORY_LIMIT = 4
 
 
@@ -98,8 +107,7 @@ async def _classify_with_llm(state: RealEstateAgentState) -> dict[str, Any]:
         logger.error("intent_node | LLM classification failed: %s", exc)
         return {StateKeys.USER_INTENT: "general"}
 
-    result = _apply_search_context(state, classification)
-    return result
+    return _build_state_update(state, classification)
 
 
 def _obvious_intent(msg_lower: str) -> UserIntent | None:
@@ -121,11 +129,20 @@ def _obvious_intent(msg_lower: str) -> UserIntent | None:
             not _matches_keywords(msg_lower, _SEARCH_KEYWORDS)):
         return "booking"
 
+    if _matches_keywords(msg_lower, _DEPOSIT_KEYWORDS):
+        if _matches_keywords(msg_lower, _SEARCH_KEYWORDS):
+            return "search_then_deposit"
+        return "deposit_payment"
+
     return None
 
 
 def _is_booking_continuation(state: RealEstateAgentState, message: str) -> bool:
     """True when slots are pending and the user is selecting one, not searching or cancelling."""
+    # Previous intent completed — never continue a finished flow
+    if state.get(StateKeys.INTENT_COMPLETED):
+        return False
+
     booking_ctx = state.get(StateKeys.BOOKING_CONTEXT)
     if not booking_ctx or not booking_ctx.get("available_slots"):
         return False
@@ -141,12 +158,12 @@ def _is_booking_continuation(state: RealEstateAgentState, message: str) -> bool:
     )
 
 
-def _apply_search_context(
+def _build_state_update(
         state: RealEstateAgentState,
         result: IntentClassification) -> dict[str, Any]:
     """
-    Build the state updates dict, 
-    merging or replacing search_context based on extracted entities.
+    Build the full state update dict from an LLM classification result.
+    Merges or replaces search_context depending on whether location changed.
     """
     updates: dict[str, Any] = {
         StateKeys.USER_INTENT:      result.intent,
@@ -184,25 +201,16 @@ def _build_state_hint(last_intent: str | None, intent_completed: bool) -> str:
 
 def _extract_entities(result: IntentClassification) -> dict:
     """Build a partial SearchContext dict from LLM-extracted entities."""
-    entities = {}
-    if result.location:
-        entities["location"] = result.location
-    if result.address:
-        entities["address"] = result.address
-    if result.listing_type:
-        entities["listing_type"] = result.listing_type
-    if result.property_type:
-        entities["property_type"] = result.property_type
-    if result.bedrooms is not None:
-        entities["bedrooms"] = result.bedrooms
-    if result.bathrooms is not None:
-        entities["bathrooms"] = result.bathrooms
-    if result.max_price is not None:
-        entities["max_price"] = result.max_price
-    if result.min_price is not None:
-        entities["min_price"] = result.min_price
-    if result.limit is not None:
-        entities["limit"] = min(result.limit, 10)
+    # String fields: skip if falsy; numeric fields: skip if None
+    _str_fields = ("location", "address", "listing_type", "property_type")
+    _num_fields = ("bedrooms", "bathrooms", "max_price", "min_price", "limit")
+
+    entities = {f: getattr(result, f) for f in _str_fields if getattr(result, f)}
+    entities |= {f: getattr(result, f) for f in _num_fields if getattr(result, f) is not None}
+
+    if "limit" in entities:
+        entities["limit"] = min(entities["limit"], 10)
+
     return entities
 
 

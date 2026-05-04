@@ -3,11 +3,10 @@ HTTP client for the .NET backend booking API.
 All booking state is owned by .NET — Python never stores booking records.
 """
 import logging
-import uuid
 
 from app.core.constants import InternalRoutes
 from app.services.backend_client import BackendClient
-from app.core.exceptions import BackendClientError, BookingServiceError, BookingValidationError
+from app.core.exceptions import BackendClientError, BookingServiceError
 from app.schemas.booking import (
     AvailableSlot,
     AvailableSlotList,

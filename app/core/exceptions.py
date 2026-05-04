@@ -19,8 +19,16 @@ class BookingServiceError(AIServiceError):
     """Backend or connectivity failure — show user-friendly message."""
 
 
-class BookingValidationError(BookingServiceError):
+class ToolValidationError(BookingServiceError):
     """Invalid input data — message is safe to surface to the user."""
+
+
+class DepositServiceError(AIServiceError):
+    """Backend or connectivity failure — show user-friendly message."""
+
+    def __init__(self, message: str, status_code: int | None = None):
+        super().__init__(message)
+        self.status_code = status_code
 
 
 class ToolExecutionError(AIServiceError):
@@ -61,6 +69,6 @@ def raise_for_booking_status(e: BackendClientError, confirmation_id: str | None 
 
     if status == 422:
         detail = e.response.json().get("detail", "Invalid booking details")
-        raise BookingValidationError(detail) from e
+        raise ToolValidationError(detail) from e
 
     raise BookingServiceError(f"Request failed (HTTP {status}).") from e

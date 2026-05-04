@@ -22,6 +22,7 @@ from app.infrastructure.embedding import EmbeddingService
 from app.infrastructure.llm import get_llm
 from app.infrastructure.pgvector_store import PgVectorStoreService
 from app.services.booking_service import BookingService
+from app.services.deposit_service import DepositService
 from app.services.sql_service import SqlViewService
 from app.services.rag_service import RagRetriever
 from app.services.backend_client import backend_client
@@ -66,6 +67,7 @@ async def lifespan(_app: FastAPI):
 
         _app.state.backend_client = backend_client
         _app.state.booking_service = BookingService(_app.state.backend_client)
+        _app.state.deposit_service = DepositService(_app.state.backend_client)
         _app.state.sql_view_service = SqlViewService(llm=get_llm())
 
         _app.state.rag_service = RagRetriever(
@@ -124,6 +126,7 @@ def custom_openapi():
     schema["security"] = [{"ApiKeyAuth": []}]
     app.openapi_schema = schema
     return schema
+
 
 app.openapi = custom_openapi
 

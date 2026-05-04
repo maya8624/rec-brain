@@ -112,13 +112,6 @@ class TestSearchFromContext:
         await svc.search_from_context({"location": "Sydney"})
         mock_llm.ainvoke.assert_not_called()
 
-    async def test_sql_used_is_returned(self, mock_engine):
-        svc, _, mock_conn = make_service()
-        mock_engine.connect.return_value = mock_conn
-        result = await svc.search_from_context({"location": "Sydney"})
-        assert "v_listings" in result["sql_used"]
-        assert "Sydney" in result["sql_used"]
-
     async def test_db_exception_returns_success_false(self, mock_engine):
         svc, _, mock_conn = make_service()
         mock_conn.execute.side_effect = RuntimeError("DB down")
@@ -207,12 +200,6 @@ class TestSearchListings:
         mock_engine.connect.return_value = mock_conn
         result = await svc.search_listings("houses")
         assert result["result_count"] == 5
-
-    async def test_sql_used_is_returned(self, mock_engine):
-        svc, _, mock_conn = make_service(llm_response="SELECT * FROM v_listings")
-        mock_engine.connect.return_value = mock_conn
-        result = await svc.search_listings("houses")
-        assert result["sql_used"] == "SELECT * FROM v_listings"
 
     async def test_validation_error_returns_success_false(self, mock_engine):
         """LLM returns a non-SELECT query → validation fails → success=False, no crash."""

@@ -4,6 +4,7 @@ Uses make_sql_service, make_rag_service, and make_config from conftest.
 """
 import json
 
+import pytest
 from langchain_core.messages import HumanMessage
 
 from app.agents.nodes.hybrid import hybrid_search_node
@@ -107,7 +108,7 @@ class TestHybridSearchSuccess:
         self, make_sql_service, make_rag_service, make_config
     ):
         sql = make_sql_service(
-            result={"success": True, "output": [], "result_count": 0, "sql_used": ""})
+            result={"success": True, "output": [], "result_count": 0})
         rag = make_rag_service(nodes=[])
         result = await hybrid_search_node(
             {"messages": [HumanMessage(content=_QUESTION)]},
@@ -182,23 +183,23 @@ class TestHybridSearchGuards:
         sql.search_listings.assert_not_called()
         rag.aretrieve.assert_not_called()
 
-    async def test_missing_sql_service_returns_empty(self, make_rag_service, make_config):
-        result = await hybrid_search_node(
-            {"messages": [HumanMessage(content=_QUESTION)]},
-            make_config(sql_service=None, rag_service=make_rag_service()),
-        )
-        assert result == {}
+    async def test_missing_sql_service_raises(self, make_rag_service, make_config):
+        with pytest.raises(RuntimeError):
+            await hybrid_search_node(
+                {"messages": [HumanMessage(content=_QUESTION)]},
+                make_config(sql_service=None, rag_service=make_rag_service()),
+            )
 
-    async def test_missing_rag_retriever_returns_empty(self, make_sql_service, make_config):
-        result = await hybrid_search_node(
-            {"messages": [HumanMessage(content=_QUESTION)]},
-            make_config(sql_service=make_sql_service(), rag_service=None),
-        )
-        assert result == {}
+    async def test_missing_rag_retriever_raises(self, make_sql_service, make_config):
+        with pytest.raises(RuntimeError):
+            await hybrid_search_node(
+                {"messages": [HumanMessage(content=_QUESTION)]},
+                make_config(sql_service=make_sql_service(), rag_service=None),
+            )
 
-    async def test_missing_request_returns_empty(self):
-        result = await hybrid_search_node(
-            {"messages": [HumanMessage(content=_QUESTION)]},
-            {"configurable": {}},
-        )
-        assert result == {}
+    async def test_missing_request_raises(self):
+        with pytest.raises(RuntimeError):
+            await hybrid_search_node(
+                {"messages": [HumanMessage(content=_QUESTION)]},
+                {"configurable": {}},
+            )

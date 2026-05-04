@@ -124,11 +124,21 @@ def _handle_get_booking(_state: RealEstateAgentState, _result: dict) -> dict[str
     }
 
 
+def _handle_get_deposit(_state: RealEstateAgentState, result: dict) -> dict[str, Any]:
+    """Store deposit result in state so it can be forwarded to the frontend via SSE."""
+    return {
+        StateKeys.DEPOSIT_RESULT: result if result.get("success") else None,
+        StateKeys.INTENT_COMPLETED: True,
+        StateKeys.LAST_INTENT: "deposit_payment",
+    }
+
+
 _TOOL_HANDLERS: dict[str, Any] = {
     ToolNames.CHECK_AVAILABILITY: _handle_check_availability,
     ToolNames.BOOK_INSPECTION:    _handle_book_inspection,
     ToolNames.CANCEL_INSPECTION:  _handle_cancel_inspection,
     ToolNames.GET_BOOKING:        _handle_get_booking,
+    ToolNames.GET_DEPOSIT:        _handle_get_deposit,
 }
 
 

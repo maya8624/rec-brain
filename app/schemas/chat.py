@@ -94,6 +94,11 @@ class ChatResponse(BaseModel):
         description="listing_id of the property in context, if unambiguous",
     )
 
+    deposit: dict | None = Field(
+        default=None,
+        description="Holding deposit data — present when get_deposit succeeds. Frontend uses session_url to open Stripe popup.",
+    )
+
 
 class ChatErrorResponse(BaseModel):
     """Returned on errors """

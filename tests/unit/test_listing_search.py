@@ -31,7 +31,6 @@ class TestListingSearchSuccess:
             "success": True,
             "output": [{"address": "1 Test St"}, {"address": "2 Test St"}],
             "result_count": 2,
-            "sql_used": "SELECT * FROM v_listings",
         })
 
         result = await listing_search_node(
@@ -86,7 +85,6 @@ class TestListingSearchSuccess:
             "success": True,
             "output": [],
             "result_count": 0,
-            "sql_used": "SELECT * FROM v_listings",
         })
 
         result = await listing_search_node(
@@ -103,7 +101,6 @@ class TestListingSearchSuccess:
             "success": True,
             "output": [],
             "result_count": 0,
-            "sql_used": "SELECT * FROM v_listings",
         })
 
         result = await listing_search_node(
@@ -119,7 +116,6 @@ class TestListingSearchSuccess:
             "success": True,
             "output": [{"address": f"{i} St"} for i in range(10)],
             "result_count": 10,
-            "sql_used": "SELECT * FROM v_listings LIMIT 10",
         })
 
         result = await listing_search_node(

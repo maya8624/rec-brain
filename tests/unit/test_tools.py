@@ -9,7 +9,7 @@ from app.tools.book_inspection import book_inspection
 from app.tools.cancel_inspection import cancel_inspection
 from app.tools.get_booking import get_booking
 from app.core.constants import AppStateKeys
-from app.core.exceptions import BookingServiceError, BookingValidationError
+from app.core.exceptions import BookingServiceError, ToolValidationError
 
 
 def _cfg(svc):
@@ -87,8 +87,8 @@ class TestBookInspection:
         svc.book.assert_called_once()
 
     async def test_validation_error_returns_failure(self, make_booking_service):
-        # BookingValidationError raised by the mocked service (valid date so Pydantic passes first)
-        svc = make_booking_service(raise_error=BookingValidationError("Slot no longer available"))
+        # ToolValidationError raised by the mocked service (valid date so Pydantic passes first)
+        svc = make_booking_service(raise_error=ToolValidationError("Slot no longer available"))
         result = await book_inspection.ainvoke(_BOOK_ARGS, config=_cfg(svc))
         assert result["success"] is False
         assert "Slot no longer available" in result["error"]
@@ -128,7 +128,7 @@ class TestCancelInspection:
         svc.cancel.assert_called_once_with("CONF-12345", "test-user")
 
     async def test_not_found_returns_failure(self, make_booking_service):
-        svc = make_booking_service(raise_error=BookingValidationError("Booking CONF-99999 not found"))
+        svc = make_booking_service(raise_error=ToolValidationError("Booking CONF-99999 not found"))
         result = await cancel_inspection.ainvoke(
             {"confirmation_id": "CONF-99999"}, config=_cfg(svc)
         )

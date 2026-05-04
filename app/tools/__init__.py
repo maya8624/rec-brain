@@ -12,12 +12,14 @@ from app.tools.book_inspection import book_inspection
 from app.tools.cancel_inspection import cancel_inspection
 from app.tools.check_availability import check_availability
 from app.tools.get_booking import get_booking
+from app.tools.get_deposit import get_deposit
 
 _ALL_TOOLS = [
     check_availability,
     book_inspection,
     cancel_inspection,
     get_booking,
+    get_deposit
 ]
 
 

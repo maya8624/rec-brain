@@ -74,6 +74,31 @@ class TestObviousIntent:
     def test_follow_up_returns_none(self):
         assert _obvious_intent("what about his number?") is None
 
+    def test_deposit_follow_up_with_ambiguous_prior_results_is_search_then_deposit(self):
+        state = {
+            "search_results": [
+                {"address": "150 Bond St"},
+                {"address": "155 Market St"},
+                {"address": "92 George St"},
+            ]
+        }
+        assert _obvious_intent(
+            "i think i need to pay holding deposit, i'm not sure the address. can you check it for me?",
+            state,
+        ) == "search_then_deposit"
+
+    def test_deposit_follow_up_with_specific_address_is_deposit_payment(self):
+        state = {
+            "search_results": [
+                {"address": "150 Bond St"},
+                {"address": "155 Market St"},
+            ]
+        }
+        assert _obvious_intent(
+            "i want to pay the holding deposit for 155 market st",
+            state,
+        ) == "deposit_payment"
+
 
 # ── _obvious_intent: lookup ────────────────────────────────────────────────────
 
@@ -189,6 +214,22 @@ class TestIntentNodeFastPath:
         state = {"messages": []}
         result = await intent_node(state)
         assert result["user_intent"] == "general"
+
+    async def test_deposit_follow_up_with_search_results_skips_llm(self):
+        state = {
+            "messages": [HumanMessage(
+                content="I think I need to pay holding deposit, I'm not sure the address. can you check it for me?"
+            )],
+            "search_results": [
+                {"address": "150 Bond St"},
+                {"address": "155 Market St"},
+                {"address": "92 George St"},
+            ],
+        }
+        with patch("app.agents.nodes.intent.get_llm") as mock_get_llm:
+            result = await intent_node(state)
+            mock_get_llm.assert_not_called()
+        assert result["user_intent"] == "search_then_deposit"
 
 
 # ── intent_node LLM path ───────────────────────────────────────────────────────

@@ -84,6 +84,16 @@ class TestRouteIntentOutput:
             user_intent="search_then_book"
         )) == Node.LISTING_SEARCH
 
+    def test_search_then_deposit_goes_to_listing_search(self):
+        assert route_intent_output(base_state(
+            user_intent="search_then_deposit"
+        )) == Node.LISTING_SEARCH
+
+    def test_deposit_payment_goes_to_agent(self):
+        assert route_intent_output(base_state(
+            user_intent="deposit_payment"
+        )) == Node.AGENT
+
     def test_unknown_intent_defaults_to_agent(self):
         assert route_intent_output(base_state(
             user_intent="unknown")) == Node.AGENT

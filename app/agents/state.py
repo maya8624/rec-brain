@@ -32,6 +32,8 @@ UserIntent = Literal[
     "cancellation",
     "booking_lookup",
     "search_then_book",
+    "deposit_payment",       # user wants to check/pay a holding deposit (listing already in context)
+    "search_then_deposit",   # user provides an address/location + wants to pay deposit
     "general",
     "unknown"
 ]
@@ -188,6 +190,10 @@ class RealEstateAgentState(TypedDict):
     # for the frontend to render as property cards. Reset each search turn.
     search_results: list[dict]
 
+    # Deposit result from get_deposit tool — returned in result SSE event so
+    # the frontend can open the Stripe payment popup via session_url.
+    deposit_result: dict | None
+
     # Current-turn search/RAG content — plain assignment, so always holds only
     # the latest turn's data. agent_node injects this directly into the LLM
     # prompt (never appended to messages), then clears it to None.
@@ -227,6 +233,7 @@ def initial_state() -> RealEstateAgentState:
             property_id=None,
         ),
         search_results=[],
+        deposit_result=None,
         retrieved_docs=None,
         requires_human=False,
         error_count=0,

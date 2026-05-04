@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.services.booking_service import BookingService
-from app.core.exceptions import BackendClientError, BookingServiceError, BookingValidationError
+from app.core.exceptions import BackendClientError, BookingServiceError, ToolValidationError
 from app.schemas.booking import BookingRequest
 
 
@@ -95,7 +95,7 @@ class TestGetAvailability:
 
     async def test_invalid_property_id_raises_validation_error(self):
         svc = make_service()
-        with pytest.raises(BookingValidationError, match="property_id"):
+        with pytest.raises(ToolValidationError, match="property_id"):
             await svc.check_availability("not-a-uuid")
 
     async def test_backend_client_error_raises_booking_service_error(self):

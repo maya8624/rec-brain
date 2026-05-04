@@ -22,7 +22,8 @@ TOOL_ROUTES: dict[str, str] = {
     ToolNames.CHECK_AVAILABILITY:  Node.TOOLS,
     ToolNames.BOOK_INSPECTION:     Node.TOOLS,
     ToolNames.CANCEL_INSPECTION:   Node.TOOLS,
-    ToolNames.GET_BOOKING: Node.TOOLS,
+    ToolNames.GET_BOOKING:         Node.TOOLS,
+    ToolNames.GET_DEPOSIT:         Node.TOOLS,
 }
 
 
@@ -43,6 +44,8 @@ def route_intent_output(state: RealEstateAgentState) -> str:
         "booking":          Node.AGENT,
         "cancellation":     Node.AGENT,
         "booking_lookup":   Node.AGENT,
+        "deposit_payment":        Node.AGENT,
+        "search_then_deposit":    Node.LISTING_SEARCH,
         "general":          Node.AGENT,
     }.get(intent, Node.AGENT)
 

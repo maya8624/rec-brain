@@ -7,7 +7,7 @@ from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 
 from app.core.constants import AppStateKeys
-from app.core.exceptions import BookingServiceError, BookingValidationError
+from app.core.exceptions import BookingServiceError, ToolValidationError
 from app.schemas.booking import CancellationResult
 from app.services.booking_service import BookingService
 
@@ -32,7 +32,7 @@ async def cancel_inspection(confirmation_id: str, config: RunnableConfig, reason
         logger.info("cancel_inspection | cancelled | id=%s", confirmation_id)
         return result.model_dump()
 
-    except BookingValidationError as exc:
+    except ToolValidationError as exc:
         logger.warning("cancel_inspection | validation error: %s", exc)
         return CancellationResult(
             success=False, id=confirmation_id, error=str(exc)

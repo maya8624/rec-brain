@@ -20,9 +20,6 @@ from app.schemas.chat import ChatErrorResponse, ChatRequest, ChatResponse, Prope
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
-# Nodes that build replies in code — no on_chat_model_stream events fire for these
-_CODE_REPLY_NODES = frozenset({"listing_search", "hybrid_search"})
-
 
 @router.post("", response_model=ChatResponse, dependencies=[Depends(verify_internal_key)])
 async def chat(
@@ -39,6 +36,7 @@ async def chat(
                 AppStateKeys.THREAD_ID:       request.thread_id,
                 AppStateKeys.USER_ID:         request.user_id,
                 AppStateKeys.BOOKING_SERVICE: http_request.app.state.booking_service,
+                AppStateKeys.DEPOSIT_SERVICE: http_request.app.state.deposit_service,
                 AppStateKeys.SQL_VIEW_SERVICE: http_request.app.state.sql_view_service,
                 AppStateKeys.RAG_SERVICE:     http_request.app.state.rag_service,
             }
@@ -80,7 +78,6 @@ async def chat_stream(
 
     SSE events:
         data: {"type": "token",      "content": "..."}   — LLM token (append to buffer)
-        data: {"type": "message",    "content": "..."}   — code-built reply (render at once)
         data: {"type": "tool_start", "tool": "..."}
         data: {"type": "tool_end",   "tool": "..."}
         data: {"type": "result",     "thread_id": "...", "listings": [...], "property_id": "..."}
@@ -104,8 +101,6 @@ async def chat_stream(
         },
     )
 
-# TODO: refactor
-
 
 async def _event_generator(request: ChatRequest, http_request: Request, agent):
     try:
@@ -114,6 +109,7 @@ async def _event_generator(request: ChatRequest, http_request: Request, agent):
                 AppStateKeys.THREAD_ID:       request.thread_id,
                 AppStateKeys.USER_ID:         request.user_id,
                 AppStateKeys.BOOKING_SERVICE: http_request.app.state.booking_service,
+                AppStateKeys.DEPOSIT_SERVICE: http_request.app.state.deposit_service,
                 AppStateKeys.SQL_VIEW_SERVICE: http_request.app.state.sql_view_service,
                 AppStateKeys.RAG_SERVICE:     http_request.app.state.rag_service,
             }
@@ -139,12 +135,6 @@ async def _event_generator(request: ChatRequest, http_request: Request, agent):
                     if not emitted_tokens and output.get("early_response"):
                         yield _sse("token", content=output["early_response"])
                         emitted_tokens = True
-                elif name in _CODE_REPLY_NODES and not emitted_tokens:
-                    ai_msgs = [m for m in (output.get(
-                        "messages") or []) if isinstance(m, AIMessage)]
-                    if ai_msgs:
-                        yield _sse("message", content=ai_msgs[-1].content)
-                        emitted_tokens = True
                 continue
 
             sse = _to_sse_event(event)
@@ -163,7 +153,8 @@ async def _event_generator(request: ChatRequest, http_request: Request, agent):
                    thread_id=request.thread_id,
                    listings=[lst.model_dump()
                              for lst in _extract_listings(search_results)],
-                   property_id=_extract_single_property_id(search_results))
+                   property_id=_extract_single_property_id(search_results),
+                   deposit=final_state.get("deposit_result"))
 
         yield "data: [DONE]\n\n"
 
@@ -234,6 +225,7 @@ def _build_response(thread_id: str, final_state: dict) -> ChatResponse:
         thread_id=thread_id,
         listings=_extract_listings(search_results),
         property_id=_extract_single_property_id(search_results),
+        deposit=final_state.get("deposit_result"),
     )
 
 

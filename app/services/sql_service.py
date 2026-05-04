@@ -51,7 +51,7 @@ class SqlViewService:
         try:
             sql = await self._generate_sql(question)
             rows = self._execute_sql(sql)
-            return SearchResult(success=True, output=rows, result_count=len(rows), sql_used=sql)
+            return SearchResult(success=True, output=rows, result_count=len(rows))
 
         except SqlValidationError as exc:
             logger.error("SqlViewService | validation failed | %s", exc)
@@ -69,7 +69,7 @@ class SqlViewService:
         try:
             sql = self.build_sql_from_context(ctx)
             rows = self._execute_sql(sql)
-            return SearchResult(success=True, output=rows, result_count=len(rows), sql_used=sql)
+            return SearchResult(success=True, output=rows, result_count=len(rows))
 
         except Exception as exc:
             logger.exception(

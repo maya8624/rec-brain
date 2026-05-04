@@ -9,7 +9,7 @@ from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
 
 from app.core.constants import AppStateKeys
-from app.core.exceptions import BookingServiceError, BookingValidationError
+from app.core.exceptions import BookingServiceError, ToolValidationError
 from app.schemas.booking import BookingRequest, BookingResult
 from app.services.booking_service import BookingService
 
@@ -49,7 +49,7 @@ async def book_inspection(slot_id: str, config: RunnableConfig) -> dict:
             ),
         ).model_dump()
 
-    except BookingValidationError as exc:
+    except ToolValidationError as exc:
         logger.warning("book_inspection | validation error: %s", exc)
         return BookingResult(success=False, error=str(exc)).model_dump()
 

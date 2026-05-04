@@ -56,7 +56,6 @@ def make_sql_service():
                     "price": 750_000, "bedrooms": 3},
             ],
             "result_count": 1,
-            "sql_used": "SELECT * FROM v_listings WHERE suburb = 'Sydney'",
         }
         if raise_error:
             mock.search_listings.side_effect = raise_error
