@@ -176,8 +176,12 @@ def _to_sse_event(event: dict) -> dict | None:
     kind = event.get("event", "")
     name = event.get("name", "")
 
-    # LLM is generating a token — send it immediately
+    # LLM is generating a token — only surface tokens from agent_node.
+    # Other nodes (intent, listing_search) also call the LLM internally;
+    # their on_chat_model_stream events must not reach the frontend.
     if kind == "on_chat_model_stream":
+        if event.get("metadata", {}).get("langgraph_node") != "agent":
+            return None
         chunk = event.get("data", {}).get("chunk")
         if chunk and hasattr(chunk, "content") and chunk.content:
             return {"type": "token", "content": chunk.content}
