@@ -13,9 +13,8 @@ from langchain_core.runnables import RunnableConfig
 
 from app.agents.state import initial_state
 from app.api.dependencies import get_agent, verify_internal_key, CompiledStateGraph
-from app.core.config import settings
-from app.core.constants import AppStateKeys, InternalRoutes, Messages, StateKeys
-from app.schemas.chat import ChatErrorResponse, ChatRequest, ChatResponse, PropertyListing
+from app.core.constants import AppStateKeys, Messages, StateKeys
+from app.schemas.chat import ChatErrorResponse, ChatRequest, ChatResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -151,8 +150,7 @@ async def _event_generator(request: ChatRequest, http_request: Request, agent):
         search_results = final_state.get("search_results", [])
         yield _sse("result",
                    thread_id=request.thread_id,
-                   listings=[lst.model_dump()
-                             for lst in _extract_listings(search_results)],
+                   listings=[],
                    property_id=_extract_single_property_id(search_results),
                    deposit=final_state.get("deposit_result"))
 
@@ -227,14 +225,14 @@ def _build_response(thread_id: str, final_state: dict) -> ChatResponse:
     return ChatResponse(
         reply=reply,
         thread_id=thread_id,
-        listings=_extract_listings(search_results),
+        listings=[],
         property_id=_extract_single_property_id(search_results),
         deposit=final_state.get("deposit_result"),
     )
 
 
 def _extract_single_property_id(search_results: list[dict]) -> str | None:
-    """Return the property_id only when exactly one result exists — used to trigger the Book button."""
+    """Return the property_id only when exactly one result exists — used by frontend to check availability and book an inspection."""
     if len(search_results) == 1:
         pid = search_results[0].get("property_id")
         return str(pid) if pid else None
@@ -242,14 +240,3 @@ def _extract_single_property_id(search_results: list[dict]) -> str | None:
     return None
 
 
-def _extract_listings(rows: list[dict]) -> list[PropertyListing]:
-    """Convert slim state rows into Listing response models."""
-    base = str(settings.BACKEND_BASE_URL).rstrip("/")
-    listings = []
-
-    for row in rows:
-        property_id = row.get("property_id")
-        property_url = f"{base}{InternalRoutes.property_detail(property_id)}" if property_id else None
-        listings.append(PropertyListing(**row, property_url=property_url))
-
-    return listings

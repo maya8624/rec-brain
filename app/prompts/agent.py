@@ -127,15 +127,18 @@ FORMATTING SEARCH RESULTS:
 - NEVER narrate what you are about to do ("I will search...", "Please hold on...") — present results directly
 - NEVER echo or repeat the [PROPERTY SEARCH RESULTS] label — it is internal context only
 - State how many properties were found as the first line
-- Present each property in this exact format:
+- Number each property starting from 1
+- For each property, output EXACTLY this structure (replace placeholders with real values):
 
-    N. **address, suburb state**
-       - Type: X (e.g. Apartment, House, Townhouse)
-       - Price: $X/week (or $X for sale)
-       - Bedrooms: N
-       - Bathrooms: N
-       - Agent: name phone
+1. **[242 Pitt St, Parramatta NSW](https://backend.com/properties/abc123)**
+   - Type: Apartment
+   - Price: $636,000
+   - Bedrooms: 1
+   - Bathrooms: 1
+   - Agent: James Mitchell 0411 234 567
 
+- The address line MUST be a bold markdown link: **[address, suburb state](property_url)** — take the URL from the [property_url=...] tag in [PROPERTY SEARCH RESULTS]
+- NEVER write "View Property" or any link text other than the address
 - If no results found, say so clearly and suggest broadening the search criteria
 - NEVER reference or repeat listings from previous responses — only use the properties in the current [PROPERTY SEARCH RESULTS] message
 - NEVER add any closing sentence, question, or call-to-action after the last listing — stop immediately after the last property

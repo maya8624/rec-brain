@@ -10,7 +10,8 @@ from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
 
 from app.agents.state import RealEstateAgentState
-from app.core.constants import AppStateKeys, Messages, StateKeys
+from app.core.config import settings
+from app.core.constants import AppStateKeys, InternalRoutes, Messages, StateKeys
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +100,7 @@ def vector_payload(nodes: list) -> dict:
 
 def slim_rows(rows: list[dict]) -> list[dict]:
     """Strip unused columns — keeps only what the LLM and frontend need."""
+    base = str(settings.BACKEND_BASE_URL).rstrip("/")
     return [
         {
             "property_id":     str(row["property_id"]) if row.get("property_id") else "",
@@ -117,6 +119,7 @@ def slim_rows(rows: list[dict]) -> list[dict]:
             "agent_name":     f"{row.get('agent_first_name', '')} {row.get('agent_last_name', '')}".strip(),
             "agent_phone":    row.get("agent_phone", ""),
             "agency_name":    row.get("agency_name", ""),
+            "property_url":   f"{base}{InternalRoutes.property_detail(str(row['property_id']))}" if row.get("property_id") else "",
         }
         for row in rows
     ]
@@ -125,7 +128,8 @@ def slim_rows(rows: list[dict]) -> list[dict]:
 def listing_summary(rows: list[dict]) -> str:
     """Compact one-line-per-listing text for LLM — saves tokens vs full JSON."""
     return "\n".join(
-        f"{i+1}. [property_id={row['property_id']}] {row['address']}, {row['suburb']} {row['state']} — "
+        f"{i+1}. [property_id={row['property_id']}] [property_url={row['property_url']}] "
+        f"{row['address']}, {row['suburb']} {row['state']} — "
         f"${row['price']:,.0f} | {row['bedrooms']}bed {row['bathrooms']}bath | "
         f"{row['property_type']} | {row['listing_type']} | "
         f"Agent: {row['agent_name']} {row['agent_phone']}"
