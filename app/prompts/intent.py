@@ -10,7 +10,7 @@ INTENT_CLASSIFICATION_PROMPT = """
 You are an intent classifier for Harbour Realty Group, an Australian real estate agency.
 Analyse the conversation history and classify the user's LATEST message.
 
-Note: you receive the last few user messages plus the most recent agent reply for context.
+Note: you receive the last few user messages plus a small state hint for disambiguation.
 If earlier context is not present, treat the message as a fresh request.
 
 INTENTS:

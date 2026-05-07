@@ -25,7 +25,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from app.agents.nodes._base import listing_summary
 from app.agents.state import RealEstateAgentState
-from app.core.constants import HISTORY_BY_INTENT, StateKeys
+from app.core.constants import IntentConfig, StateKeys
 from app.infrastructure.llm import get_llm
 from app.prompts.agent import REAL_ESTATE_AGENT_SYSTEM
 from app.tools import get_all_tools
@@ -59,7 +59,7 @@ async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
     llm = _get_tool_llm() if needs_tools else _get_plain_llm()
 
     intent = state.get(StateKeys.USER_INTENT, "general")
-    history_limit = HISTORY_BY_INTENT.get(intent, 6)
+    history_limit = IntentConfig.HISTORY_BY_INTENT.get(intent, 6)
     history = list(state["messages"])[-history_limit:]
 
     prompt = _build_prompt(state, intent, history)

@@ -32,7 +32,8 @@ UserIntent = Literal[
     "cancellation",
     "booking_lookup",
     "search_then_book",
-    "deposit_payment",       # user wants to check/pay a holding deposit (listing already in context)
+    # user wants to check/pay a holding deposit (listing already in context)
+    "deposit_payment",
     "search_then_deposit",   # user provides an address/location + wants to pay deposit
     "general",
     "unknown"
@@ -116,24 +117,20 @@ class SearchContext(TypedDict, total=False):
     The user might say "in Parramatta" then "under $600k" then "3 bedrooms"
     across separate messages — this accumulates those filters.
     """
-    property_id: str                # specific property ID passed from .NET (eg. from property page)
-    location: str                   # suburb or area name
-    # street address (e.g. "177 Castlereagh St")
+    property_id: str
+    location: str
     address: str
-    listing_type: str               # "Sale" or "Rent"
-    property_type: str              # House | Apartment | Townhouse | Villa | Studio
+    listing_type: str
+    property_type: str
     bedrooms: int
     bathrooms: int
-    max_price: float                # AUD
-    min_price: float                # AUD
+    max_price: float
+    min_price: float
     keywords: list[str]             # ["pool", "garage", "pet friendly"]
     last_result_count: int          # how many results the last search returned
     limit: int                      # max rows to return — user-specified, capped at 10
 
 
-# ------------------------------------
-#  LLM-based intent classification output
-# ------------------------------------
 class IntentClassification(BaseModel):
     """
     Structured output returned by the LLM intent classifier.
@@ -141,22 +138,16 @@ class IntentClassification(BaseModel):
     """
     intent: UserIntent
     early_response: str | None = None
-    # Search entities — null means not mentioned, do not guess
     location: str | None = None
-    # street address (e.g. "177 Castlereagh St")
     address: str | None = None
-    listing_type: str | None = None     # "Sale" or "Rent"
-    # House | Apartment | Townhouse | Villa | Studio
+    listing_type: str | None = None
     property_type: str | None = None
     bedrooms: int | None = None
     bathrooms: int | None = None
     max_price: float | None = None
     min_price: float | None = None
-    # explicit count requested by the user (e.g. "show me 3")
     limit: int | None = None
 
-
-# ── Main agent state ──────────────────────────────────────────────────────────
 
 class RealEstateAgentState(TypedDict):
     """

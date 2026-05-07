@@ -92,15 +92,55 @@ class AppStateKeys:
     RAG_SERVICE = "rag_service"
 
 
-HISTORY_BY_INTENT: dict[str, int] = {
-    "booking": 12,
-    "cancellation": 6,
-    "booking_lookup": 6,
-    "search": 6,
-    "hybrid_search": 6,
-    "document_query": 4,
-    "general": 4,
-}
+class IntentConfig:
+    CLASSIFIER_HISTORY_LIMIT: int = 4
+
+    HISTORY_BY_INTENT: dict[str, int] = {
+        "booking": 12,
+        "cancellation": 6,
+        "booking_lookup": 6,
+        "search": 6,
+        "hybrid_search": 6,
+        "document_query": 4,
+        "general": 4,
+    }
+
+    CANCELLATION_KEYWORDS: frozenset[str] = frozenset([
+        "cancel", "cancellation", "cancelled", "withdraw",
+        "remove booking", "no longer want to attend", "no longer available",
+        "don't want to attend", "don't want the booking", "don't want the inspection",
+    ])
+
+    # Only used as fast-path when NO search keywords are present.
+    # This prevents "find a house and book it" from being misclassified as a standalone
+    # booking — it routes to listing_search_node first.
+    BOOKING_KEYWORDS: frozenset[str] = frozenset([
+        "book", "viewing", "view the property",
+        "schedule", "arrange", "open for inspection", "open home",
+    ])
+
+    # Lookup phrases indicate the user wants to retrieve an existing booking, not create one.
+    LOOKUP_KEYWORDS: frozenset[str] = frozenset([
+        "my booking", "my inspection", "check my booking", "check booking",
+        "booking details", "booking status", "when is my inspection",
+        "what time is my", "show my booking", "my confirmation",
+        "look up my booking", "find my booking",
+        "see my booking", "see my inspection", "view my booking", "view my inspection",
+        "booked an inspection", "booked a viewing", "i booked",
+    ])
+
+    # Suppresses the booking fast-path and detects search_then_deposit.
+    SEARCH_KEYWORDS: frozenset[str] = frozenset([
+        "find", "search", "show", "list", "looking for",
+        "properties", "house", "apartment", "unit", "townhouse",
+        "bedroom", "bathroom", "suburb", "price", "budget",
+        "under", "rent for", "for rent", "to rent", "buy", "purchase",
+    ])
+
+    DEPOSIT_KEYWORDS: frozenset[str] = frozenset([
+        "pay deposit", "paying deposit", "holding deposit",
+        "pay the deposit", "deposit payment", "pay my deposit",
+    ])
 
 
 class Messages:

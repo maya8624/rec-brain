@@ -27,8 +27,8 @@ def search_error_response() -> dict:
 def last_human_message(state: RealEstateAgentState) -> str:
     """Return the content of the most recent HumanMessage in state, or ''."""
     for msg in reversed(state["messages"]):
-        if isinstance(msg, HumanMessage):
-            return msg.content if isinstance(msg.content, str) else ""
+        if isinstance(msg, HumanMessage) and isinstance(msg.content, str):
+            return msg.content
     return ""
 
 
