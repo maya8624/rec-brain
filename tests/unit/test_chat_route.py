@@ -2,14 +2,11 @@
 Unit tests for the chat route helper functions.
 These are pure functions — no HTTP server or LangGraph agent required.
 """
-import json
-
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage
 
 from app.api.routes.chat import (
     _build_response,
-    _extract_sources,
-    _extract_tools_used,
+    _extract_single_property_id,
     _to_sse_event,
 )
 
@@ -61,44 +58,6 @@ class TestBuildResponse:
         response = _build_response("my-thread-99", self._make_result())
         assert response.thread_id == "my-thread-99"
 
-    def test_intent_populated(self):
-        result = self._make_result(user_intent="booking")
-        response = _build_response("t", result)
-        assert response.intent == "booking"
-
-    def test_booking_confirmed_true(self):
-        result = self._make_result(
-            booking_status={
-                "confirmed": True,
-                "cancelled": False,
-                "awaiting_confirmation": False
-            }
-        )
-        response = _build_response("t", result)
-        assert response.booking_confirmed is True
-
-    def test_booking_cancelled_true(self):
-        result = self._make_result(
-            booking_status={
-                "confirmed": False,
-                "cancelled": True,
-                "awaiting_confirmation": False
-            }
-        )
-        response = _build_response("t", result)
-        assert response.booking_cancelled is True
-
-    def test_confirmation_id_from_booking_context(self):
-        result = self._make_result(
-            booking_context={"confirmation_id": "CONF-7"})
-
-        response = _build_response("t", result)
-        assert response.confirmation_id == "CONF-7"
-
-    def test_requires_human_propagated(self):
-        response = _build_response("t", self._make_result(requires_human=True))
-        assert response.requires_human is True
-
     def test_requires_human_reply_when_no_ai_message(self):
         """Escalation path: no AIMessage in state → escalation reply, not generic fallback."""
         result = self._make_result(
@@ -109,9 +68,14 @@ class TestBuildResponse:
         assert "team member" in response.reply.lower()
         assert response.reply != "I couldn't process that request."
 
-    def test_sources_empty_by_default(self):
+    def test_deposit_populated_from_state(self):
+        result = self._make_result(deposit_result={"listing_id": "abc", "session_url": "https://stripe.com/x"})
+        response = _build_response("t", result)
+        assert response.deposit == {"listing_id": "abc", "session_url": "https://stripe.com/x"}
+
+    def test_deposit_none_by_default(self):
         response = _build_response("t", self._make_result())
-        assert response.sources == []
+        assert response.deposit is None
 
     def test_property_id_set_when_single_search_result(self):
         result = self._make_result(search_results=[{"property_id": "abc-123"}])
@@ -131,113 +95,24 @@ class TestBuildResponse:
         assert response.property_id is None
 
 
-# ── _extract_tools_used ────────────────────────────────────────────────────────
+# ── _extract_single_property_id ───────────────────────────────────────────────
 
-class TestExtractToolsUsed:
-    def test_single_tool_extracted(self):
-        ai_msg = AIMessage(
-            content="",
-            tool_calls=[
-                {
-                    "name": "check_availability",
-                    "args": {},
-                    "id": "tc_1",
-                    "type": "tool_call"
-                }
-            ],
-        )
-        assert _extract_tools_used([ai_msg]) == ["check_availability"]
+class TestExtractSinglePropertyId:
+    def test_returns_id_when_exactly_one_result(self):
+        assert _extract_single_property_id([{"property_id": "abc-123"}]) == "abc-123"
 
-    def test_multiple_tools_across_messages(self):
-        msg1 = AIMessage(content="", tool_calls=[{
-            "name": "check_availability",
-            "args": {},
-            "id": "tc_1",
-            "type": "tool_call"
-        }])
+    def test_returns_none_when_multiple_results(self):
+        rows = [{"property_id": "abc"}, {"property_id": "def"}]
+        assert _extract_single_property_id(rows) is None
 
-        msg2 = AIMessage(content="", tool_calls=[{
-            "name": "book_inspection",
-            "args": {},
-            "id": "tc_2",
-            "type": "tool_call"
-        }])
+    def test_returns_none_when_empty(self):
+        assert _extract_single_property_id([]) is None
 
-        tools = _extract_tools_used([msg1, msg2])
-        assert "check_availability" in tools
-        assert "book_inspection" in tools
+    def test_returns_none_when_property_id_missing(self):
+        assert _extract_single_property_id([{"address": "1 George St"}]) is None
 
-    def test_deduplicates_repeated_tools(self):
-        msg = AIMessage(
-            content="",
-            tool_calls=[
-                {
-                    "name": "check_availability", "args": {},
-                    "id": "tc_1", "type": "tool_call"
-                },
-                {
-                    "name": "check_availability", "args": {},
-                    "id": "tc_2", "type": "tool_call"
-                },
-            ],
-        )
-        assert _extract_tools_used([msg]).count("check_availability") == 1
-
-    def test_no_tool_calls_returns_empty(self):
-        assert _extract_tools_used([AIMessage(content="plain response")]) == []
-
-    def test_ignores_non_ai_messages(self):
-        assert _extract_tools_used([HumanMessage(content="hi")]) == []
-
-
-class TestExtractSources:
-    def test_sources_from_search_documents_tool_message(self):
-        content = {
-            "sources": [
-                {
-                    "document": "lease.pdf", "doc_type": "lease",
-                    "page": "2", "relevance_score": 0.91
-                },
-            ]
-        }
-
-        msg = ToolMessage(
-            content=json.dumps(content),
-            name="search_documents",
-            tool_call_id="tc_1"
-        )
-
-        sources = _extract_sources([msg])
-
-        assert len(sources) == 1
-        assert sources[0].document == "lease.pdf"
-        assert sources[0].relevance_score == 0.91
-
-    def test_ignores_non_search_documents_tools(self):
-        content = {"sources": [
-            {"document": "lease.pdf", "doc_type": "lease",
-                "page": "1", "relevance_score": 0.9}
-        ]}
-
-        msg = ToolMessage(
-            content=json.dumps(content),
-            name="book_inspection",
-            tool_call_id="tc_1"
-        )
-
-        assert _extract_sources([msg]) == []
-
-    def test_returns_empty_when_no_tool_messages(self):
-        assert _extract_sources([AIMessage(content="response")]) == []
-
-    def test_malformed_json_returns_empty(self):
-        msg = ToolMessage(
-            content="not json }",
-            name="search_documents",
-            tool_call_id="tc_1"
-        )
-
-        assert _extract_sources([msg]) == []
+    def test_coerces_property_id_to_str(self):
+        assert _extract_single_property_id([{"property_id": 42}]) == "42"
 
 
 class TestToSseEvent:
@@ -246,6 +121,7 @@ class TestToSseEvent:
         event = {
             "event": "on_chat_model_stream",
             "name": "",
+            "metadata": {"langgraph_node": "agent"},
             "data": {"chunk": chunk}
         }
 
@@ -256,6 +132,7 @@ class TestToSseEvent:
         chunk = type("Chunk", (), {"content": ""})()
         event = {
             "event": "on_chat_model_stream",
+            "metadata": {"langgraph_node": "agent"},
             "data": {"chunk": chunk}
         }
 

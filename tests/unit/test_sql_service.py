@@ -103,8 +103,8 @@ class TestSearchFromContext:
         svc, _, mock_conn = make_service()
         mock_engine.connect.return_value = mock_conn
         result = await svc.search_from_context({"location": "Sydney", "bedrooms": 3})
-        assert result["success"] is True
-        assert result["result_count"] == 1
+        assert result.success is True
+        assert result.result_count == 1
 
     async def test_does_not_call_llm(self, mock_engine):
         svc, mock_llm, mock_conn = make_service()
@@ -117,7 +117,7 @@ class TestSearchFromContext:
         mock_conn.execute.side_effect = RuntimeError("DB down")
         mock_engine.connect.return_value = mock_conn
         result = await svc.search_from_context({"location": "Sydney"})
-        assert result["success"] is False
+        assert result.success is False
 
 
 # ── _validate_sql ──────────────────────────────────────────────────────────────
@@ -190,42 +190,42 @@ class TestSearchListings:
         svc, _, mock_conn = make_service()
         mock_engine.connect.return_value = mock_conn
         result = await svc.search_listings("Show me houses in Sydney")
-        assert result["success"] is True
-        assert result["result_count"] == 1
-        assert result["output"] is not None
+        assert result.success is True
+        assert result.result_count == 1
+        assert result.output is not None
 
     async def test_result_count_matches_db_rows(self, mock_engine):
         rows = [{"address": f"{i} St"} for i in range(5)]
         svc, _, mock_conn = make_service(db_rows=rows)
         mock_engine.connect.return_value = mock_conn
         result = await svc.search_listings("houses")
-        assert result["result_count"] == 5
+        assert result.result_count == 5
 
     async def test_validation_error_returns_success_false(self, mock_engine):
         """LLM returns a non-SELECT query → validation fails → success=False, no crash."""
         svc, _, mock_conn = make_service(llm_response="DELETE FROM v_listings")
         mock_engine.connect.return_value = mock_conn
         result = await svc.search_listings("delete everything")
-        assert result["success"] is False
-        assert result["output"] is None
+        assert result.success is False
+        assert result.output is None
 
     async def test_db_exception_returns_success_false(self, mock_engine):
         svc, _, mock_conn = make_service()
         mock_conn.execute.side_effect = RuntimeError("connection timeout")
         mock_engine.connect.return_value = mock_conn
         result = await svc.search_listings("houses in Sydney")
-        assert result["success"] is False
+        assert result.success is False
 
     async def test_llm_exception_returns_success_false(self, mock_engine):
         svc, mock_llm, mock_conn = make_service()
         mock_llm.ainvoke.side_effect = RuntimeError("Groq API unreachable")
         mock_engine.connect.return_value = mock_conn
         result = await svc.search_listings("houses")
-        assert result["success"] is False
+        assert result.success is False
 
     async def test_empty_result_returns_zero_count(self, mock_engine):
         svc, _, mock_conn = make_service(db_rows=[])
         mock_engine.connect.return_value = mock_conn
         result = await svc.search_listings("10 bedroom mansion under $10k")
-        assert result["success"] is True
-        assert result["result_count"] == 0
+        assert result.success is True
+        assert result.result_count == 0

@@ -16,7 +16,7 @@ from typing import Any
 
 from langchain_core.runnables import RunnableConfig
 
-from app.agents.nodes._base import last_human_message, resolve_app_service, search_error_response, vector_payload
+from app.agents.nodes._base import last_human_message, resolve_app_service, vector_payload
 from app.agents.state import RealEstateAgentState
 from app.core.constants import AppStateKeys, Messages, Node, StateKeys
 from app.services.rag_service import RagRetriever
@@ -36,17 +36,16 @@ async def vector_search_node(
         logger.warning("vector_search_node | no human message found")
         return {}
 
-    rag_service: RagRetriever = resolve_app_service(
-        config, AppStateKeys.RAG_SERVICE, Node.VECTOR_SEARCH
-    )
-
     try:
+        rag_service: RagRetriever = resolve_app_service(
+            config, AppStateKeys.RAG_SERVICE, Node.VECTOR_SEARCH
+        )
         nodes = await rag_service.aretrieve(question)
         return {StateKeys.RETRIEVED_DOCS: _build_retrieved_docs(nodes)}
 
     except Exception as exc:
         logger.exception("vector_search_node | failed | %s", exc)
-        return search_error_response()
+        return {}
 
 
 def _build_retrieved_docs(nodes: list) -> str:

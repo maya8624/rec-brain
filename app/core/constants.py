@@ -97,7 +97,7 @@ class IntentConfig:
 
     HISTORY_BY_INTENT: dict[str, int] = {
         "booking": 12,
-        "cancellation": 6,
+        "cancellation": 12,
         "booking_lookup": 6,
         "search": 6,
         "hybrid_search": 6,
@@ -142,6 +142,11 @@ class IntentConfig:
         "pay the deposit", "deposit payment", "pay my deposit",
     ])
 
+    CONFIRMATION_KEYWORDS: frozenset[str] = frozenset([
+        "yes", "confirm", "confirmed", "go ahead", "go for it", "proceed",
+        "do it", "cancel it",
+    ])
+
 
 class Messages:
     """User-facing fallback messages returned when the agent cannot complete a request."""
@@ -149,6 +154,12 @@ class Messages:
     FALLBACK = "I couldn't process that request."
     SEARCH_ERROR = "I'm having trouble finding that information right now. Please try again."
     NO_RESULTS = "No properties matched your search. Try broadening your criteria — for example, a nearby suburb or a higher price range."
+
+
+class PromptLabels:
+    RETRIEVED_DOCUMENTS  = "[RETRIEVED DOCUMENTS]"
+    PROPERTY_SEARCH_RESULTS = "[PROPERTY SEARCH RESULTS]"
+    BOOKING_CONTEXT      = "[BOOKING CONTEXT]"
 
 
 class Node:

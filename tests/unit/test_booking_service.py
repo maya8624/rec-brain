@@ -93,10 +93,14 @@ class TestGetAvailability:
         assert result.slot_count == 1
         assert result.available_slots[0].slot_id == "slot-002"
 
-    async def test_invalid_property_id_raises_validation_error(self):
-        svc = make_service()
-        with pytest.raises(ToolValidationError, match="property_id"):
-            await svc.check_availability("not-a-uuid")
+    async def test_invalid_property_id_is_passed_to_backend(self):
+        """BookingService.check_availability passes property_id to backend as-is.
+        UUID validation is the tool's responsibility (check_availability.py)."""
+        client = make_backend_client(get_return=[])
+        svc = BookingService(client)
+        result = await svc.check_availability("not-a-uuid")
+        assert result.success is True
+        client.get.assert_called_once()
 
     async def test_backend_client_error_raises_booking_service_error(self):
         client = make_backend_client(
@@ -210,12 +214,13 @@ class TestGetMyBookings:
         results = await BookingService(client).get_my_bookings("user-123")
         assert results == []
 
-    async def test_get_called_with_user_id_param(self):
+    async def test_get_called_with_user_id_in_url(self):
+        """get_my_bookings embeds user_id in the URL path, not as a query param."""
         client = make_backend_client(get_return=[])
         await BookingService(client).get_my_bookings("user-123")
         client.get.assert_called_once()
-        params = client.get.call_args.kwargs.get("params", {})
-        assert params.get("userId") == "user-123"
+        url = client.get.call_args.args[0]
+        assert "user-123" in url
 
     async def test_non_list_response_raises_booking_service_error(self):
         client = make_backend_client(get_return=_booking_dto())

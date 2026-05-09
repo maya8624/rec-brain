@@ -16,7 +16,8 @@ If earlier context is not present, treat the message as a fresh request.
 INTENTS:
 - search           — user wants to find, browse, or list properties
 - document_query   — user asks about leases, contracts, strata, agency info,
-                     staff details, office hours, trading hours, fees, or contact information
+                     staff details, agent details, managing agent, agent name, agent licence,
+                     office hours, trading hours, fees, or contact information
 - hybrid_search    — user wants BOTH property listings AND document/agency info, e.g.:
                      "show me 2-bed apartments in Chatswood and explain what a strata report is"
                      "find rentals in Parramatta and tell me about break lease rules"
@@ -27,7 +28,10 @@ INTENTS:
                      booking (e.g. "can I see my booking?", "I booked an inspection,
                      can I see it?", "what time is my inspection?")
 - search_then_book — user wants to search for a property AND book an inspection
-                     in the same message
+                     in the same message, OR user wants to book for a specific
+                     address but no property has been found yet in this conversation
+                     (e.g. "I want to book an inspection for 219 Bridge St, Castle Hill NSW"
+                     with no prior search results → search_then_book)
 - deposit_payment  — user wants to pay or check a holding deposit and a listing is
                      already in context (e.g. "can I pay the deposit?", "pay my holding deposit")
 - search_then_deposit — user provides a property address or location AND wants to pay
@@ -53,11 +57,20 @@ explicitly stated or clearly implied. Leave all others null — do not guess.
 - min_price:      numeric AUD — null if not mentioned
 - limit:          integer — explicit count requested by the user (e.g. "show me 3" → 3, "show me 5 properties" → 5) — null if not mentioned.
                   NOTE: numbers in pasted property details (e.g. "3. 92 George St", "1 bed", "$590/week") are NOT a count — null in this case.
+                  NOTE: bedroom/bathroom counts are NEVER a limit — "2-bedroom", "3-bed", "2 bedrooms" → limit=null, bedrooms=2.
+                  NOTE: Any number immediately followed by "-bedroom", "-bed", or "bedrooms" is always
+                  a bedroom count (bedrooms field), never a limit — regardless of sentence structure
+                  or any preceding text ("Fair enough. Show me 2-bedroom rentals" → limit=null, bedrooms=2).
 
 CLARIFICATION (early_response):
 Set a short clarifying question ONLY in these exact cases:
-- intent is "search" or "search_then_book" AND no location is mentioned
-  and cannot be inferred from conversation history
+- intent is "search" or "search_then_book" AND no location is mentioned in the current
+  message AND no suburb or area was mentioned in any prior search message in the history.
+  Prior non-search turns (greetings, office hours, booking attempts, out-of-scope questions)
+  do NOT count as location context — only an earlier search message that named a suburb or area.
+  Counter-example: history contains "Show me houses for sale in Parramatta" then
+  "What about apartments?" then user now says "Any under $900k?" — do NOT ask for location,
+  Parramatta appears in an earlier search message and applies to the whole conversation thread.
 - intent is "search_then_deposit" and the user has not clearly identified which property
   they mean from prior search results
 - two conflicting intents detected — excluding: search + booking (→ search_then_book)
@@ -78,6 +91,41 @@ RULES:
    Any message that refines or continues a prior search — including property type
    changes ("apartments", "townhouses"), price adjustments, "as well", "also",
    "what about X", "any X?" — is ALWAYS "search", never "hybrid_search" or "general".
+   This includes short follow-ups that only change one filter, such as:
+   "What about apartments?", "Any under $900k?", "under $700 per week?",
+   "3 bedrooms instead", "for rent?", "for sale?", "with 2 bathrooms?".
+   In these cases, inherit the active search from history and update only the
+   filter explicitly changed by the latest message.
+   IMPORTANT: preserve all unchanged filters from the prior search, especially
+   location, listing_type, bedrooms, bathrooms, and price bounds, unless the
+   latest message explicitly changes one of them.
+   Example:
+   prior search: "Show me 3-bedroom houses for sale in Parramatta"
+   latest: "What about apartments?"
+   => classify as search and extract only {property_type: Apartment}
+   The prior filters still remain in effect: location=Parramatta,
+   listing_type=Sale, bedrooms=3.
+   Example:
+   prior search: "3-bedroom apartments for sale in Parramatta"
+   latest: "Any under $900k?"
+   => classify as search and extract only {max_price: 900000}
+   with early_response=null. Do NOT ask for location because it is already
+   available from the prior search context.
+   Example:
+   prior search: "Show me 3-bedroom houses for sale in Parramatta"
+   latest: "What about apartments?"
+   => NEVER reinterpret this as rentals. The message changes only
+   property_type, so listing_type remains Sale.
+2a. When the current message names a NEW location (different from the prior search),
+    treat it as a fresh search. Extract ONLY what is explicitly stated in the current
+    message — do NOT carry over price limits, listing_type, bedrooms, or any other
+    filters from prior turns. Those filters were specific to the previous location.
+    Example: prior search was "apartments for sale in Chatswood under $900k",
+    user now says "Show me houses in Castle Hill" →
+    extract {location: Castle Hill, property_type: House} only — null everything else.
+2b. If a prior search location exists in history and the latest message is a
+    search refinement that does NOT name a new location, NEVER set early_response
+    asking for location. Reuse the prior search location and any unchanged filters.
 3. Simple greetings ("hello", "hi", "hey", "thanks", "ok") are ALWAYS
    "general" — never inherit a previous intent from history.
    If a greeting is combined with a substantive question in the same message

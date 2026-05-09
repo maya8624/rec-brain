@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 import pytest
 from langchain_core.messages import HumanMessage
+from app.schemas.property import SearchResult
 
 
 @pytest.fixture
@@ -47,16 +48,23 @@ def make_rag_service(make_node):
 @pytest.fixture
 def make_sql_service():
     """Factory for a mock SqlViewService."""
-    def _factory(result: dict | None = None, raise_error: Exception | None = None):
+    def _factory(result: SearchResult | dict | None = None, raise_error: Exception | None = None):
         mock = AsyncMock()
-        default_result = result or {
-            "success": True,
-            "output": [
-                {"address": "12 Park Ave, Sydney",
-                    "price": 750_000, "bedrooms": 3},
-            ],
-            "result_count": 1,
-        }
+        if isinstance(result, dict):
+            result = SearchResult(**result)
+        default_result = result if result is not None else SearchResult(
+            success=True,
+            output=[{
+                "property_id": "prop-001", "listing_id": "list-001",
+                "address_line1": "12 Park Ave", "suburb": "Sydney", "state": "NSW",
+                "postcode": "2000", "price": 750_000, "bedrooms": 3, "bathrooms": 2,
+                "car_spaces": 1, "property_type": "House", "listing_type": "Sale",
+                "listing_status": "Available", "agent_first_name": "John",
+                "agent_last_name": "Doe", "agent_phone": "0412 345 678",
+                "agency_name": "Harbour Realty",
+            }],
+            result_count=1,
+        )
         if raise_error:
             mock.search_listings.side_effect = raise_error
             mock.search_from_context.side_effect = raise_error

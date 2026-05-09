@@ -53,6 +53,7 @@ RULES:
    — Default to 10 if the user does not specify a count
    — Maximum is 10 — never exceed 10, even if the user asks for more
    — NEVER use numbers from pasted property details as N (e.g. "3. 92 George St", "1 bed", "$590/week" are NOT count requests)
+   — NEVER use bedroom/bathroom counts as N — "2-bedroom", "3-bed", "2 bedrooms" → LIMIT 10, not LIMIT 2
 4. NEVER use SELECT *
 5. NEVER query any table other than v_listings
 6. NEVER use INSERT, UPDATE, DELETE, DROP, CREATE, ALTER, TRUNCATE

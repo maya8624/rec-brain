@@ -174,6 +174,54 @@ class TestHandleCancelInspection:
         assert result["booking_status"]["awaiting_confirmation"] is False
 
 
+class TestHandleGetBooking:
+    def test_single_booking_lookup_persists_booking_context(self):
+        state = make_state(
+            [_tool_msg(ToolNames.GET_BOOKING, {
+                "success": True,
+                "confirmation_id": "CONF-12345",
+                "property_id": "prop_123",
+                "property_address": "150 Bond St, Castle Hill NSW",
+            })],
+            booking_context={},
+            user_intent="booking_lookup",
+        )
+        result = context_update_node(state)
+        assert result["booking_context"]["confirmation_id"] == "CONF-12345"
+        assert result["booking_context"]["property_id"] == "prop_123"
+
+    def test_single_result_list_persists_booking_context(self):
+        state = make_state(
+            [_tool_msg(ToolNames.GET_BOOKING, {
+                "success": True,
+                "bookings": [{
+                    "confirmation_id": "CONF-12345",
+                    "property_id": "prop_123",
+                    "property_address": "150 Bond St, Castle Hill NSW",
+                }],
+            })],
+            booking_context={},
+            user_intent="booking_lookup",
+        )
+        result = context_update_node(state)
+        assert result["booking_context"]["confirmation_id"] == "CONF-12345"
+
+    def test_multiple_results_do_not_guess_booking_context(self):
+        state = make_state(
+            [_tool_msg(ToolNames.GET_BOOKING, {
+                "success": True,
+                "bookings": [
+                    {"confirmation_id": "CONF-1", "property_id": "prop_1"},
+                    {"confirmation_id": "CONF-2", "property_id": "prop_2"},
+                ],
+            })],
+            booking_context={},
+            user_intent="booking_lookup",
+        )
+        result = context_update_node(state)
+        assert "booking_context" not in result
+
+
 class TestContextUpdateJsonResilience:
     def test_malformed_json_tool_message_does_not_crash(self):
         bad_msg = ToolMessage(

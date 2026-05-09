@@ -4,7 +4,7 @@ Unit tests for agent_node and its _needs_tools helper.
 from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, RemoveMessage, SystemMessage, ToolMessage
 
 from app.agents.nodes.agent import agent_node, _needs_tools
 
@@ -163,23 +163,58 @@ class TestAgentNode:
         }
         await agent_node(state)
         call_messages = mock_llm.ainvoke.call_args.args[0]
-        # 1 SystemMessage + 12 history
-        assert len(call_messages) == 13
+        # 1 SystemMessage + 12 history + 1 PROPERTY_SEARCH_RESULTS SystemMessage
+        assert len(call_messages) == 14
+
+    async def test_format_pass_prunes_tool_batch(self, mock_get_llm, mock_llm):
+        """Format pass returns RemoveMessage for the tool-call AIMessage and ToolMessages."""
+        mock_get_llm.return_value = mock_llm
+        ai_tool_call = AIMessage(content="", tool_calls=[
+            {"name": "check_availability", "args": {}, "id": "tc_1", "type": "tool_call"}
+        ])
+        tool_result = ToolMessage(
+            content="{}", name="check_availability", tool_call_id="tc_1"
+        )
+        state = {
+            "messages": [
+                HumanMessage(content="book an inspection"),
+                ai_tool_call,
+                tool_result,
+            ],
+            "user_intent": "booking",
+            "error_count": 0,
+        }
+        result = await agent_node(state)
+        removed_ids = {m.id for m in result["messages"] if isinstance(m, RemoveMessage)}
+        assert ai_tool_call.id in removed_ids
+        assert tool_result.id in removed_ids
+
+    async def test_first_pass_does_not_prune(self, mock_get_llm, mock_llm):
+        """First booking turn (needs_tools=True) must not prune anything."""
+        mock_get_llm.return_value = mock_llm
+        state = {
+            "messages": [HumanMessage(content="book an inspection")],
+            "user_intent": "booking",
+            "error_count": 0,
+        }
+        result = await agent_node(state)
+        assert not any(isinstance(m, RemoveMessage) for m in result["messages"])
 
     async def test_retrieved_docs_injected_into_prompt(self, mock_get_llm, mock_llm):
-        """retrieved_docs is appended as a SystemMessage at the end of the prompt."""
+        """retrieved_docs is injected as a SystemMessage somewhere in the prompt."""
         mock_get_llm.return_value = mock_llm
         state = {
             "messages": [HumanMessage(content="show me houses")],
             "user_intent": "search",
             "error_count": 0,
-            "retrieved_docs": "[PROPERTY SEARCH RESULTS — 2 listing(s) found.]\n1. 12 Park St...",
+            "retrieved_docs": "excerpt from agency documents",
         }
         await agent_node(state)
         call_messages = mock_llm.ainvoke.call_args.args[0]
-        last_msg = call_messages[-1]
-        assert isinstance(last_msg, SystemMessage)
-        assert "[PROPERTY SEARCH RESULTS" in last_msg.content
+        assert any(
+            isinstance(m, SystemMessage) and "excerpt from agency documents" in m.content
+            for m in call_messages
+        )
 
     async def test_retrieved_docs_cleared_in_return(self, mock_get_llm, mock_llm):
         """agent_node always returns retrieved_docs=None to clear it for next turn."""
@@ -214,13 +249,18 @@ class TestAgentNode:
                     "address": "150 Bond St",
                     "suburb": "Castle Hill",
                     "state": "NSW",
+                    "postcode": "2160",
                     "price": 560,
                     "bedrooms": 1,
                     "bathrooms": 1,
+                    "car_spaces": 0,
                     "property_type": "Apartment",
                     "listing_type": "Rent",
+                    "listing_status": "Available",
                     "agent_name": "Lucas Anderson",
                     "agent_phone": "0419 012 345",
+                    "agency_name": "Harbour Realty",
+                    "property_url": "http://localhost:8000/api/properties/property-1",
                 }
             ],
         }

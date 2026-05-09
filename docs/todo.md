@@ -64,6 +64,11 @@ Tracked from inline `TODO` comments across the codebase.
 
 ## NLU Pipeline
 
+- [ ] **Split `INTENT_CLASSIFICATION_PROMPT` by concern**
+  `app/prompts/intent.py`
+  As the rule set grows, the LLM struggles to hold all rules in attention reliably.
+  Split into focused sub-prompts: intent classification, entity extraction, clarification rules.
+
 - [ ] **Named entity extraction as a separate step**
   Currently `intent_node` classifies intent and extracts entities in one LLM call.
   A dedicated extraction step (separate LLM call or rule-based) would be more
@@ -79,6 +84,18 @@ Tracked from inline `TODO` comments across the codebase.
   LLM prompt hints. Move this to deterministic code — build structured context
   blocks in nodes and pass them as typed state, rather than relying on the LLM
   to infer context from conversation history.
+
+---
+
+## RAG / Vector Search
+
+- [ ] **Pre-process retrieved tables before injecting into LLM prompt**
+  The vector store returns markdown tables (e.g. office trading hours). The LLM
+  reformats them into prose and can collapse rows incorrectly (e.g. merging
+  Property Management hours into "All Offices"). Pre-processing the table into
+  the desired format in the RAG/vector layer before it reaches the LLM would
+  produce consistent output without relying on prompt rules, and would handle
+  new rows (e.g. a new office type) automatically without prompt changes.
 
 ---
 

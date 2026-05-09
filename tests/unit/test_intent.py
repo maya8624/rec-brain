@@ -1,7 +1,7 @@
 """
 Unit tests for intent_node and its helpers.
 
-Fast path (_obvious_intent): pure keyword matching — no DB or LLM required.
+Fast path (obvious_intent): pure keyword matching — no DB or LLM required.
 LLM path (intent_node):      patched LLM — tests state mutations and entity extraction.
 """
 import pytest
@@ -9,114 +9,100 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from langchain_core.messages import HumanMessage, AIMessage
 
-from app.agents.nodes.intent import (
-    _is_booking_continuation,
-    _matches_keywords,
-    _obvious_intent,
-    intent_node,
+from app.agents.nodes.intent import intent_node
+from app.agents.nodes._fast_path import (
+    is_booking_continuation,
+    is_cancellation_continuation,
+    obvious_intent,
 )
 from app.agents.state import IntentClassification
 
 
-# ── _obvious_intent ────────────────────────────────────────────────────────────
+# ── obvious_intent ────────────────────────────────────────────────────────────
 
 class TestObviousIntent:
     def test_cancel_keyword(self):
-        assert _obvious_intent("I want to cancel my inspection") == "cancellation"
+        assert obvious_intent("I want to cancel my inspection") == "cancellation"
 
     def test_cancellation_keyword(self):
-        assert _obvious_intent("I need a cancellation") == "cancellation"
+        assert obvious_intent("I need a cancellation") == "cancellation"
 
     def test_withdraw_keyword(self):
-        assert _obvious_intent("I'd like to withdraw my booking") == "cancellation"
+        assert obvious_intent("I'd like to withdraw my booking") == "cancellation"
 
     def test_no_longer_available_keyword(self):
-        assert _obvious_intent("I'm no longer available for the inspection") == "cancellation"
+        assert obvious_intent("I'm no longer available for the inspection") == "cancellation"
 
     def test_dont_want_to_attend_keyword(self):
-        assert _obvious_intent("I don't want to attend the inspection") == "cancellation"
+        assert obvious_intent("I don't want to attend the inspection") == "cancellation"
 
     def test_no_longer_want_not_cancellation(self):
         """'no longer want' alone is too vague — must fall through to LLM."""
-        assert _obvious_intent("I no longer want 3 bedrooms") is None
+        assert obvious_intent("I no longer want 3 bedrooms") is None
 
     def test_dont_want_not_cancellation(self):
         """'don't want' alone is too vague — must fall through to LLM."""
-        assert _obvious_intent("I don't want a property near a highway") is None
+        assert obvious_intent("I don't want a property near a highway") is None
 
     def test_book_keyword_alone(self):
-        assert _obvious_intent("I'd like to book an inspection") == "booking"
+        assert obvious_intent("I'd like to book an inspection") == "booking"
 
     def test_schedule_keyword_alone(self):
-        assert _obvious_intent("Can we schedule a viewing?") == "booking"
+        assert obvious_intent("Can we schedule a viewing?") == "booking"
 
     def test_open_home_keyword(self):
-        assert _obvious_intent("When is the next open home?") == "booking"
+        assert obvious_intent("When is the next open home?") == "booking"
 
     def test_book_with_search_returns_none(self):
         """search + booking → not obvious, needs LLM to detect search_then_book."""
-        assert _obvious_intent("find houses in sydney and book an inspection") is None
+        assert obvious_intent("find houses in sydney and book an inspection") is None
 
     def test_cancel_with_search_returns_none(self):
         """search + cancellation → compound, needs LLM."""
-        assert _obvious_intent("show me apartments and cancel my booking") is None
+        assert obvious_intent("show me apartments and cancel my booking") is None
 
     def test_search_returns_none(self):
         """Search always goes to LLM for entity extraction."""
-        assert _obvious_intent("Show me 3 bedroom houses in Sydney") is None
+        assert obvious_intent("Show me 3 bedroom houses in Sydney") is None
 
     def test_general_returns_none(self):
-        assert _obvious_intent("Hello, how are you?") is None
+        assert obvious_intent("Hello, how are you?") is None
 
     def test_empty_message_returns_none(self):
-        assert _obvious_intent("") is None
+        assert obvious_intent("") is None
 
     def test_follow_up_returns_none(self):
-        assert _obvious_intent("what about his number?") is None
+        assert obvious_intent("what about his number?") is None
 
-    def test_deposit_follow_up_with_ambiguous_prior_results_is_search_then_deposit(self):
-        state = {
-            "search_results": [
-                {"address": "150 Bond St"},
-                {"address": "155 Market St"},
-                {"address": "92 George St"},
-            ]
-        }
-        assert _obvious_intent(
+    def test_deposit_keyword_without_search_keyword_is_deposit_payment(self):
+        """obvious_intent is keyword-only — state-based upgrade happens in intent_node."""
+        assert obvious_intent(
             "i think i need to pay holding deposit, i'm not sure the address. can you check it for me?",
-            state,
-        ) == "search_then_deposit"
+        ) == "deposit_payment"
 
     def test_deposit_follow_up_with_specific_address_is_deposit_payment(self):
-        state = {
-            "search_results": [
-                {"address": "150 Bond St"},
-                {"address": "155 Market St"},
-            ]
-        }
-        assert _obvious_intent(
+        assert obvious_intent(
             "i want to pay the holding deposit for 155 market st",
-            state,
         ) == "deposit_payment"
 
 
-# ── _obvious_intent: lookup ────────────────────────────────────────────────────
+# ── obvious_intent: lookup ────────────────────────────────────────────────────
 
 class TestObviousIntentLookup:
     def test_my_booking_keyword(self):
-        assert _obvious_intent("show me my booking") == "booking_lookup"
+        assert obvious_intent("show me my booking") == "booking_lookup"
 
     def test_booking_status_keyword(self):
-        assert _obvious_intent("what's my booking status?") == "booking_lookup"
+        assert obvious_intent("what's my booking status?") == "booking_lookup"
 
     def test_check_my_booking_keyword(self):
-        assert _obvious_intent("can you check my booking?") == "booking_lookup"
+        assert obvious_intent("can you check my booking?") == "booking_lookup"
 
     def test_i_booked_keyword(self):
-        assert _obvious_intent("I booked an inspection yesterday") == "booking_lookup"
+        assert obvious_intent("I booked an inspection yesterday") == "booking_lookup"
 
 
-# ── _is_booking_continuation ───────────────────────────────────────────────────
+# ── is_booking_continuation ───────────────────────────────────────────────────
 
 def _state_with_slots(**extra):
     return {
@@ -128,35 +114,61 @@ def _state_with_slots(**extra):
 
 class TestIsBookingContinuation:
     def test_returns_true_for_neutral_slot_selection(self):
-        assert _is_booking_continuation(_state_with_slots(), "the 10am one") is True
+        assert is_booking_continuation(_state_with_slots(), "the 10am one") is True
 
     def test_returns_true_for_option_number(self):
-        assert _is_booking_continuation(_state_with_slots(), "option 2 please") is True
+        assert is_booking_continuation(_state_with_slots(), "option 2 please") is True
 
     def test_returns_false_when_no_booking_context(self):
         state = {"messages": [HumanMessage(content="ok")]}
-        assert _is_booking_continuation(state, "the 10am one") is False
+        assert is_booking_continuation(state, "the 10am one") is False
 
     def test_returns_false_when_slots_empty(self):
         state = {
             "messages": [HumanMessage(content="ok")],
             "booking_context": {"available_slots": []},
         }
-        assert _is_booking_continuation(state, "the 10am one") is False
+        assert is_booking_continuation(state, "the 10am one") is False
 
     def test_returns_false_when_message_has_search_keywords(self):
-        assert _is_booking_continuation(_state_with_slots(), "show me cheaper properties") is False
+        assert is_booking_continuation(_state_with_slots(), "show me cheaper properties") is False
 
     def test_returns_false_when_message_has_cancellation_keywords(self):
-        assert _is_booking_continuation(_state_with_slots(), "cancel") is False
+        assert is_booking_continuation(_state_with_slots(), "cancel") is False
 
     def test_returns_false_when_booking_confirmed(self):
         state = _state_with_slots(booking_status={"confirmed": True, "cancelled": False, "awaiting_confirmation": False})
-        assert _is_booking_continuation(state, "what are the trading hours") is False
+        assert is_booking_continuation(state, "what are the trading hours") is False
 
     def test_returns_false_when_booking_cancelled(self):
         state = _state_with_slots(booking_status={"confirmed": False, "cancelled": True, "awaiting_confirmation": False})
-        assert _is_booking_continuation(state, "show me more properties") is False
+        assert is_booking_continuation(state, "show me more properties") is False
+
+
+class TestIsCancellationContinuation:
+    def test_returns_true_for_go_ahead_with_confirmation_id(self):
+        state = {
+            "booking_context": {"confirmation_id": "CONF-12345"},
+            "booking_status": {"cancelled": False},
+            "last_intent": "booking_lookup",
+        }
+        assert is_cancellation_continuation(state, "go ahead") is True
+
+    def test_returns_false_without_confirmation_id(self):
+        state = {
+            "booking_context": {},
+            "booking_status": {"cancelled": False},
+            "last_intent": "booking_lookup",
+        }
+        assert is_cancellation_continuation(state, "go ahead") is False
+
+    def test_returns_false_after_cancellation(self):
+        state = {
+            "booking_context": {"confirmation_id": "CONF-12345"},
+            "booking_status": {"cancelled": True},
+            "last_intent": "cancellation",
+        }
+        assert is_cancellation_continuation(state, "go ahead") is False
 
 
 # ── intent_node fast path ──────────────────────────────────────────────────────
@@ -193,6 +205,18 @@ class TestIntentNodeFastPath:
             result = await intent_node(state)
             mock_get_llm.assert_not_called()
         assert result["user_intent"] == "booking"
+
+    async def test_cancellation_confirmation_skips_llm(self):
+        state = {
+            "messages": [HumanMessage(content="go ahead")],
+            "booking_context": {"confirmation_id": "CONF-12345"},
+            "booking_status": {"cancelled": False},
+            "last_intent": "booking_lookup",
+        }
+        with patch("app.agents.nodes.intent.get_llm") as mock_get_llm:
+            result = await intent_node(state)
+            mock_get_llm.assert_not_called()
+        assert result["user_intent"] == "cancellation"
 
     @pytest.mark.xfail(reason="fast path fires before slot check — fix pending decision")
     async def test_cancellation_mid_slot_goes_to_llm(self):

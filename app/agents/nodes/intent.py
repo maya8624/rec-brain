@@ -22,7 +22,11 @@ from typing import Any
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.agents.nodes._base import last_human_message
-from app.agents.nodes._fast_path import is_booking_continuation, obvious_intent
+from app.agents.nodes._fast_path import (
+    is_booking_continuation,
+    is_cancellation_continuation,
+    fast_path_intent,
+)
 from app.agents.state import IntentClassification, RealEstateAgentState
 from app.core.constants import IntentConfig, StateKeys
 from app.infrastructure.llm import get_llm
@@ -39,14 +43,41 @@ async def intent_node(state: RealEstateAgentState) -> dict[str, Any]:
     if not message:
         return {StateKeys.USER_INTENT: "general"}
 
-    obvious = obvious_intent(message)
+    obvious = fast_path_intent(message, state)
     if obvious:
+        # elif obvious == "deposit_payment":
+        #     obvious = _maybe_search_then_book(state)
         return {StateKeys.USER_INTENT: obvious}
 
+    # TODO: should be in _fast_path
     if is_booking_continuation(state, message):
         return {StateKeys.USER_INTENT: "booking"}
 
+    # TODO: should be in _fast_path
+    if is_cancellation_continuation(state, message):
+        return {StateKeys.USER_INTENT: "cancellation"}
+
     return await _classify_with_llm(state)
+
+
+def _maybe_search_then_deposit(message: str, state: RealEstateAgentState) -> str:
+    """
+    Upgrade deposit_payment → search_then_deposit when prior search results are
+    present but no specific address from those results appears in the message.
+    This lets the user pick from the list rather than failing a deposit lookup
+    with no identified property.
+    """
+    search_results = state.get(StateKeys.SEARCH_RESULTS) or []
+    if len(search_results) <= 1:
+        return "deposit_payment"
+    known_addresses = {
+        r.get("address", "").lower()
+        for r in search_results
+        if r.get("address")
+    }
+    if any(addr and addr in message for addr in known_addresses):
+        return "deposit_payment"
+    return "search_then_deposit"
 
 
 async def _classify_with_llm(state: RealEstateAgentState) -> dict[str, Any]:

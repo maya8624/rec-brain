@@ -117,11 +117,38 @@ def _handle_cancel_inspection(state: RealEstateAgentState, result: dict) -> dict
 
 
 def _handle_get_booking(_state: RealEstateAgentState, _result: dict) -> dict[str, Any]:
-    """Mark booking_lookup as complete — regardless of whether results were found."""
-    return {
+    """Persist a uniquely identified booking for follow-up actions like cancellation."""
+    result = _result
+    updates: dict[str, Any] = {
         StateKeys.INTENT_COMPLETED: True,
         StateKeys.LAST_INTENT: "booking_lookup",
     }
+
+    if not result.get("success"):
+        return updates
+
+    booking_data: dict[str, Any] | None = None
+    if result.get("confirmation_id"):
+        booking_data = result
+    else:
+        bookings = result.get("bookings") or []
+        if len(bookings) == 1:
+            booking_data = bookings[0]
+
+    if not booking_data:
+        return updates
+
+    merged = _merge_context(
+        _state,
+        StateKeys.BOOKING_CONTEXT,
+        {
+            "confirmation_id": booking_data.get("confirmation_id", ""),
+            "property_id": booking_data.get("property_id", ""),
+            "property_address": booking_data.get("property_address", ""),
+        },
+    )
+    updates[StateKeys.BOOKING_CONTEXT] = BookingContext(**merged)
+    return updates
 
 
 def _handle_get_deposit(_state: RealEstateAgentState, result: dict) -> dict[str, Any]:

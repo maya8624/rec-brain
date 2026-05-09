@@ -16,11 +16,16 @@ def _cfg(svc):
     return {"configurable": {AppStateKeys.BOOKING_SERVICE: svc, AppStateKeys.USER_ID: "test-user"}}
 
 
+# check_availability validates that property_id is a proper UUID
+_PROP_UUID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+_PROP_UUID_2 = "f1e2d3c4-b5a6-7890-fedc-ba9876543210"
+
+
 class TestCheckAvailability:
     async def test_success_returns_slot_count(self, make_booking_service):
         svc = make_booking_service()
         result = await check_availability.ainvoke(
-            {"property_id": "prop_123"}, config=_cfg(svc)
+            {"property_id": _PROP_UUID}, config=_cfg(svc)
         )
         assert result["success"] is True
         assert result["slot_count"] == 2
@@ -28,25 +33,34 @@ class TestCheckAvailability:
     async def test_calls_service_with_property_id(self, make_booking_service):
         svc = make_booking_service()
         await check_availability.ainvoke(
-            {"property_id": "prop_999"}, config=_cfg(svc)
+            {"property_id": _PROP_UUID_2}, config=_cfg(svc)
         )
-        svc.check_availability.assert_called_once_with("prop_999")
+        svc.check_availability.assert_called_once_with(_PROP_UUID_2)
 
     async def test_no_slots_returns_success_with_zero_count(self, make_booking_service):
         from app.schemas.booking import AvailabilityResult
         svc = make_booking_service(availability=AvailabilityResult(
-            success=True, property_id="prop_123", available_slots=[], slot_count=0
+            success=True, property_id=_PROP_UUID, available_slots=[], slot_count=0
         ))
         result = await check_availability.ainvoke(
-            {"property_id": "prop_123"}, config=_cfg(svc)
+            {"property_id": _PROP_UUID}, config=_cfg(svc)
         )
         assert result["success"] is True
         assert result["slot_count"] == 0
 
+    async def test_invalid_property_id_raises(self, make_booking_service):
+        """Non-UUID property_id raises ToolValidationError before calling service."""
+        svc = make_booking_service()
+        with pytest.raises(ToolValidationError):
+            await check_availability.ainvoke(
+                {"property_id": "not-a-uuid"}, config=_cfg(svc)
+            )
+        svc.check_availability.assert_not_called()
+
     async def test_service_error_returns_failure(self, make_booking_service):
         svc = make_booking_service(raise_error=BookingServiceError("Backend unavailable"))
         result = await check_availability.ainvoke(
-            {"property_id": "prop_123"}, config=_cfg(svc)
+            {"property_id": _PROP_UUID}, config=_cfg(svc)
         )
         assert result["success"] is False
         assert result["error"]
@@ -54,20 +68,19 @@ class TestCheckAvailability:
     async def test_unexpected_exception_returns_failure(self, make_booking_service):
         svc = make_booking_service(raise_error=RuntimeError("unexpected"))
         result = await check_availability.ainvoke(
-            {"property_id": "prop_123"}, config=_cfg(svc)
+            {"property_id": _PROP_UUID}, config=_cfg(svc)
         )
         assert result["success"] is False
 
     async def test_slot_times_converted_to_sydney_time(self, make_booking_service):
         svc = make_booking_service()
         result = await check_availability.ainvoke(
-            {"property_id": "prop_123"}, config=_cfg(svc)
+            {"property_id": _PROP_UUID}, config=_cfg(svc)
         )
         slot = result["available_slots"][0]
-        assert "T" not in slot["start_at"]
-        assert "Z" not in slot["start_at"]
+        assert "Z" not in slot["start_at"]          # not raw UTC
         assert "AEST" in slot["start_at"] or "AEDT" in slot["start_at"]
-        assert "T" not in slot["end_at"]
+        assert "Z" not in slot["end_at"]
         assert "AEST" in slot["end_at"] or "AEDT" in slot["end_at"]
 
 

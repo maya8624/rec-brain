@@ -125,13 +125,21 @@ def slim_rows(rows: list[dict]) -> list[dict]:
     ]
 
 
-def listing_summary(rows: list[dict]) -> str:
-    """Compact one-line-per-listing text for LLM — saves tokens vs full JSON."""
-    return "\n".join(
-        f"{i+1}. [property_id={row['property_id']}] [property_url={row['property_url']}] "
-        f"{row['address']}, {row['suburb']} {row['state']} — "
-        f"${row['price']:,.0f} | {row['bedrooms']}bed {row['bathrooms']}bath | "
-        f"{row['property_type']} | {row['listing_type']} | "
-        f"Agent: {row['agent_name']} {row['agent_phone']}"
-        for i, row in enumerate(rows)
-    )
+def format_listings(rows: list[dict]) -> str:
+    """Build final display markdown for search results — the LLM outputs this verbatim."""
+    count = len(rows)
+    header = f"{count} {'property' if count == 1 else 'properties'} found."
+    blocks = []
+    for i, row in enumerate(rows, 1):
+        price = row.get("price", 0)
+        listing_type = row.get("listing_type", "")
+        price_str = f"${price:,.0f} per week" if listing_type == "Rent" else f"${price:,.0f}"
+        blocks.append(
+            f"{i}. **[{row['address']}, {row['suburb']} {row['state']}]({row['property_url']})** [property_id={row['property_id']}]\n"
+            f"   - Type: {row['property_type']}\n"
+            f"   - Price: {price_str}\n"
+            f"   - Bedrooms: {row['bedrooms']}\n"
+            f"   - Bathrooms: {row['bathrooms']}\n"
+            f"   - Agent: {row['agent_name']} {row['agent_phone']}"
+        )
+    return header + "\n\n" + "\n\n".join(blocks)

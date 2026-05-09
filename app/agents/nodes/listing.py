@@ -13,7 +13,6 @@ from langchain_core.runnables import RunnableConfig
 from app.agents.nodes._base import (
     last_human_message,
     resolve_app_service,
-    search_error_response,
     slim_rows,
 )
 from app.agents.state import RealEstateAgentState
@@ -31,13 +30,14 @@ async def listing_search_node(
         logger.warning("listing_search_node | no human message found")
         return {}
 
-    sql_service: SqlViewService = resolve_app_service(
-        config, AppStateKeys.SQL_VIEW_SERVICE, Node.LISTING_SEARCH
-    )
-
     try:
+        sql_service: SqlViewService = resolve_app_service(
+            config, AppStateKeys.SQL_VIEW_SERVICE, Node.LISTING_SEARCH
+        )
+
         ctx = state.get(StateKeys.SEARCH_CONTEXT)
         if ctx and (ctx.get("property_id") or ctx.get("location") or ctx.get("address")):
+            logger.debug("listing_search_node | ctx=%s", ctx)
             result = await sql_service.search_from_context(ctx)
         else:
             result = await sql_service.search_listings(question)
@@ -58,4 +58,4 @@ async def listing_search_node(
 
     except Exception as exc:
         logger.exception("listing_search_node | failed | %s", exc)
-        return search_error_response()
+        return {}
