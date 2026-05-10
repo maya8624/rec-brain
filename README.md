@@ -130,6 +130,10 @@ Same request body. Returns tokens via Server-Sent Events.
 | `get_booking` | `booking_lookup` | Retrieves booking details from .NET |
 | `get_deposit` | `deposit_payment` | Looks up holding deposit; returns Stripe session URL |
 
+## Deployment
+
+Hosted on Azure Container Apps. CI/CD via GitHub Actions.
+
 ## Testing
 
 ```bash
