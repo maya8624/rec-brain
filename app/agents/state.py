@@ -16,32 +16,33 @@ LangGraph state rules:
     messages       — Annotated with operator.add → APPENDS each turn
     everything else — plain assignment → last write wins per turn
 """
+from enum import Enum
 from typing import Annotated, Literal, Sequence, TypedDict
 import operator
 from langchain_core.messages import BaseMessage
 from pydantic import BaseModel
 
-# ------------------------------------
-# Intent literals — only these values are valid
-# ------------------------------------
 UserIntent = Literal[
     "search",
     "document_query",
-    "hybrid_search",    # user wants property listings + document context together
+    "hybrid_search",
     "booking",
     "cancellation",
     "booking_lookup",
-    "search_then_book",
-    # user wants to check/pay a holding deposit (listing already in context)
     "deposit_payment",
-    "search_then_deposit",   # user provides an address/location + wants to pay deposit
     "general",
     "unknown"
 ]
 
-# ------------------------------------
-#  Nested context types
-# ------------------------------------
+
+class ConversationPhase(str, Enum):
+    IDLE = "idle"
+    SEARCH_RESULTS_SHOWN = "search_results_shown"
+    BOOKING_CONFIRMED = "booking_confirmed"
+    BOOKING_PENDING = "booking_pending"
+    DEPOSIT_PENDING = "deposit_pending"
+    DEPOSIT_CONFIRMED = "deposit_confirmed"
+    CANCELLATION_PENDING = "cancellation_pending"
 
 
 class PropertyContext(TypedDict, total=False):
@@ -91,6 +92,10 @@ class BookingContext(TypedDict, total=False):
     contact_email: str
     contact_phone: str
 
+    awaiting_confirmation: bool     # all details collected, pending user yes/no
+    confirmed: bool                 # set after book_inspection succeeds
+    cancelled: bool                 # set after cancel_inspection succeeds
+
     # Set by .NET after successful booking
     confirmation_id: str            # .NET booking reference number
     confirmed_datetime: str         # confirmed slot from .NET response
@@ -98,17 +103,6 @@ class BookingContext(TypedDict, total=False):
     # Set when cancelling an existing booking
     cancellation_id: str            # existing booking ID to cancel
     cancellation_reason: str
-
-
-class BookingStatus(TypedDict, total=False):
-    """
-    Separate from BookingContext — tracks WHERE we are in the booking flow.
-    Using explicit bool fields with required=True (no total=False) so they
-    are always present and never cause KeyError.
-    """
-    awaiting_confirmation: bool     # all details collected, needs user yes/no
-    confirmed: bool                 # booking completed with .NET
-    cancelled: bool                 # booking was cancelled with .NET
 
 
 class SearchContext(TypedDict, total=False):
@@ -154,53 +148,20 @@ class RealEstateAgentState(TypedDict):
     Complete state for one conversation thread with the real estate agent.
     Persisted across turns by LangGraph checkpointer:
     """
-
-    # ── Conversation history ──────────────────────────────────────────────────
-    # operator.add = APPEND semantics — never overwrite the full list
-    # In nodes, always return: {"messages": [new_message]}
-    # Never return: {"messages": all_messages}
     messages: Annotated[Sequence[BaseMessage], operator.add]
-
-    # ── Intent ────────────────────────────────────────────────────────────────
-    # Detected from the latest user message
-    # Router uses this to short-circuit to the right tool fast
     user_intent: UserIntent
-
-    # ── Structured context ────────────────────────────────────────────────────
-    # Built incrementally across turns — nodes merge into these dicts
     property_context: PropertyContext   # property currently being discussed
     booking_context: BookingContext     # in-progress booking details
-    booking_status: BookingStatus       # where we are in the booking flow
     search_context: SearchContext       # accumulated search filters
-
-    # set by intent_node for compound intents, bypasses LLM
     early_response: str | None
-
-    # ── Search results ────────────────────────────────────────────────────────
-    # Slim property rows from the last SQL search — returned in ChatResponse
-    # for the frontend to render as property cards. Reset each search turn.
     search_results: list[dict]
-
-    # Deposit result from get_deposit tool — returned in result SSE event so
-    # the frontend can open the Stripe payment popup via session_url.
     deposit_result: dict | None
-
-    # Current-turn search/RAG content — plain assignment, so always holds only
-    # the latest turn's data. agent_node injects this directly into the LLM
-    # prompt (never appended to messages), then clears it to None.
-    # Prevents old search results from accumulating in conversation history.
     retrieved_docs: str | None
-
-    # ── Flow control ──────────────────────────────────────────────────────────
     requires_human: bool                # True → escalate to human agent
     error_count: int                    # consecutive tool failures this session
     intent_completed: bool              # True → last intent's tool flow finished
-    last_intent: UserIntent | None      # intent from the just-completed flow
+    phase: ConversationPhase
 
-
-# ------------------------------------
-# Default state factory
-# ------------------------------------
 
 def initial_state() -> RealEstateAgentState:
     """
@@ -212,8 +173,8 @@ def initial_state() -> RealEstateAgentState:
         messages=[],
         user_intent="unknown",
         property_context=PropertyContext(),
-        booking_context=BookingContext(available_slots=[]),
-        booking_status=BookingStatus(
+        booking_context=BookingContext(
+            available_slots=[],
             awaiting_confirmation=False,
             confirmed=False,
             cancelled=False,
@@ -229,5 +190,5 @@ def initial_state() -> RealEstateAgentState:
         requires_human=False,
         error_count=0,
         intent_completed=False,
-        last_intent=None,
+        phase=ConversationPhase.IDLE
     )

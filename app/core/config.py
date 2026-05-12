@@ -30,7 +30,7 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         # silently ignore unknown vars (PATH, HOME, etc)
         extra="ignore",
-        case_sensitive=False,   # GROQ_API_KEY == groq_api_key
+        case_sensitive=False,
     )
 
     APP_VERSION: str = Field("1.0.0")

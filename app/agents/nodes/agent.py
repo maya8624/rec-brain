@@ -64,6 +64,11 @@ async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
     history_limit = IntentConfig.HISTORY_BY_INTENT.get(intent, 6)
     history = list(state["messages"])[-history_limit:]
 
+    # if intent == "general":
+    #     last_intent = state.get(StateKeys.LAST_INTENT)
+    #     if last_intent and last_intent != "general":
+    #         history = list(state["messages"])[-1:]
+
     if needs_tools:
         booking_ctx = state.get(StateKeys.BOOKING_CONTEXT) or {}
         if booking_ctx.get("available_slots"):
@@ -91,17 +96,19 @@ async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
     if response.tool_calls:
         logger.info("agent_node | tool_calls=%s", [
                     tc["name"] for tc in response.tool_calls])
-    # elif needs_tools:
-    #     logger.warning("agent_node | needs_tools=True but no tool_calls | intent=%s | prompt_len=%d | response=%s",
-    #                    intent, len(prompt), response.content[:200])
 
-    is_format_pass = not needs_tools and intent in _TOOL_INTENTS
+    is_complete = (
+        # search, general, document_query etc — always one pass
+        intent not in _TOOL_INTENTS
+        # booking/cancellation — True on formatting pass
+        or (not needs_tools and intent in _TOOL_INTENTS)
+    )
 
     return {
-        "messages": [response],
-        StateKeys.RETRIEVED_DOCS: None,
-        StateKeys.INTENT_COMPLETED: is_format_pass,
-        StateKeys.LAST_INTENT: intent,
+        "messages":                 [response],
+        StateKeys.RETRIEVED_DOCS:   None,
+        StateKeys.INTENT_COMPLETED: is_complete,
+        StateKeys.LAST_INTENT:      intent,
     }
 
 

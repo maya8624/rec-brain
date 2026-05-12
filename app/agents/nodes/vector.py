@@ -18,7 +18,7 @@ from langchain_core.runnables import RunnableConfig
 
 from app.agents.nodes._base import last_human_message, resolve_app_service, vector_payload
 from app.agents.state import RealEstateAgentState
-from app.core.constants import AppStateKeys, Messages, Node, StateKeys
+from app.core.constants import AppStateKeys, Node, StateKeys
 from app.services.rag_service import RagRetriever
 
 logger = logging.getLogger(__name__)

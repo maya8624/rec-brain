@@ -15,7 +15,7 @@ from app.agents.nodes._base import (
     resolve_app_service,
     slim_rows,
 )
-from app.agents.state import RealEstateAgentState
+from app.agents.state import ConversationPhase, RealEstateAgentState
 from app.core.constants import AppStateKeys, Node, StateKeys
 from app.services.sql_service import SqlViewService
 
@@ -44,16 +44,10 @@ async def listing_search_node(
 
         rows = slim_rows(result.output or [])
 
-        if state.get(StateKeys.USER_INTENT) == "search_then_book" and rows:
-            return {
-                StateKeys.SEARCH_RESULTS: rows,
-                StateKeys.RETRIEVED_DOCS: None,
-                StateKeys.USER_INTENT: "booking",
-            }
-
         return {
             StateKeys.SEARCH_RESULTS: rows,
             StateKeys.RETRIEVED_DOCS: None,
+            StateKeys.PHASE:          ConversationPhase.SEARCH_RESULTS_SHOWN,
         }
 
     except Exception as exc:

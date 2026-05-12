@@ -13,7 +13,7 @@ from langchain_core.messages import AIMessage, ToolMessage
 from app.core.constants import ToolNames, StateKeys
 from app.agents.state import (
     BookingContext,
-    BookingStatus,
+    ConversationPhase,
     RealEstateAgentState,
 )
 
@@ -81,21 +81,21 @@ def _handle_book_inspection(state: RealEstateAgentState, result: dict) -> dict[s
     merged = _merge_context(
         state,
         StateKeys.BOOKING_CONTEXT,
-        {"confirmation_id": result.get("confirmation_id", ""),
-         "confirmed_datetime": result.get("confirmed_datetime", "")}
+        {
+            "confirmation_id": result.get("confirmation_id", ""),
+            "confirmed_datetime": result.get("confirmed_datetime", ""),
+            "confirmed": True,
+            "cancelled": False,
+            "awaiting_confirmation": False
+        }
     )
     # slots are stale once booking is confirmed
     merged.pop("available_slots", None)
 
     return {
         StateKeys.BOOKING_CONTEXT: BookingContext(**merged),
-        StateKeys.BOOKING_STATUS: BookingStatus(
-            awaiting_confirmation=False,
-            confirmed=True,
-            cancelled=False,
-        ),
-        StateKeys.INTENT_COMPLETED: True,
-        StateKeys.LAST_INTENT: state.get(StateKeys.USER_INTENT),
+        StateKeys.PHASE: ConversationPhase.BOOKING_CONFIRMED,
+        StateKeys.INTENT_COMPLETED: True
     }
 
 
@@ -105,24 +105,26 @@ def _handle_cancel_inspection(state: RealEstateAgentState, result: dict) -> dict
     if not result.get("success"):
         return {}
 
+    merged = _merge_context(
+        state,
+        StateKeys.BOOKING_CONTEXT,
+        {
+            "cancelled":          True,       # ← replaces BookingStatus
+            "confirmed":          False,
+            "awaiting_confirmation": False,
+        }
+    )
     return {
-        StateKeys.BOOKING_STATUS: BookingStatus(
-            awaiting_confirmation=False,
-            confirmed=False,
-            cancelled=True,
-        ),
-        StateKeys.INTENT_COMPLETED: True,
-        StateKeys.LAST_INTENT: state.get(StateKeys.USER_INTENT),
+        StateKeys.BOOKING_CONTEXT:  BookingContext(**merged),
+        StateKeys.PHASE:            ConversationPhase.IDLE,  # ← back to idle after cancel
+        StateKeys.INTENT_COMPLETED: True
     }
 
 
 def _handle_get_booking(_state: RealEstateAgentState, _result: dict) -> dict[str, Any]:
     """Persist a uniquely identified booking for follow-up actions like cancellation."""
     result = _result
-    updates: dict[str, Any] = {
-        StateKeys.INTENT_COMPLETED: True,
-        StateKeys.LAST_INTENT: "booking_lookup",
-    }
+    updates: dict[str, Any] = {StateKeys.INTENT_COMPLETED: True}
 
     if not result.get("success"):
         return updates
@@ -155,8 +157,8 @@ def _handle_get_deposit(_state: RealEstateAgentState, result: dict) -> dict[str,
     """Store deposit result in state so it can be forwarded to the frontend via SSE."""
     return {
         StateKeys.DEPOSIT_RESULT: result if result.get("success") else None,
-        StateKeys.INTENT_COMPLETED: True,
-        StateKeys.LAST_INTENT: "deposit_payment",
+        StateKeys.PHASE: ConversationPhase.DEPOSIT_CONFIRMED,
+        StateKeys.INTENT_COMPLETED: True
     }
 
 

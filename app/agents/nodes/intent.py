@@ -27,7 +27,7 @@ from app.agents.nodes._fast_path import (
     is_cancellation_continuation,
     fast_path_intent,
 )
-from app.agents.state import IntentClassification, RealEstateAgentState
+from app.agents.state import ConversationPhase, IntentClassification, RealEstateAgentState
 from app.core.constants import IntentConfig, StateKeys
 from app.infrastructure.llm import get_llm
 from app.prompts.intent import INTENT_CLASSIFICATION_PROMPT
@@ -60,24 +60,24 @@ async def intent_node(state: RealEstateAgentState) -> dict[str, Any]:
     return await _classify_with_llm(state)
 
 
-def _maybe_search_then_deposit(message: str, state: RealEstateAgentState) -> str:
-    """
-    Upgrade deposit_payment → search_then_deposit when prior search results are
-    present but no specific address from those results appears in the message.
-    This lets the user pick from the list rather than failing a deposit lookup
-    with no identified property.
-    """
-    search_results = state.get(StateKeys.SEARCH_RESULTS) or []
-    if len(search_results) <= 1:
-        return "deposit_payment"
-    known_addresses = {
-        r.get("address", "").lower()
-        for r in search_results
-        if r.get("address")
-    }
-    if any(addr and addr in message for addr in known_addresses):
-        return "deposit_payment"
-    return "search_then_deposit"
+# def _maybe_search_then_deposit(message: str, state: RealEstateAgentState) -> str:
+#     """
+#     Upgrade deposit_payment → search_then_deposit when prior search results are
+#     present but no specific address from those results appears in the message.
+#     This lets the user pick from the list rather than failing a deposit lookup
+#     with no identified property.
+#     """
+#     search_results = state.get(StateKeys.SEARCH_RESULTS) or []
+#     if len(search_results) <= 1:
+#         return "deposit_payment"
+#     known_addresses = {
+#         r.get("address", "").lower()
+#         for r in search_results
+#         if r.get("address")
+#     }
+#     if any(addr and addr in message for addr in known_addresses):
+#         return "deposit_payment"
+#     return "search_then_deposit"
 
 
 async def _classify_with_llm(state: RealEstateAgentState) -> dict[str, Any]:
@@ -102,8 +102,7 @@ async def _classify_with_llm(state: RealEstateAgentState) -> dict[str, Any]:
         ]
         history = human_messages[-IntentConfig.CLASSIFIER_HISTORY_LIMIT:]
 
-    last_intent = state.get(StateKeys.LAST_INTENT)
-    state_hint = _build_state_hint(last_intent, intent_completed)
+    state_hint = _build_state_hint(state, intent_completed)
 
     content = INTENT_CLASSIFICATION_PROMPT + state_hint
     prompt = [SystemMessage(content=content), *history]
@@ -115,10 +114,10 @@ async def _classify_with_llm(state: RealEstateAgentState) -> dict[str, Any]:
         logger.error("intent_node | LLM classification failed: %s", exc)
         return {StateKeys.USER_INTENT: "general"}
 
-    return _build_state_update(state, classification)
+    return _build_intent_state_update(state, classification)
 
 
-def _build_state_update(
+def _build_intent_state_update(
         state: RealEstateAgentState,
         classification: IntentClassification) -> dict[str, Any]:
     """
@@ -128,40 +127,40 @@ def _build_state_update(
     "document_query"). For all others, replaces search_context on a new location
     or merges new entities into the existing context when location is unchanged.
     """
-    state_update: dict[str, Any] = {
+    update = {
         StateKeys.USER_INTENT:      classification.intent,
         StateKeys.EARLY_RESPONSE:   classification.early_response,
-        StateKeys.LAST_INTENT:      classification.intent,
         StateKeys.INTENT_COMPLETED: False,
     }
 
     if classification.intent in ("general", "document_query"):
-        return state_update
+        return update
 
     entities = _extract_entities(classification)
     if not entities:
-        return state_update
+        return update
 
-    if entities.get("location"):
-        state_update[StateKeys.SEARCH_CONTEXT] = entities
-    else:
-        existing = dict(state.get(StateKeys.SEARCH_CONTEXT) or {})
-        state_update[StateKeys.SEARCH_CONTEXT] = {**existing, **entities}
+    existing = dict(state.get(StateKeys.SEARCH_CONTEXT) or {})
+    update[StateKeys.SEARCH_CONTEXT] = (
+        entities if entities.get("location")
+        else {**existing, **entities}
+    )
 
-    return state_update
+    return update
 
 
-def _build_state_hint(last_intent: str | None, intent_completed: bool) -> str:
+def _build_state_hint(state: RealEstateAgentState, intent_completed: bool) -> str:
     """Return a [STATE] hint string for the LLM prompt."""
-    if not last_intent:
+    phase = state.get(StateKeys.PHASE, ConversationPhase.IDLE)
+    if phase == ConversationPhase.IDLE and not intent_completed:
         return ""
 
-    state = ("\n[STATE]\n"
-             f"previous_intent: {last_intent}\n"
-             f"completed: {intent_completed}\n"
-             "rule: if completed=true, treat the latest user message as a fresh request.\n")
+    hint = ("\n[STATE]\n"
+            f"phase: {phase.value}\n"
+            f"completed: {intent_completed}\n"
+            "rule: if completed=true, treat the latest user message as a fresh request.\n")
 
-    return state
+    return hint
 
 
 def _extract_entities(classification: IntentClassification) -> dict:

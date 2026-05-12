@@ -66,7 +66,7 @@ class StateKeys:
     Constants for state keys used in the AI agent.
     """
     USER_INTENT = "user_intent"
-    LAST_INTENT = "last_intent"
+    LAST_INTENT = "last_intent"  # might be gone??
     INTENT_COMPLETED = "intent_completed"
     EARLY_RESPONSE = "early_response"
     SEARCH_CONTEXT = "search_context"
@@ -74,9 +74,10 @@ class StateKeys:
     RETRIEVED_DOCS = "retrieved_docs"
     DEPOSIT_RESULT = "deposit_result"
     BOOKING_CONTEXT = "booking_context"
-    BOOKING_STATUS = "booking_status"
+    # BOOKING_STATUS = "booking_status"
     ERROR_COUNT = "error_count"
     REQUIRES_HUMAN = "requires_human"
+    PHASE = "phase"
 
 
 class AppStateKeys:
@@ -111,12 +112,20 @@ class IntentConfig:
         "don't want to attend", "don't want the booking", "don't want the inspection",
     ])
 
-    # Only used as fast-path when NO search keywords are present.
-    # This prevents "find a house and book it" from being misclassified as a standalone
-    # booking — it routes to listing_search_node first.
     BOOKING_KEYWORDS: frozenset[str] = frozenset([
-        "book", "viewing", "view the property",
-        "schedule", "arrange", "open for inspection", "open home",
+        "book a viewing",
+        "book an inspection",
+        "book a time",
+        "book a visit",
+        "view the property",
+        "schedule inspection",
+        "schedule a viewing",
+        "schedule a visit",
+        "arrange inspection",
+        "arrange a viewing",
+        "inspect the property",
+        "open for inspection",
+        "open home",
     ])
 
     # Lookup phrases indicate the user wants to retrieve an existing booking, not create one.
@@ -142,6 +151,11 @@ class IntentConfig:
         "pay the deposit", "deposit payment", "pay my deposit",
     ])
 
+    DOCUMENT_KEYWORDS: frozenset[str] = frozenset([
+        "working hours", "opening hours", "office hours",
+        "business hours", "hours of operation", "trading hours",
+    ])
+
     CONFIRMATION_KEYWORDS: frozenset[str] = frozenset([
         "yes", "confirm", "confirmed", "go ahead", "go for it", "proceed",
         "do it", "cancel it",
@@ -157,9 +171,9 @@ class Messages:
 
 
 class PromptLabels:
-    RETRIEVED_DOCUMENTS  = "[RETRIEVED DOCUMENTS]"
+    RETRIEVED_DOCUMENTS = "[RETRIEVED DOCUMENTS]"
     PROPERTY_SEARCH_RESULTS = "[PROPERTY SEARCH RESULTS]"
-    BOOKING_CONTEXT      = "[BOOKING CONTEXT]"
+    BOOKING_CONTEXT = "[BOOKING CONTEXT]"
 
 
 class Node:

@@ -13,7 +13,7 @@ Router map:
 import json
 import logging
 from langchain_core.messages import AIMessage, ToolMessage
-from app.agents.state import RealEstateAgentState
+from app.agents.state import ConversationPhase, RealEstateAgentState
 from app.core.constants import ToolNames, Node, StateKeys
 
 logger = logging.getLogger(__name__)
@@ -35,17 +35,22 @@ def route_intent_output(state: RealEstateAgentState) -> str:
         return Node.END
 
     intent = state.get(StateKeys.USER_INTENT, "general")
+    phase = state.get(StateKeys.PHASE, ConversationPhase.IDLE)
+
+    if intent in ("booking", "deposit_payment"):
+        if phase != ConversationPhase.SEARCH_RESULTS_SHOWN:
+            return Node.LISTING_SEARCH
 
     route = {
         "search":           Node.LISTING_SEARCH,
-        "search_then_book": Node.LISTING_SEARCH,
+        # "search_then_book": Node.LISTING_SEARCH,
         "document_query":   Node.VECTOR_SEARCH,
         "hybrid_search":    Node.HYBRID_SEARCH,
         "booking":          Node.AGENT,
         "cancellation":     Node.AGENT,
         "booking_lookup":   Node.AGENT,
-        "deposit_payment":        Node.AGENT,
-        "search_then_deposit":    Node.LISTING_SEARCH,
+        "deposit_payment":  Node.AGENT,
+        # "search_then_deposit":    Node.LISTING_SEARCH,
         "general":          Node.AGENT,
     }.get(intent, Node.AGENT)
 

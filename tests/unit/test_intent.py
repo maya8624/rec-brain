@@ -332,6 +332,17 @@ class TestIntentNodeLLMPath:
         assert result["user_intent"] == "general"
         assert result["early_response"]
 
+    async def test_out_of_scope_general_suppresses_early_response(self, mock_get_llm):
+        mock_get_llm.return_value = _make_llm_mock(IntentClassification(
+            intent="general",
+            early_response="Please pick one action: ask about office hours, agency address, or booking a flight.",
+        ))
+        state = {"messages": [HumanMessage(content="Can you book me a flight to Bali?")]}
+        result = await intent_node(state)
+
+        assert result["user_intent"] == "general"
+        assert result["early_response"] is None
+
     async def test_entities_merged_with_existing_search_context(self, mock_get_llm):
         """New entities merge with existing context — previous filters preserved."""
         mock_get_llm.return_value = _make_llm_mock(IntentClassification(
