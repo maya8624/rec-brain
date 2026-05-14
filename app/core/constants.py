@@ -66,7 +66,6 @@ class StateKeys:
     Constants for state keys used in the AI agent.
     """
     USER_INTENT = "user_intent"
-    LAST_INTENT = "last_intent"  # might be gone??
     INTENT_COMPLETED = "intent_completed"
     EARLY_RESPONSE = "early_response"
     SEARCH_CONTEXT = "search_context"
@@ -106,13 +105,13 @@ class IntentConfig:
         "general": 4,
     }
 
-    CANCELLATION_KEYWORDS: frozenset[str] = frozenset([
+    CANCELLATION_KEYWORDS = frozenset([
         "cancel", "cancellation", "cancelled", "withdraw",
         "remove booking", "no longer want to attend", "no longer available",
         "don't want to attend", "don't want the booking", "don't want the inspection",
     ])
 
-    BOOKING_KEYWORDS: frozenset[str] = frozenset([
+    BOOKING_KEYWORDS = frozenset([
         "book a viewing",
         "book an inspection",
         "book a time",
@@ -129,7 +128,7 @@ class IntentConfig:
     ])
 
     # Lookup phrases indicate the user wants to retrieve an existing booking, not create one.
-    LOOKUP_KEYWORDS: frozenset[str] = frozenset([
+    LOOKUP_KEYWORDS = frozenset([
         "my booking", "my inspection", "check my booking", "check booking",
         "booking details", "booking status", "when is my inspection",
         "what time is my", "show my booking", "my confirmation",
@@ -139,26 +138,57 @@ class IntentConfig:
     ])
 
     # Suppresses the booking fast-path and detects search_then_deposit.
-    SEARCH_KEYWORDS: frozenset[str] = frozenset([
+    SEARCH_KEYWORDS = frozenset([
         "find", "search", "show", "list", "looking for",
         "properties", "house", "apartment", "unit", "townhouse",
         "bedroom", "bathroom", "suburb", "price", "budget",
         "under", "rent for", "for rent", "to rent", "buy", "purchase",
     ])
 
-    DEPOSIT_KEYWORDS: frozenset[str] = frozenset([
-        "pay deposit", "paying deposit", "holding deposit",
-        "pay the deposit", "deposit payment", "pay my deposit",
+    DEPOSIT_KEYWORDS = frozenset([
+        "pay deposit",
+        "paying deposit",
+        "holding deposit",
+        "pay the deposit",
+        "deposit payment",
+        "pay my deposit",
     ])
 
-    DOCUMENT_KEYWORDS: frozenset[str] = frozenset([
-        "working hours", "opening hours", "office hours",
-        "business hours", "hours of operation", "trading hours",
+    DOCUMENT_KEYWORDS = frozenset([
+        "working hours",
+        "opening hours",
+        "office hours",
+        "business hours",
+        "hours of operation",
+        "trading hours",
     ])
 
-    CONFIRMATION_KEYWORDS: frozenset[str] = frozenset([
+    CONFIRMATION_KEYWORDS = frozenset([
         "yes", "confirm", "confirmed", "go ahead", "go for it", "proceed",
         "do it", "cancel it",
+    ])
+
+    BOOKING_INTENTS = frozenset([
+        "booking",
+        "cancellation",
+        "booking_lookup"
+    ])
+
+    DOC_INTENTS = frozenset([
+        "document_query",
+        "hybrid_search"
+    ])
+
+    TOOL_INTENTS = frozenset([
+        "booking",
+        "cancellation",
+        "booking_lookup",
+        "deposit_payment"
+    ])
+
+    SEARCH_INTENTS = TOOL_INTENTS | frozenset([
+        "search",
+        "hybrid_search"
     ])
 
 

@@ -6,6 +6,7 @@ import json
 
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
+from app.agents.state import ConversationPhase
 from app.agents.router import (
     route_after_context,
     route_after_safety,
@@ -67,9 +68,15 @@ class TestRouteIntentOutput:
             user_intent="hybrid_search"
         )) == Node.HYBRID_SEARCH
 
-    def test_booking_goes_to_agent(self):
+    def test_booking_without_search_results_goes_to_listing_search(self):
         assert route_intent_output(base_state(
-            user_intent="booking")) == Node.AGENT
+            user_intent="booking")) == Node.LISTING_SEARCH
+
+    def test_booking_with_search_results_shown_goes_to_agent(self):
+        assert route_intent_output(base_state(
+            user_intent="booking",
+            phase=ConversationPhase.SEARCH_RESULTS_SHOWN,
+        )) == Node.AGENT
 
     def test_cancellation_goes_to_agent(self):
         assert route_intent_output(base_state(
@@ -79,19 +86,15 @@ class TestRouteIntentOutput:
         assert route_intent_output(base_state(
             user_intent="general")) == Node.AGENT
 
-    def test_search_then_book_goes_to_listing_search(self):
+    def test_deposit_payment_without_search_results_goes_to_listing_search(self):
         assert route_intent_output(base_state(
-            user_intent="search_then_book"
+            user_intent="deposit_payment",
         )) == Node.LISTING_SEARCH
 
-    def test_search_then_deposit_goes_to_listing_search(self):
+    def test_deposit_payment_with_search_results_shown_goes_to_agent(self):
         assert route_intent_output(base_state(
-            user_intent="search_then_deposit"
-        )) == Node.LISTING_SEARCH
-
-    def test_deposit_payment_goes_to_agent(self):
-        assert route_intent_output(base_state(
-            user_intent="deposit_payment"
+            user_intent="deposit_payment",
+            phase=ConversationPhase.SEARCH_RESULTS_SHOWN,
         )) == Node.AGENT
 
     def test_unknown_intent_defaults_to_agent(self):

@@ -28,29 +28,24 @@ TOOL_ROUTES: dict[str, str] = {
 
 
 def route_intent_output(state: RealEstateAgentState) -> str:
-    """
-    Routes after intent_node based on user_intent in state.
-    """
+    """Booking/deposit pre-searches for listings unless search results are already shown."""
     if state.get(StateKeys.EARLY_RESPONSE):
         return Node.END
 
     intent = state.get(StateKeys.USER_INTENT, "general")
     phase = state.get(StateKeys.PHASE, ConversationPhase.IDLE)
 
-    if intent in ("booking", "deposit_payment"):
-        if phase != ConversationPhase.SEARCH_RESULTS_SHOWN:
-            return Node.LISTING_SEARCH
+    if (intent in ("booking", "deposit_payment") and phase != ConversationPhase.SEARCH_RESULTS_SHOWN):
+        return Node.LISTING_SEARCH
 
     route = {
         "search":           Node.LISTING_SEARCH,
-        # "search_then_book": Node.LISTING_SEARCH,
         "document_query":   Node.VECTOR_SEARCH,
         "hybrid_search":    Node.HYBRID_SEARCH,
         "booking":          Node.AGENT,
         "cancellation":     Node.AGENT,
         "booking_lookup":   Node.AGENT,
         "deposit_payment":  Node.AGENT,
-        # "search_then_deposit":    Node.LISTING_SEARCH,
         "general":          Node.AGENT,
     }.get(intent, Node.AGENT)
 
@@ -58,75 +53,47 @@ def route_intent_output(state: RealEstateAgentState) -> str:
 
 
 def route_agent_output(state: RealEstateAgentState) -> str:
-    """
-    Reads tool_calls from the last AIMessage and routes to:
-        "tools" — LLM called check_availability / book_inspection / cancel_inspection
-        "end"   — plain text response or escalation
-    """
+    """Routes to tools if the last AIMessage has tool calls, otherwise end."""
     if _requires_human(state, "route_agent_output"):
         return Node.END
 
-    message = _last_ai_message(state)
-    if message is None:
-        logger.warning("route_agent_output | no AI message → end")
+    ai_message = _last_ai_message(state)
+    if ai_message is None:
         return Node.END
 
-    if not getattr(message, "tool_calls", None):
-        logger.info("route_agent_output | plain response → end")
+    if not getattr(ai_message, "tool_calls", None):
         return Node.END
 
-    for tool_call in message.tool_calls:
+    for tool_call in ai_message.tool_calls:
         if destination := TOOL_ROUTES.get(tool_call["name"]):
-            logger.info(
-                "route_agent_output | tool=%s → %s",
-                tool_call["name"],
-                destination,
-            )
             return destination
 
     logger.warning(
         "route_agent_output | unrecognised tools=%s → end",
-        message.tool_calls,
+        ai_message.tool_calls,
     )
     return Node.END
 
 
 def route_after_search(state: RealEstateAgentState) -> str:
-    """
-    Routes after listing_search_node / vector_search_node / hybrid_search_node.
-    """
     if _requires_human(state, "route_after_search"):
         return Node.END
-
-    last = state["messages"][-1] if state["messages"] else None
-    if isinstance(last, AIMessage):
-        return Node.END
-
     return Node.AGENT
 
 
 def route_after_tools(state: RealEstateAgentState) -> str:
-    """
-    Inspects ToolMessage results from the current turn and routes to:
-        "context_update" — at least one tool succeeded
-        "safety"         — no results or all tools failed
-    """
+    """Routes to context_update if any tool succeeded, safety if all failed or no results."""
     if _requires_human(state, "route_after_tools"):
         return Node.END
 
-    results = _extract_tool_results(list(state["messages"]))
+    tool_results = _parse_tool_messages(list(state["messages"]))
 
-    if not results:
+    if not tool_results:
         logger.warning("route_after_tools | no tool results → safety")
         return Node.SAFETY
 
-    succeeded = sum(1 for result in results if result.get("success"))
-
-    if succeeded == 0:
-        logger.warning(
-            "route_after_tools | all %d tool(s) failed → safety",
-            len(results),
-        )
+    success_count = sum(1 for result in tool_results if result.get("success"))
+    if success_count == 0:
         return Node.SAFETY
 
     return Node.CONTEXT_UPDATE
@@ -146,10 +113,6 @@ def route_after_safety(state: RealEstateAgentState) -> str:
     return Node.AGENT
 
 
-# ---------------------------------------------------------------------------
-# Private helpers
-# ---------------------------------------------------------------------------
-
 def _requires_human(state: RealEstateAgentState, caller: str) -> bool:
     if state.get(StateKeys.REQUIRES_HUMAN):
         logger.warning("%s | requires_human=True → end", caller)
@@ -164,7 +127,7 @@ def _last_ai_message(state: RealEstateAgentState) -> AIMessage | None:
     return None
 
 
-def _extract_tool_results(messages: list) -> list[dict]:
+def _parse_tool_messages(messages: list) -> list[dict]:
     results: list[dict] = []
 
     for msg in reversed(messages):
@@ -175,21 +138,15 @@ def _extract_tool_results(messages: list) -> list[dict]:
             continue
 
         try:
-            content = (
-                json.loads(msg.content)
-                if isinstance(msg.content, str)
-                else msg.content
-            )
+            content = json.loads(msg.content)
             if isinstance(content, dict):
                 content.setdefault("success", False)
                 results.append(content)
             else:
                 results.append({"success": False, "output": content})
 
-        except (json.JSONDecodeError, TypeError) as exc:
-            logger.error(
-                "_extract_tool_results | failed to parse ToolMessage: %s", exc
-            )
+        except (json.JSONDecodeError, TypeError):  # as exc:
+            # logger.error("_parse_tool_messages | failed to parse ToolMessage: %s", exc)
             results.append({"success": False, "error": str(msg.content)})
 
     return results

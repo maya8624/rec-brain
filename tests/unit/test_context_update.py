@@ -10,7 +10,7 @@ import pytest
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from app.agents.nodes.context import context_update_node
-from app.agents.state import BookingContext, BookingStatus
+from app.agents.state import BookingContext
 from app.core.constants import ToolNames
 
 
@@ -41,7 +41,6 @@ def make_state(tool_messages: list, booking_context: dict | None = None, **kwarg
         "error_count": 0,
         "requires_human": False,
         "booking_context": BookingContext(**(booking_context or {})),
-        "booking_status": BookingStatus(awaiting_confirmation=False, confirmed=False, cancelled=False),
         **kwargs,
     }
 
@@ -51,7 +50,6 @@ class TestContextUpdateNoOp:
         state = {
             "messages": [HumanMessage(content="book"), _ai_with_tool_call()],
             "booking_context": BookingContext(),
-            "booking_status": BookingStatus(awaiting_confirmation=False, confirmed=False, cancelled=False),
             "error_count": 0,
         }
         assert context_update_node(state) == {}
@@ -66,13 +64,13 @@ class TestContextUpdateNoOp:
         state = make_state([_tool_msg(ToolNames.BOOK_INSPECTION, {
                            "success": False, "error": "slot gone"})])
         result = context_update_node(state)
-        assert "booking_status" not in result
+        assert "booking_context" not in result
 
     def test_failed_cancel_inspection_returns_empty(self):
         state = make_state(
             [_tool_msg(ToolNames.CANCEL_INSPECTION, {"success": False})])
         result = context_update_node(state)
-        assert "booking_status" not in result
+        assert "booking_context" not in result
 
 
 class TestHandleCheckAvailability:
@@ -106,7 +104,7 @@ class TestHandleCheckAvailability:
         result = context_update_node(state)
         assert result["booking_context"]["property_id"] == "prop_555"
 
-    def test_success_does_not_overwrite_existing_property_id(self):
+    def test_always_overwrites_property_id_on_new_availability_check(self):
         state = make_state(
             [_tool_msg(ToolNames.CHECK_AVAILABILITY, {
                 "success": True,
@@ -117,7 +115,7 @@ class TestHandleCheckAvailability:
             booking_context={"property_id": "prop_ORIG"},
         )
         result = context_update_node(state)
-        assert result["booking_context"]["property_id"] == "prop_ORIG"
+        assert result["booking_context"]["property_id"] == "prop_NEW"
 
     def test_no_slots_returns_empty(self):
         state = make_state([_tool_msg(ToolNames.CHECK_AVAILABILITY, {
@@ -140,16 +138,15 @@ class TestHandleBookInspection:
         result = context_update_node(state)
         assert result["booking_context"]["confirmation_id"] == "CONF-9999"
 
-    def test_success_flips_booking_status_to_confirmed(self):
+    def test_success_sets_confirmed_in_booking_context(self):
         state = make_state([_tool_msg(ToolNames.BOOK_INSPECTION, {
             "success": True,
             "confirmation_id": "CONF-9999",
             "confirmed_datetime": "2026-04-12 10:00",
         })])
         result = context_update_node(state)
-        assert result["booking_status"]["confirmed"] is True
-        assert result["booking_status"]["awaiting_confirmation"] is False
-        assert result["booking_status"]["cancelled"] is False
+        assert result["booking_context"]["confirmed"] is True
+        assert result["booking_context"]["cancelled"] is False
 
     def test_success_resets_error_count(self):
         state = make_state(
@@ -169,9 +166,8 @@ class TestHandleCancelInspection:
         state = make_state(
             [_tool_msg(ToolNames.CANCEL_INSPECTION, {"success": True})])
         result = context_update_node(state)
-        assert result["booking_status"]["cancelled"] is True
-        assert result["booking_status"]["confirmed"] is False
-        assert result["booking_status"]["awaiting_confirmation"] is False
+        assert result["booking_context"]["cancelled"] is True
+        assert result["booking_context"]["confirmed"] is False
 
 
 class TestHandleGetBooking:
@@ -236,7 +232,6 @@ class TestContextUpdateJsonResilience:
                 bad_msg,
             ],
             "booking_context": BookingContext(),
-            "booking_status": BookingStatus(awaiting_confirmation=False, confirmed=False, cancelled=False),
             "error_count": 0,
         }
         # Must not raise — returns {} because parsed content has no "success": True

@@ -37,7 +37,8 @@ async def book_inspection(slot_id: str, config: RunnableConfig) -> dict:
         return BookingResult(
             success=True,
             confirmation_id=result.confirmation_id,
-            # property_address=result.property_address,
+            property_id=result.property_id,
+            property_address=result.property_address,
             start_at_utc=result.start_at_utc,
             end_at_utc=result.end_at_utc,
             agent_name=f"{result.agent_first_name} {result.agent_last_name}".strip(),

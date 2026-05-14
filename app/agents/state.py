@@ -72,36 +72,24 @@ class BookingContext(TypedDict, total=False):
     via BookingService.
 
     Multi-turn flow:
-        1. intent detected     → property_id set
-        2. availability fetched → available_slots populated (.NET API call)
-        3. slot selected       → selected_slot set
-        4. contact collected   → contact_* fields filled turn by turn
-        5. user confirms       → awaiting_confirmation=True
-        6. .NET books it       → confirmation_id set, confirmed=True
+        1. availability fetched → available_slots + property_id set
+        2. slot selected        → user chooses from available_slots
+        3. user confirms        → book_inspection called
+        4. .NET books it        → confirmation_id + confirmed=True set
     """
-    # Property being inspected
     property_id: str
     property_address: str
 
-    # Slots returned by .NET availability API
-    available_slots: list[str]      # ["2025-06-14 10:00", "2025-06-14 14:00"]
-    selected_slot: str              # slot the user chose from available_slots
+    available_slots: list[str]
+    selected_slot: str
 
-    # Contact details — collected across turns, sent to .NET on confirmation
-    contact_name: str
-    contact_email: str
-    contact_phone: str
+    confirmed: bool
+    cancelled: bool
 
-    awaiting_confirmation: bool     # all details collected, pending user yes/no
-    confirmed: bool                 # set after book_inspection succeeds
-    cancelled: bool                 # set after cancel_inspection succeeds
+    confirmation_id: str
+    confirmed_datetime: str
 
-    # Set by .NET after successful booking
-    confirmation_id: str            # .NET booking reference number
-    confirmed_datetime: str         # confirmed slot from .NET response
-
-    # Set when cancelling an existing booking
-    cancellation_id: str            # existing booking ID to cancel
+    cancellation_id: str
     cancellation_reason: str
 
 
@@ -175,7 +163,6 @@ def initial_state() -> RealEstateAgentState:
         property_context=PropertyContext(),
         booking_context=BookingContext(
             available_slots=[],
-            awaiting_confirmation=False,
             confirmed=False,
             cancelled=False,
         ),

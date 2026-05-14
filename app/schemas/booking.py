@@ -75,6 +75,7 @@ class BookingResult(BaseModel):
     """Tool return for book_inspection."""
     success: bool
     confirmation_id: str = ""
+    property_id: str = ""
     property_address: str = ""
     start_at_utc: datetime | None = None
     end_at_utc: datetime | None = None

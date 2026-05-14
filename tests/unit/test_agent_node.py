@@ -163,31 +163,26 @@ class TestAgentNode:
         }
         await agent_node(state)
         call_messages = mock_llm.ainvoke.call_args.args[0]
-        # 1 SystemMessage + 12 history + 1 PROPERTY_SEARCH_RESULTS SystemMessage
-        assert len(call_messages) == 14
+        # 1 SystemMessage + 12 history
+        assert len(call_messages) == 13
 
-    async def test_format_pass_prunes_tool_batch(self, mock_get_llm, mock_llm):
-        """Format pass returns RemoveMessage for the tool-call AIMessage and ToolMessages."""
+    async def test_format_pass_does_not_bind_tools(self, mock_get_llm, mock_llm):
+        """Format pass (ToolMessage last) uses plain LLM — no tools bound."""
         mock_get_llm.return_value = mock_llm
-        ai_tool_call = AIMessage(content="", tool_calls=[
-            {"name": "check_availability", "args": {}, "id": "tc_1", "type": "tool_call"}
-        ])
-        tool_result = ToolMessage(
-            content="{}", name="check_availability", tool_call_id="tc_1"
-        )
         state = {
             "messages": [
                 HumanMessage(content="book an inspection"),
-                ai_tool_call,
-                tool_result,
+                AIMessage(content="", tool_calls=[
+                    {"name": "check_availability", "args": {}, "id": "tc_1", "type": "tool_call"}
+                ]),
+                ToolMessage(content="{}", name="check_availability", tool_call_id="tc_1"),
             ],
             "user_intent": "booking",
             "error_count": 0,
         }
         result = await agent_node(state)
-        removed_ids = {m.id for m in result["messages"] if isinstance(m, RemoveMessage)}
-        assert ai_tool_call.id in removed_ids
-        assert tool_result.id in removed_ids
+        mock_llm.bind_tools.assert_not_called()
+        assert result["intent_completed"] is True
 
     async def test_first_pass_does_not_prune(self, mock_get_llm, mock_llm):
         """First booking turn (needs_tools=True) must not prune anything."""
@@ -201,11 +196,11 @@ class TestAgentNode:
         assert not any(isinstance(m, RemoveMessage) for m in result["messages"])
 
     async def test_retrieved_docs_injected_into_prompt(self, mock_get_llm, mock_llm):
-        """retrieved_docs is injected as a SystemMessage somewhere in the prompt."""
+        """retrieved_docs is injected as a SystemMessage for document intents."""
         mock_get_llm.return_value = mock_llm
         state = {
-            "messages": [HumanMessage(content="show me houses")],
-            "user_intent": "search",
+            "messages": [HumanMessage(content="what are your opening hours?")],
+            "user_intent": "document_query",
             "error_count": 0,
             "retrieved_docs": "excerpt from agency documents",
         }
