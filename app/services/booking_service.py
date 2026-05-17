@@ -11,7 +11,7 @@ from app.schemas.booking import (
     AvailableSlot,
     AvailableSlotList,
     AvailabilityResult,
-    BookingConfirmation,
+    BookingLookupResult,
     BookingRequest,
     CancellationConfirmation,
 )
@@ -46,7 +46,7 @@ class BookingService:
             slot_count=count,
         )
 
-    async def book(self, request: BookingRequest) -> BookingConfirmation:
+    async def book(self, request: BookingRequest) -> BookingLookupResult:
         """
         Create a confirmed inspection booking.
         """
@@ -64,7 +64,7 @@ class BookingService:
 
         return response
 
-    async def get_booking(self, confirmation_id: str, user_id: str) -> BookingConfirmation:
+    async def get_booking(self, confirmation_id: str, user_id: str) -> BookingLookupResult:
         """Fetch a single booking by confirmation ID."""
         try:
             url = InternalRoutes.get_booking(confirmation_id)
@@ -75,7 +75,7 @@ class BookingService:
 
         return self._parse_booking_response(data)
 
-    async def get_my_bookings(self, user_id: str) -> list[BookingConfirmation]:
+    async def get_my_bookings(self, user_id: str) -> list[BookingLookupResult]:
         """Fetch all bookings for the current user."""
         try:
             data = await self._client.get(f"{InternalRoutes.MY_BOOKINGS}/{user_id}")
@@ -107,10 +107,10 @@ class BookingService:
         slots = AvailableSlotList.validate_python(data)
         return [s for s in slots if s.available and s.start_at]
 
-    def _parse_booking_response(self, data: dict) -> BookingConfirmation:
+    def _parse_booking_response(self, data: dict) -> BookingLookupResult:
         """Normalise .NET booking confirmation response into a typed model."""
 
-        return BookingConfirmation(
+        return BookingLookupResult(
             confirmation_id=data.get("id", ""),
             property_id=data.get("propertyId", ""),
             property_address=data.get("propertyAddress", ""),

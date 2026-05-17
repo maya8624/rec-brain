@@ -100,9 +100,8 @@ def _handle_cancel_inspection(_state: RealEstateAgentState, result: dict) -> dic
     }
 
 
-def _handle_get_booking(_state: RealEstateAgentState, _result: dict) -> dict[str, Any]:
+def _handle_get_booking(_state: RealEstateAgentState, result: dict) -> dict[str, Any]:
     """Persist a uniquely identified booking for follow-up actions like cancellation."""
-    result = _result
     updates: dict[str, Any] = {StateKeys.INTENT_COMPLETED: True}
 
     if not result.get("success"):

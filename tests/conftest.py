@@ -81,18 +81,18 @@ def make_sql_service():
 def make_booking_service():
     """Factory for a mock BookingService."""
     from app.services.booking_service import BookingService
-    from app.schemas.booking import AvailabilityResult, AvailableSlot, BookingConfirmation, CancellationConfirmation
+    from app.schemas.booking import AvailabilityResult, AvailableSlot, BookingLookupResult, CancellationConfirmation
 
     def _factory(
         availability: AvailabilityResult | None = None,
-        booking_result: BookingConfirmation | None = None,
-        lookup_result: BookingConfirmation | None = None,
-        my_bookings: list[BookingConfirmation] | None = None,
+        booking_result: BookingLookupResult | None = None,
+        lookup_result: BookingLookupResult | None = None,
+        my_bookings: list[BookingLookupResult] | None = None,
         raise_error: Exception | None = None,
     ):
         mock = AsyncMock(spec=BookingService)
 
-        _default_confirmation = BookingConfirmation(
+        _default_confirmation = BookingLookupResult(
             confirmation_id="CONF-12345",
             property_id="prop_123",
             property_address="42 Main St, Sydney",

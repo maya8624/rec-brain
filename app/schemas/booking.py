@@ -8,6 +8,7 @@ booking, and cancellation endpoints.
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, TypeAdapter, computed_field, field_validator
 from app.core.config import DATETIME_FORMAT
+from app.core.utils import fmt_dt_sydney
 
 
 class ContactInfo(BaseModel):
@@ -58,32 +59,6 @@ class AvailabilityResult(BaseModel):
     error: str | None = None
 
 
-class BookingConfirmation(BaseModel):
-    """Confirmation details returned after a successful booking."""
-    confirmation_id: str
-    property_id: str = ""
-    property_address: str = ""
-    status: str = ""
-    agent_first_name: str = ""
-    agent_last_name: str = ""
-    agent_phone: str | None = None
-    start_at_utc: datetime | None = None
-    end_at_utc: datetime | None = None
-
-
-class BookingResult(BaseModel):
-    """Tool return for book_inspection."""
-    success: bool
-    confirmation_id: str = ""
-    property_id: str = ""
-    property_address: str = ""
-    start_at_utc: datetime | None = None
-    end_at_utc: datetime | None = None
-    agent_name: str = ""
-    agent_phone: str = ""
-    message: str = ""
-    error: str | None = None
-
 
 class CancellationConfirmation(BaseModel):
     """Confirmation returned after a successful cancellation."""
@@ -100,16 +75,46 @@ class CancellationResult(BaseModel):
     error: str | None = None
 
 
-class BookingLookupResult(BaseModel):
-    """Tool return for get_booking."""
+class BookingResult(BaseModel):
+    """Tool return for book_inspection."""
     success: bool
     confirmation_id: str = ""
     property_id: str = ""
     property_address: str = ""
-    status: str = ""
+    start_at_utc: datetime | None = None
+    end_at_utc: datetime | None = None
     agent_name: str = ""
-    agent_phone: str | None = None
-    start_at: str = ""
-    end_at: str = ""
-    bookings: list[dict] = []   # populated when returning all user bookings
+    agent_phone: str = ""
+    message: str = ""
     error: str | None = None
+
+
+class BookingLookupResult(BaseModel):
+    """Booking confirmation from .NET; also the get_booking tool return."""
+    success: bool = True
+    confirmation_id: str = ""
+    property_id: str = ""
+    property_address: str = ""
+    status: str = ""
+    agent_first_name: str = Field("", exclude=True)
+    agent_last_name: str = Field("", exclude=True)
+    agent_phone: str | None = None
+    start_at_utc: datetime | None = Field(None, exclude=True)
+    end_at_utc: datetime | None = Field(None, exclude=True)
+    bookings: list[dict] = []
+    error: str | None = None
+
+    @computed_field
+    @property
+    def agent_name(self) -> str:
+        return f"{self.agent_first_name} {self.agent_last_name}".strip()
+
+    @computed_field
+    @property
+    def start_at(self) -> str:
+        return fmt_dt_sydney(self.start_at_utc)
+
+    @computed_field
+    @property
+    def end_at(self) -> str:
+        return fmt_dt_sydney(self.end_at_utc)

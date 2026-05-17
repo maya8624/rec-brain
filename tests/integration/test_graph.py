@@ -31,9 +31,9 @@ async def graph():
 
 def make_booking_service():
     from datetime import datetime, timezone
-    from app.schemas.booking import AvailabilityResult, AvailableSlot, BookingConfirmation, CancellationConfirmation
+    from app.schemas.booking import AvailabilityResult, AvailableSlot, BookingLookupResult, CancellationConfirmation
 
-    _default_confirmation = BookingConfirmation(
+    _default_confirmation = BookingLookupResult(
         confirmation_id="CONF-12345",
         property_id="prop_123",
         property_address="42 Main St, Sydney NSW 2000",

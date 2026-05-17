@@ -8,25 +8,10 @@ from langchain_core.tools import tool
 
 from app.core.constants import AppStateKeys
 from app.core.exceptions import BookingServiceError
-from app.schemas.booking import BookingConfirmation, BookingLookupResult
+from app.schemas.booking import BookingLookupResult
 from app.services.booking_service import BookingService
-from app.tools._utils import fmt_dt_sydney
 
 logger = logging.getLogger(__name__)
-
-
-def _to_result(booking: BookingConfirmation) -> BookingLookupResult:
-    return BookingLookupResult(
-        success=True,
-        confirmation_id=booking.confirmation_id,
-        property_id=booking.property_id,
-        property_address=booking.property_address,
-        status=booking.status,
-        agent_name=f"{booking.agent_first_name} {booking.agent_last_name}".strip(),
-        agent_phone=booking.agent_phone,
-        start_at=fmt_dt_sydney(booking.start_at_utc),
-        end_at=fmt_dt_sydney(booking.end_at_utc),
-    )
 
 
 @tool
@@ -42,7 +27,7 @@ async def get_booking(config: RunnableConfig, confirmation_id: str = "") -> dict
     try:
         if confirmation_id:
             booking = await booking_service.get_booking(confirmation_id, user_id)
-            return _to_result(booking).model_dump()
+            return booking.model_dump()
 
         bookings = await booking_service.get_my_bookings(user_id)
         if not bookings:
@@ -53,8 +38,7 @@ async def get_booking(config: RunnableConfig, confirmation_id: str = "") -> dict
 
         return BookingLookupResult(
             success=True,
-            bookings=[_to_result(booking).model_dump()
-                      for booking in bookings],
+            bookings=[b.model_dump() for b in bookings],
         ).model_dump()
 
     except BookingServiceError as exc:
