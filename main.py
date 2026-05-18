@@ -15,7 +15,7 @@ from fastapi.openapi.utils import get_openapi
 from app.agents.graph import build_graph
 from app.infrastructure.checkpointer import PostgresCheckpointer
 from app.core.middleware import RequestLoggingMiddleware
-from app.api.routes import chat, health
+from app.api.routes import chat, health, search
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.infrastructure.embedding import EmbeddingService
@@ -25,6 +25,7 @@ from app.services.booking_service import BookingService
 from app.services.deposit_service import DepositService
 from app.services.sql_service import SqlViewService
 from app.services.rag_service import RagRetriever
+from app.services.search_service import SearchService
 from app.services.backend_client import backend_client
 
 logger = structlog.get_logger(__name__)
@@ -73,6 +74,11 @@ async def lifespan(_app: FastAPI):
         _app.state.rag_service = RagRetriever(
             vector_store_service=PgVectorStoreService(),
             embedding_service=EmbeddingService(),
+        )
+        _app.state.search_service = SearchService(
+            sql=_app.state.sql_view_service,
+            rag=_app.state.rag_service,
+            llm=get_llm(),
         )
 
         _app.state.checkpointer = await PostgresCheckpointer.create()
@@ -149,3 +155,4 @@ app.add_middleware(
 # ------------------------------------
 app.include_router(chat.router)
 app.include_router(health.router)
+app.include_router(search.router)

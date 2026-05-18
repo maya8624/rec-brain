@@ -81,7 +81,6 @@ def _handle_book_inspection(_state: RealEstateAgentState, result: dict) -> dict[
             cancelled=False,
         ),
         StateKeys.PHASE: ConversationPhase.BOOKING_CONFIRMED,
-        StateKeys.INTENT_COMPLETED: True
     }
 
 
@@ -96,16 +95,13 @@ def _handle_cancel_inspection(_state: RealEstateAgentState, result: dict) -> dic
             confirmed=False,
         ),
         StateKeys.PHASE: ConversationPhase.IDLE,
-        StateKeys.INTENT_COMPLETED: True
     }
 
 
 def _handle_get_booking(_state: RealEstateAgentState, result: dict) -> dict[str, Any]:
     """Persist a uniquely identified booking for follow-up actions like cancellation."""
-    updates: dict[str, Any] = {StateKeys.INTENT_COMPLETED: True}
-
     if not result.get("success"):
-        return updates
+        return {}
 
     booking_data: dict[str, Any] | None = None
     if result.get("confirmation_id"):
@@ -116,7 +112,7 @@ def _handle_get_booking(_state: RealEstateAgentState, result: dict) -> dict[str,
             booking_data = bookings[0]
 
     if not booking_data:
-        return updates
+        return {}
 
     merged = _merge_context(
         _state,
@@ -127,8 +123,7 @@ def _handle_get_booking(_state: RealEstateAgentState, result: dict) -> dict[str,
             "property_address": booking_data.get("property_address", ""),
         },
     )
-    updates[StateKeys.BOOKING_CONTEXT] = BookingContext(**merged)
-    return updates
+    return {StateKeys.BOOKING_CONTEXT: BookingContext(**merged)}
 
 
 def _handle_get_deposit(_state: RealEstateAgentState, result: dict) -> dict[str, Any]:
@@ -136,7 +131,6 @@ def _handle_get_deposit(_state: RealEstateAgentState, result: dict) -> dict[str,
     return {
         StateKeys.DEPOSIT_RESULT: result if result.get("success") else None,
         StateKeys.PHASE: ConversationPhase.DEPOSIT_CONFIRMED,
-        StateKeys.INTENT_COMPLETED: True
     }
 
 

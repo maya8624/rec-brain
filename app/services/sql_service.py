@@ -18,6 +18,7 @@ from app.infrastructure.database import engine
 from app.prompts.sql import SQL_GENERATION_PROMPT
 from app.agents.state import SearchContext
 from app.schemas.property import SearchResult
+from app.schemas.search import TenantPreference
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +102,40 @@ class SqlViewService:
                 sql = sql[3:]
 
         return sql.strip()
+
+    async def generate_summary(
+        self,
+        pref: TenantPreference,
+        top: list[dict],
+        total: int,
+    ) -> str:
+        """Generate a warm summary message for a tenant preference search result."""
+
+        if len(pref.suburbs) > 1:
+            suburb_str = ", ".join(
+                pref.suburbs[:-1]) + f" and {pref.suburbs[-1]}"
+        else:
+            suburb_str = pref.suburbs[0] if pref.suburbs else "your preferred suburbs"
+
+        summaries = "\n".join(
+            f"- {r.get('address_line1', '')} {r.get('suburb', '')}, "
+            f"${r.get('price', 0):.0f}/wk, {r.get('bedrooms', 0)} bed"
+            for r in top
+        )
+
+        prompt = (
+            f"You are a real estate assistant. Write a warm, natural 1-2 sentence message "
+            f"summarising search results for a tenant.\n\n"
+            f"Preferences: {pref.minBeds}-{pref.maxBeds} bed, pet friendly: {pref.petFriendly}, "
+            f"max rent: ${pref.maxRent}/wk, suburbs: {suburb_str}, "
+            f"available within {pref.availableWithinDays} days.\n"
+            f"Total matches: {total}\n"
+            f"Top listings:\n{summaries}\n\n"
+            f"Mention suburbs, budget, and total count. No bullet points."
+        )
+
+        response = await self._llm.ainvoke([HumanMessage(content=prompt)])
+        return response.content.strip()
 
     @staticmethod
     def build_sql_from_context(ctx: SearchContext) -> str:
