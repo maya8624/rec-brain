@@ -16,7 +16,8 @@ async def search_by_preferences(
     request: Request,
 ) -> PreferenceSearchResponse:
     service: SearchService = request.app.state.search_service
-    return await service.search_by_preferences(pref)
+    results = await service.search_by_preferences(pref)
+    return results
 
 
 @router.post("/suburb-summary", dependencies=[Depends(verify_internal_key)])

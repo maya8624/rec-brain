@@ -2,8 +2,9 @@
 Unit tests for SearchService — preference-based listing search and suburb summary.
 All external calls (SQL, RAG) are mocked.
 """
+import uuid
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.services.search_service import SearchService, _to_search_query, DISPLAY_COUNT
 from app.schemas.search import TenantPreference, PreferenceSearchResponse, SuburbSummaryResponse
@@ -17,10 +18,19 @@ pytestmark = pytest.mark.unit
 def make_listing(n: int = 1) -> list[dict]:
     return [
         {
-            "address_line1": f"{i} Test St",
-            "suburb": "Sydney",
+            "listing_id": str(uuid.uuid4()),
+            "property_id": str(uuid.uuid4()),
+            "listing_type": "Rent",
+            "listing_status": "Active",
             "price": 500 + i * 10,
             "bedrooms": 2,
+            "bathrooms": 1,
+            "car_spaces": 0,
+            "property_type": "Apartment",
+            "address_line1": f"{i} Test St",
+            "suburb": "Sydney",
+            "state": "NSW",
+            "postcode": "2000",
         }
         for i in range(n)
     ]
@@ -29,8 +39,7 @@ def make_listing(n: int = 1) -> list[dict]:
 def make_service(
     listings: list[dict] | None = None,
     search_success: bool = True,
-    summary_text: str = "Great options found.",
-    suburb_summary_text: str = "Bondi is a vibrant coastal suburb.",
+    llm_text: str = "Great options found.",
     nodes: list | None = None,
     sql_error: Exception | None = None,
     rag_error: Exception | None = None,
@@ -49,8 +58,7 @@ def make_service(
             output=rows if search_success else None,
             result_count=len(rows) if search_success else 0,
         )
-    mock_sql.generate_summary.return_value = summary_text
-    mock_llm.ainvoke.return_value = MagicMock(content=suburb_summary_text)
+    mock_llm.ainvoke.return_value = MagicMock(content=llm_text)
 
     if rag_error:
         mock_rag.aretrieve.side_effect = rag_error
@@ -121,7 +129,7 @@ class TestSearchByPreferences:
         assert isinstance(result, PreferenceSearchResponse)
 
     async def test_message_comes_from_generate_summary(self):
-        svc, _, _, _ = make_service(summary_text="Found great listings!")
+        svc, _, _, _ = make_service(llm_text="Found great listings!")
         result = await svc.search_by_preferences(make_pref())
         assert result.message == "Found great listings!"
 
@@ -154,9 +162,10 @@ class TestSearchByPreferences:
 
     async def test_generate_summary_receives_top_slice_only(self):
         listings = make_listing(DISPLAY_COUNT + 2)
-        svc, mock_sql, _, _ = make_service(listings=listings)
-        await svc.search_by_preferences(make_pref())
-        _, called_top, called_total = mock_sql.generate_summary.call_args.args
+        svc, _, _, _ = make_service(listings=listings)
+        with patch.object(svc, "_generate_summary", new=AsyncMock(return_value="ok")) as mock_summary:
+            await svc.search_by_preferences(make_pref())
+        _, called_top, called_total = mock_summary.call_args.args
         assert len(called_top) == DISPLAY_COUNT
         assert called_total == DISPLAY_COUNT + 2
 
@@ -182,7 +191,7 @@ class TestGetSuburbSummary:
         assert isinstance(result, SuburbSummaryResponse)
 
     async def test_summary_comes_from_llm(self):
-        svc, _, _, _ = make_service(suburb_summary_text="Bondi is a vibrant coastal suburb.")
+        svc, _, _, _ = make_service(llm_text="Bondi is a vibrant coastal suburb.")
         result = await svc.get_suburb_summary(["Bondi"])
         assert result.summary == "Bondi is a vibrant coastal suburb."
 

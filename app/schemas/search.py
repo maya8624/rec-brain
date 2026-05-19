@@ -1,5 +1,7 @@
 from pydantic import BaseModel
 
+from app.schemas.property import Listing
+
 
 class TenantPreference(BaseModel):
     suburbs: list[str]
@@ -12,7 +14,7 @@ class TenantPreference(BaseModel):
 
 class PreferenceSearchResponse(BaseModel):
     message: str
-    listings: list[dict]
+    listings: list[Listing]
     display_count: int
     total_count: int
     has_more: bool

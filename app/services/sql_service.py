@@ -18,7 +18,6 @@ from app.infrastructure.database import engine
 from app.prompts.sql import SQL_GENERATION_PROMPT
 from app.agents.state import SearchContext
 from app.schemas.property import SearchResult
-from app.schemas.search import TenantPreference
 
 logger = logging.getLogger(__name__)
 
@@ -29,8 +28,9 @@ _SEARCH_ERROR = SearchResult(
 # Fixed SELECT columns — mirrors SQL_GENERATION_PROMPT rule 1
 _SELECT_COLS = (
     "SELECT listing_id, property_id, listing_type, listing_status, price, bedrooms, bathrooms, "
-    "car_spaces, property_type, title, address_line1, address_line2, suburb, state, "
-    "postcode, agent_first_name, agent_last_name, agent_phone, agency_name"
+    "car_spaces, property_type, title, description, address_line1, address_line2, suburb, state, "
+    "postcode, available_from_utc, land_size_sqm, building_size_sqm, year_built, image_url, "
+    "agent_first_name, agent_last_name, agent_email, agent_phone, agency_name, agency_phone"
 )
 
 
@@ -82,8 +82,8 @@ class SqlViewService:
         """Validate and run a SELECT query. Returns rows as a list of dicts."""
         self._validate_sql(sql)
         with engine.connect() as conn:
-            result = conn.execute(text(sql))
-            return [dict(row._mapping) for row in result]
+            rows = conn.execute(text(sql))
+            return [dict(row._mapping) for row in rows]
 
     async def _generate_sql(self, question: str) -> str:
         """Send question + v_listings schema to LLM. Returns raw SQL string."""
@@ -102,40 +102,6 @@ class SqlViewService:
                 sql = sql[3:]
 
         return sql.strip()
-
-    async def generate_summary(
-        self,
-        pref: TenantPreference,
-        top: list[dict],
-        total: int,
-    ) -> str:
-        """Generate a warm summary message for a tenant preference search result."""
-
-        if len(pref.suburbs) > 1:
-            suburb_str = ", ".join(
-                pref.suburbs[:-1]) + f" and {pref.suburbs[-1]}"
-        else:
-            suburb_str = pref.suburbs[0] if pref.suburbs else "your preferred suburbs"
-
-        summaries = "\n".join(
-            f"- {r.get('address_line1', '')} {r.get('suburb', '')}, "
-            f"${r.get('price', 0):.0f}/wk, {r.get('bedrooms', 0)} bed"
-            for r in top
-        )
-
-        prompt = (
-            f"You are a real estate assistant. Write a warm, natural 1-2 sentence message "
-            f"summarising search results for a tenant.\n\n"
-            f"Preferences: {pref.minBeds}-{pref.maxBeds} bed, pet friendly: {pref.petFriendly}, "
-            f"max rent: ${pref.maxRent}/wk, suburbs: {suburb_str}, "
-            f"available within {pref.availableWithinDays} days.\n"
-            f"Total matches: {total}\n"
-            f"Top listings:\n{summaries}\n\n"
-            f"Mention suburbs, budget, and total count. No bullet points."
-        )
-
-        response = await self._llm.ainvoke([HumanMessage(content=prompt)])
-        return response.content.strip()
 
     @staticmethod
     def build_sql_from_context(ctx: SearchContext) -> str:

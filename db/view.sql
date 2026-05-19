@@ -20,7 +20,6 @@ SELECT
     l.is_published,
     l.listed_at_utc,
     l.available_from_utc,
-
     -- Property
     p.id                        AS property_id,
     p.title,
@@ -32,10 +31,8 @@ SELECT
     p.building_size_sqm,
     p.year_built,
     p.is_active,
-
     -- Property Type
     pt.name                     AS property_type,
-
     -- Address
     pa.address_line1,
     pa.address_line2,
@@ -45,23 +42,23 @@ SELECT
     pa.country,
     pa.latitude,
     pa.longitude,
-
+    -- Image
+    pi.image_url,
     -- Agent
     ag.id                       AS agent_id,
     ag.first_name               AS agent_first_name,
     ag.last_name                AS agent_last_name,
     ag.email                    AS agent_email,
     ag.phone_number             AS agent_phone,
-
     -- Agency
     agc.id                      AS agency_id,
     agc.name                    AS agency_name,
     agc.email                   AS agency_email,
     agc.phone_number            AS agency_phone
-
 FROM listings l
 JOIN properties p           ON l.property_id    = p.id
 JOIN property_addresses pa  ON pa.property_id   = p.id
 JOIN property_types pt      ON pt.id            = p.property_type_id
-JOIN agents ag         ON l.agent_id       = ag.id
-JOIN agencies agc      ON l.agency_id      = agc.id;
+LEFT JOIN property_images pi ON pi.property_id  = p.id AND pi.is_primary = true
+JOIN agents ag              ON l.agent_id       = ag.id
+JOIN agencies agc           ON l.agency_id      = agc.id;

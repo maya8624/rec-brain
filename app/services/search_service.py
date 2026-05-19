@@ -4,6 +4,8 @@ from langchain_core.messages import HumanMessage
 
 from app.services.sql_service import SqlViewService
 from app.services.rag_service import RagRetriever
+from app.prompts.sql import build_search_summary_prompt
+from app.schemas.property import Listing
 from app.schemas.search import TenantPreference, PreferenceSearchResponse, SuburbSummaryResponse
 
 logger = logging.getLogger(__name__)
@@ -49,20 +51,50 @@ class SearchService:
     async def search_by_preferences(self, pref: TenantPreference) -> PreferenceSearchResponse:
         query = _to_search_query(pref)
         result = await self._sql.search_listings(query)
-        all_listings = result.output or []
+        all_listings = [
+            Listing.model_validate(result) for result in (result.output or [])
+        ]
+        total = len(all_listings)
         top = all_listings[:DISPLAY_COUNT]
-        message = await self._sql.generate_summary(pref, top, len(all_listings))
+        message = await self._generate_summary(pref, top, total)
 
         return PreferenceSearchResponse(
             message=message,
             listings=all_listings,
             display_count=len(top),
-            total_count=len(all_listings),
-            has_more=len(all_listings) > DISPLAY_COUNT,
+            total_count=total,
+            has_more=total > DISPLAY_COUNT,
         )
 
+    async def _generate_summary(
+        self,
+        pref: TenantPreference,
+        top_listings: list[Listing],
+        total: int,
+    ) -> str:
+        if len(pref.suburbs) > 1:
+            suburb_str = ", ".join(
+                pref.suburbs[:-1]) + f" and {pref.suburbs[-1]}"
+        else:
+            suburb_str = pref.suburbs[0] if pref.suburbs else "your preferred suburbs"
+
+        summaries = "\n".join(
+            f"- {listing.address_line1} {listing.suburb}, ${listing.price:.0f}/wk, {listing.bedrooms} bed"
+            for listing in top_listings
+        )
+
+        prompt = build_search_summary_prompt(
+            pref=pref,
+            suburb_str=suburb_str,
+            total=total,
+            summaries=summaries,
+        )
+        response = await self._llm.ainvoke([HumanMessage(content=prompt)])
+        return response.content.strip()
+
     async def get_suburb_summary(self, suburbs: list[str]) -> SuburbSummaryResponse:
-        query = "suburb profile " + " ".join(suburbs) if suburbs else "suburb overview"
+        query = "suburb profile " + \
+            " ".join(suburbs) if suburbs else "suburb overview"
         nodes = await self._rag.aretrieve(query)
 
         if not nodes:

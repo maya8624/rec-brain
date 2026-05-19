@@ -1,11 +1,14 @@
 """
 Prompts for SQL generation scoped to v_listings view only.
 
-SQL_GENERATION_PROMPT — used by SqlViewService to generate safe SELECT queries
-                         from natural language user messages.
+SQL_GENERATION_PROMPT       — used by SqlViewService to generate safe SELECT queries
+                              from natural language user messages.
+build_search_summary_prompt — builds the tenant search summary message prompt.
 """
 
 from datetime import date
+
+from app.schemas.search import TenantPreference
 
 _today = date.today().strftime("%Y-%m-%d")
 
@@ -23,30 +26,52 @@ Generate a single PostgreSQL SELECT query against the v_listings view only.
 Return ONLY the raw SQL query — no explanation, no markdown, no extra text.
 
 V_LISTINGS COLUMNS:
-    listing_id        — UUID
-    property_id       — UUID (the property this listing belongs to — used for booking)
-    listing_type      — text: 'Sale' or 'Rent'
-    listing_status    — text: 'Active', 'Sold', 'Leased'
-    price             — numeric, AUD (sale price or weekly rent)
-    bedrooms          — integer
-    bathrooms         — integer
-    car_spaces        — integer
-    property_type     — text: 'House', 'Apartment', 'Townhouse', 'Unit', 'Villa', 'Studio'
-    title             — text
-    address_line1     — text
-    address_line2     — text
-    suburb            — text: local area or neighbourhood name (e.g. 'Sydney', 'Parramatta', 'Chatswood', 'Bondi')
-    state             — text: Australian state/territory abbreviation only — valid values: NSW, VIC, QLD, WA, SA, TAS, ACT, NT
-    postcode          — text
-    agent_first_name  — text
-    agent_last_name   — text
-    agent_phone       — text
-    agency_name       — text
-    is_published      — boolean
-    is_active         — boolean
+    -- Listing
+    listing_id           — UUID
+    listing_type         — text: 'Sale' or 'Rent'
+    listing_status       — text: 'Active', 'Sold', 'Leased'
+    price                — numeric, AUD (sale price or weekly rent)
+    is_published         — boolean
+    listed_at_utc        — timestamptz: when the listing was posted
+    available_from_utc   — timestamptz: earliest move-in / available date
+    -- Property
+    property_id          — UUID (the property this listing belongs to — used for booking)
+    title                — text
+    description          — text
+    bedrooms             — integer
+    bathrooms            — integer
+    car_spaces           — integer
+    land_size_sqm        — numeric, nullable
+    building_size_sqm    — numeric, nullable
+    year_built           — integer, nullable
+    is_active            — boolean
+    -- Property type
+    property_type        — text: 'House', 'Apartment', 'Townhouse', 'Villa', 'Studio'
+    -- Address
+    address_line1        — text
+    address_line2        — text, nullable
+    suburb               — text: local area or neighbourhood name (e.g. 'Sydney', 'Parramatta', 'Chatswood', 'Bondi')
+    state                — text: Australian state/territory abbreviation only — valid values: NSW, VIC, QLD, WA, SA, TAS, ACT, NT
+    postcode             — text
+    country              — text
+    latitude             — numeric, nullable
+    longitude            — numeric, nullable
+    -- Image
+    image_url            — text, nullable
+    -- Agent
+    agent_id             — UUID
+    agent_first_name     — text
+    agent_last_name      — text
+    agent_email          — text
+    agent_phone          — text
+    -- Agency
+    agency_id            — UUID
+    agency_name          — text
+    agency_email         — text
+    agency_phone         — text
 
 RULES:
-1. ALWAYS start with: SELECT listing_id, property_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, address_line1, address_line2, suburb, state, postcode, agent_first_name, agent_last_name, agent_phone, agency_name
+1. ALWAYS start with: SELECT listing_id, property_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, description, address_line1, address_line2, suburb, state, postcode, available_from_utc, land_size_sqm, building_size_sqm, year_built, image_url, agent_first_name, agent_last_name, agent_email, agent_phone, agency_name, agency_phone
 2. ALWAYS filter: WHERE is_published = true AND is_active = true
 3. ALWAYS end with: ORDER BY price ASC LIMIT N
    — N = the number the user explicitly requests (e.g. "show me 3" → LIMIT 3)
@@ -57,15 +82,21 @@ RULES:
 4. NEVER use SELECT *
 5. NEVER query any table other than v_listings
 6. NEVER use INSERT, UPDATE, DELETE, DROP, CREATE, ALTER, TRUNCATE
-7. Use ILIKE '%value%' for free-text fields (suburb, address_line1, agent name)
+7. MULTIPLE SUBURBS — when the user mentions more than one suburb, combine them with OR:
+   (suburb ILIKE '%Bondi%' OR suburb ILIKE '%Surry Hills%')
+   NEVER drop suburbs — every suburb the user mentions must appear in the query.
+8. Use ILIKE '%value%' for free-text fields (suburb, address_line1, agent name)
    — suburb is a local area or neighbourhood name, NOT a state abbreviation
    — For property_type use exact case-insensitive match: property_type ILIKE 'House'
      NOT property_type ILIKE '%House%' — this prevents 'House' matching 'Townhouse'
    — Valid property_type values: 'House', 'Apartment', 'Townhouse', 'Villa', 'Studio'
    — 'Unit' does not exist — always use 'Apartment' instead
-8. Use numeric comparisons for price and bedrooms (price <= 800000)
-9. Convert price shorthands: "$800k" → 800000, "$1.2m" → 1200000
-10. LOCATION RULES — critical:
+9. Use numeric comparisons for price and bedrooms (price <= 800000)
+10. Convert price shorthands: "$800k" → 800000, "$1.2m" → 1200000
+11. AVAILABILITY — for "available within X days" or "available from [date]":
+    - Use: available_from_utc <= NOW() + INTERVAL 'X days'
+    - Example: "available within 14 days" → available_from_utc <= NOW() + INTERVAL '14 days'
+12. LOCATION RULES — critical:
     - suburb column: local area or neighbourhood (e.g. 'Sydney', 'Parramatta', 'Chatswood', 'Bondi')
     - state column: Australian state/territory only — valid values: NSW, VIC, QLD, WA, SA, TAS, ACT, NT
     - If the location is a city, suburb, or neighbourhood → use suburb column
@@ -78,29 +109,55 @@ RULES:
 EXAMPLES:
 
 User: "Show me properties in Sydney"
-SQL: SELECT listing_id, property_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, address_line1, address_line2, suburb, state, postcode, agent_first_name, agent_last_name, agent_phone, agency_name FROM v_listings WHERE is_published = true AND is_active = true AND suburb ILIKE '%Sydney%' ORDER BY price ASC LIMIT 10
+SQL: SELECT listing_id, property_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, description, address_line1, address_line2, suburb, state, postcode, available_from_utc, land_size_sqm, building_size_sqm, year_built, image_url, agent_first_name, agent_last_name, agent_email, agent_phone, agency_name, agency_phone FROM v_listings WHERE is_published = true AND is_active = true AND suburb ILIKE '%Sydney%' ORDER BY price ASC LIMIT 10
 
 User: "Show me properties in Queensland"
-SQL: SELECT listing_id, property_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, address_line1, address_line2, suburb, state, postcode, agent_first_name, agent_last_name, agent_phone, agency_name FROM v_listings WHERE is_published = true AND is_active = true AND (state ILIKE '%QLD%' OR state ILIKE '%Queensland%') ORDER BY price ASC LIMIT 10
+SQL: SELECT listing_id, property_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, description, address_line1, address_line2, suburb, state, postcode, available_from_utc, land_size_sqm, building_size_sqm, year_built, image_url, agent_first_name, agent_last_name, agent_email, agent_phone, agency_name, agency_phone FROM v_listings WHERE is_published = true AND is_active = true AND (state ILIKE '%QLD%' OR state ILIKE '%Queensland%') ORDER BY price ASC LIMIT 10
 
 User: "Show me properties in Parramatta NSW"
-SQL: SELECT listing_id, property_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, address_line1, address_line2, suburb, state, postcode, agent_first_name, agent_last_name, agent_phone, agency_name FROM v_listings WHERE is_published = true AND is_active = true AND suburb ILIKE '%Parramatta%' AND state = 'NSW' ORDER BY price ASC LIMIT 10
+SQL: SELECT listing_id, property_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, description, address_line1, address_line2, suburb, state, postcode, available_from_utc, land_size_sqm, building_size_sqm, year_built, image_url, agent_first_name, agent_last_name, agent_email, agent_phone, agency_name, agency_phone FROM v_listings WHERE is_published = true AND is_active = true AND suburb ILIKE '%Parramatta%' AND state = 'NSW' ORDER BY price ASC LIMIT 10
 
 User: "Show me 3 bedroom houses in Parramatta under $800k"
-SQL: SELECT listing_id, property_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, address_line1, address_line2, suburb, state, postcode, agent_first_name, agent_last_name, agent_phone, agency_name FROM v_listings WHERE is_published = true AND is_active = true AND bedrooms = 3 AND property_type ILIKE 'House' AND suburb ILIKE '%Parramatta%' AND price <= 800000 ORDER BY price ASC LIMIT 10
+SQL: SELECT listing_id, property_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, description, address_line1, address_line2, suburb, state, postcode, available_from_utc, land_size_sqm, building_size_sqm, year_built, image_url, agent_first_name, agent_last_name, agent_email, agent_phone, agency_name, agency_phone FROM v_listings WHERE is_published = true AND is_active = true AND bedrooms = 3 AND property_type ILIKE 'House' AND suburb ILIKE '%Parramatta%' AND price <= 800000 ORDER BY price ASC LIMIT 10
 
 User: "Rental apartments in Parramatta under $600 per week"
-SQL: SELECT listing_id, property_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, address_line1, address_line2, suburb, state, postcode, agent_first_name, agent_last_name, agent_phone, agency_name FROM v_listings WHERE is_published = true AND is_active = true AND listing_type = 'Rent' AND property_type ILIKE 'Apartment' AND suburb ILIKE '%Parramatta%' AND price <= 600 ORDER BY price ASC LIMIT 10
+SQL: SELECT listing_id, property_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, description, address_line1, address_line2, suburb, state, postcode, available_from_utc, land_size_sqm, building_size_sqm, year_built, image_url, agent_first_name, agent_last_name, agent_email, agent_phone, agency_name, agency_phone FROM v_listings WHERE is_published = true AND is_active = true AND listing_type = 'Rent' AND property_type ILIKE 'Apartment' AND suburb ILIKE '%Parramatta%' AND price <= 600 ORDER BY price ASC LIMIT 10
 
 User: "Houses between $500k and $1.2m in Sydney"
-SQL: SELECT listing_id, property_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, address_line1, address_line2, suburb, state, postcode, agent_first_name, agent_last_name, agent_phone, agency_name FROM v_listings WHERE is_published = true AND is_active = true AND property_type ILIKE 'House' AND suburb ILIKE '%Sydney%' AND price BETWEEN 500000 AND 1200000 ORDER BY price ASC LIMIT 10
+SQL: SELECT listing_id, property_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, description, address_line1, address_line2, suburb, state, postcode, available_from_utc, land_size_sqm, building_size_sqm, year_built, image_url, agent_first_name, agent_last_name, agent_email, agent_phone, agency_name, agency_phone FROM v_listings WHERE is_published = true AND is_active = true AND property_type ILIKE 'House' AND suburb ILIKE '%Sydney%' AND price BETWEEN 500000 AND 1200000 ORDER BY price ASC LIMIT 10
 
 User: "Show me 3 bedroom townhouses in Parramatta NSW for sale under $900k"
-SQL: SELECT listing_id, property_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, address_line1, address_line2, suburb, state, postcode, agent_first_name, agent_last_name, agent_phone, agency_name FROM v_listings WHERE is_published = true AND is_active = true AND listing_type = 'Sale' AND bedrooms = 3 AND property_type ILIKE 'Townhouse' AND suburb ILIKE '%Parramatta%' AND state = 'NSW' AND price <= 900000 ORDER BY price ASC LIMIT 10
+SQL: SELECT listing_id, property_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, description, address_line1, address_line2, suburb, state, postcode, available_from_utc, land_size_sqm, building_size_sqm, year_built, image_url, agent_first_name, agent_last_name, agent_email, agent_phone, agency_name, agency_phone FROM v_listings WHERE is_published = true AND is_active = true AND listing_type = 'Sale' AND bedrooms = 3 AND property_type ILIKE 'Townhouse' AND suburb ILIKE '%Parramatta%' AND state = 'NSW' AND price <= 900000 ORDER BY price ASC LIMIT 10
 
 User: "Show me 3 properties in Castle Hill"
-SQL: SELECT listing_id, property_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, address_line1, address_line2, suburb, state, postcode, agent_first_name, agent_last_name, agent_phone, agency_name FROM v_listings WHERE is_published = true AND is_active = true AND suburb ILIKE '%Castle Hill%' ORDER BY price ASC LIMIT 3
+SQL: SELECT listing_id, property_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, description, address_line1, address_line2, suburb, state, postcode, available_from_utc, land_size_sqm, building_size_sqm, year_built, image_url, agent_first_name, agent_last_name, agent_email, agent_phone, agency_name, agency_phone FROM v_listings WHERE is_published = true AND is_active = true AND suburb ILIKE '%Castle Hill%' ORDER BY price ASC LIMIT 3
 
 User: "Show me the property on 177 Castlereagh St, Sydney"
-SQL: SELECT listing_id, property_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, address_line1, address_line2, suburb, state, postcode, agent_first_name, agent_last_name, agent_phone, agency_name FROM v_listings WHERE is_published = true AND is_active = true AND address_line1 ILIKE '%177 Castlereagh%' AND suburb ILIKE '%Sydney%' ORDER BY price ASC LIMIT 10
+SQL: SELECT listing_id, property_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, description, address_line1, address_line2, suburb, state, postcode, available_from_utc, land_size_sqm, building_size_sqm, year_built, image_url, agent_first_name, agent_last_name, agent_email, agent_phone, agency_name, agency_phone FROM v_listings WHERE is_published = true AND is_active = true AND address_line1 ILIKE '%177 Castlereagh%' AND suburb ILIKE '%Sydney%' ORDER BY price ASC LIMIT 10
+
+User: "Find me a 2-3 bedroom pet friendly property in Bondi, Bondi Beach or Surry Hills under $950/wk available within 14 days"
+SQL: SELECT listing_id, property_id, listing_type, listing_status, price, bedrooms, bathrooms, car_spaces, property_type, title, description, address_line1, address_line2, suburb, state, postcode, available_from_utc, land_size_sqm, building_size_sqm, year_built, image_url, agent_first_name, agent_last_name, agent_email, agent_phone, agency_name, agency_phone FROM v_listings WHERE is_published = true AND is_active = true AND listing_type = 'Rent' AND bedrooms BETWEEN 2 AND 3 AND (suburb ILIKE '%Bondi%' OR suburb ILIKE '%Bondi Beach%' OR suburb ILIKE '%Surry Hills%') AND price <= 950 AND available_from_utc <= NOW() + INTERVAL '14 days' ORDER BY price ASC LIMIT 10
 """
+
+
+# ---------------------------------------------------------------------------
+# build_search_summary_prompt
+# Used by SqlViewService.generate_summary to produce a warm tenant-facing
+# summary of search results. Accepts plain values to avoid schema imports.
+# ---------------------------------------------------------------------------
+def build_search_summary_prompt(
+    pref: TenantPreference,
+    suburb_str: str,
+    total: int,
+    summaries: str,
+) -> str:
+    return (
+        f"You are a real estate assistant. Write a warm, natural 1-2 sentence message "
+        f"summarising search results for a tenant.\n\n"
+        f"Preferences: {pref.minBeds}-{pref.maxBeds} bed, pet friendly: {pref.petFriendly}, "
+        f"max rent: ${pref.maxRent}/wk, suburbs: {suburb_str}, "
+        f"available within {pref.availableWithinDays} days.\n"
+        f"Total matches: {total}\n"
+        f"Top listings:\n{summaries}\n\n"
+        f"Mention suburbs, budget, and total count. No bullet points."
+    )

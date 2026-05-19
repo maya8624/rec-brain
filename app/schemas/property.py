@@ -6,8 +6,42 @@ Used by the documents router and as structured output hints.
 """
 from __future__ import annotations
 
+from datetime import datetime
+from decimal import Decimal
 from typing import Optional
+from uuid import UUID
 from pydantic import BaseModel, Field
+
+
+class Listing(BaseModel):
+    """A row from v_listings — full column set returned by SqlViewService."""
+    listing_id: UUID
+    property_id: UUID
+    listing_type: str
+    listing_status: str
+    price: Decimal
+    bedrooms: int = 0
+    bathrooms: int = 0
+    car_spaces: int = 0
+    property_type: str
+    title: str = ""
+    description: str | None = None
+    address_line1: str = ""
+    address_line2: str | None = None
+    suburb: str = ""
+    state: str = ""
+    postcode: str = ""
+    available_from_utc: datetime | None = None
+    land_size_sqm: Decimal | None = None
+    building_size_sqm: Decimal | None = None
+    year_built: int | None = None
+    image_url: str | None = None
+    agent_first_name: str = ""
+    agent_last_name: str = ""
+    agent_email: str = ""
+    agent_phone: str = ""
+    agency_name: str = ""
+    agency_phone: str = ""
 
 
 class PropertySummary(BaseModel):
