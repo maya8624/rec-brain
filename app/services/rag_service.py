@@ -2,6 +2,7 @@ import logging
 
 from llama_index.core import VectorStoreIndex
 from llama_index.core.schema import NodeWithScore
+from llama_index.core.vector_stores import MetadataFilter, MetadataFilters
 
 from app.infrastructure.embedding import EmbeddingService
 from app.infrastructure.pgvector_store import PgVectorStoreService
@@ -29,14 +30,25 @@ class RagRetriever:
             embed_model=self._embed_model,
         )
 
-    def _build_retriever(self):
+    def _build_retriever(self, filters: MetadataFilters | None = None):
         return self._index.as_retriever(
             similarity_top_k=self._similarity_top_k,
+            filters=filters,
         )
 
-    async def aretrieve(self, query: str) -> list[NodeWithScore]:
+    async def aretrieve(
+        self,
+        query: str,
+        doc_type: str | None = None,
+    ) -> list[NodeWithScore]:
         if not query.strip():
             raise ValueError("Query cannot be empty.")
 
-        retriever = self._build_retriever()
+        filters = None
+        if doc_type:
+            filters = MetadataFilters(filters=[
+                MetadataFilter(key="doc_type", value=doc_type)
+            ])
+
+        retriever = self._build_retriever(filters=filters)
         return await retriever.aretrieve(query)

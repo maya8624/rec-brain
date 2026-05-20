@@ -6,6 +6,17 @@ Used by rag_service.generate_answer() when synthesising
 an answer from retrieved document chunks.
 """
 
+def build_suburb_summary_prompt(suburb_str: str, context: str) -> str:
+    return (
+        f"Extract suburb profiles for {suburb_str} from the following content.\n"
+        f"For each suburb provide a 2-3 sentence description covering lifestyle and amenities, "
+        f"and extract the exact median rents, vacancy rate, and trend figures exactly as they appear in the source.\n"
+        f"IMPORTANT: if rent figures, vacancy rate, or trend are not present in the context, set those fields to null — "
+        f"do NOT invent or estimate any numbers.\n\n"
+        f"{context}"
+    )
+
+
 RAG_SYSTEM_PROMPT = """
 You are a helpful real estate assistant with access to property documents.
 

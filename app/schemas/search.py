@@ -24,5 +24,19 @@ class SuburbSummaryRequest(BaseModel):
     suburbs: list[str]
 
 
+class SuburbRents(BaseModel):
+    one_bedroom: str | None = None
+    two_bedroom: str | None = None
+    three_bedroom: str | None = None
+
+
+class SuburbProfile(BaseModel):
+    name: str
+    description: str
+    rents: SuburbRents
+    vacancy_rate: str | None = None
+    trend: str | None = None
+
+
 class SuburbSummaryResponse(BaseModel):
-    summary: str | None = None
+    suburbs: list[SuburbProfile] = []

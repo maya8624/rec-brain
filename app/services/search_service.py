@@ -1,12 +1,17 @@
+import asyncio
 import logging
+from typing import Any
 
+from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage
+from langchain_core.runnables import Runnable
 
 from app.services.sql_service import SqlViewService
 from app.services.rag_service import RagRetriever
 from app.prompts.sql import build_search_summary_prompt
+from app.prompts.rag import build_suburb_summary_prompt
 from app.schemas.property import Listing
-from app.schemas.search import TenantPreference, PreferenceSearchResponse, SuburbSummaryResponse
+from app.schemas.search import TenantPreference, PreferenceSearchResponse, SuburbSummaryResponse, SuburbProfile
 
 logger = logging.getLogger(__name__)
 
@@ -43,10 +48,10 @@ def _to_search_query(pref: TenantPreference) -> str:
 
 
 class SearchService:
-    def __init__(self, sql: SqlViewService, rag: RagRetriever, llm) -> None:
+    def __init__(self, sql: SqlViewService, rag: RagRetriever, llm: BaseChatModel) -> None:
         self._sql = sql
         self._rag = rag
-        self._llm = llm
+        self._llm: BaseChatModel = llm
 
     async def search_by_preferences(self, pref: TenantPreference) -> PreferenceSearchResponse:
         query = _to_search_query(pref)
@@ -93,19 +98,29 @@ class SearchService:
         return response.content.strip()
 
     async def get_suburb_summary(self, suburbs: list[str]) -> SuburbSummaryResponse:
-        query = "suburb profile " + \
-            " ".join(suburbs) if suburbs else "suburb overview"
-        nodes = await self._rag.aretrieve(query)
+        if not suburbs:
+            return SuburbSummaryResponse()
 
-        if not nodes:
-            return SuburbSummaryResponse(summary=None)
-
-        context = "\n\n".join(n.node.get_content() for n in nodes)
-        suburb_str = ", ".join(suburbs) if suburbs else "the suburb"
-
-        prompt = (
-            f"Summarise the following suburb profile for {suburb_str} in 2-3 sentences. "
-            f"Focus on lifestyle, amenities, and rental appeal.\n\n{context}"
+        results = await asyncio.gather(
+            *[self._rag.aretrieve(f"suburb profile {s}", doc_type="guide") for s in suburbs],
+            return_exceptions=True,
         )
-        response = await self._llm.ainvoke([HumanMessage(content=prompt)])
-        return SuburbSummaryResponse(summary=response.content.strip())
+
+        context_blocks = []
+        for suburb, nodes in zip(suburbs, results):
+            if isinstance(nodes, Exception) or not nodes:
+                continue
+            content = "\n".join(n.node.get_content() for n in nodes)
+            context_blocks.append(f"### {suburb}\n{content}")
+
+        if not context_blocks:
+            return SuburbSummaryResponse()
+
+        suburb_str = ", ".join(suburbs)
+        context = "\n\n".join(context_blocks)
+        prompt = build_suburb_summary_prompt(suburb_str, context)
+
+        structured_llm = self._llm.with_structured_output(
+            SuburbSummaryResponse)
+        result: SuburbSummaryResponse = await structured_llm.ainvoke([HumanMessage(content=prompt)])
+        return result
