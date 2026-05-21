@@ -287,6 +287,13 @@ class TestGetSuburbSummary:
         query = rag.aretrieve.call_args.args[0]
         assert "Castle Hill" in query
 
+    async def test_rag_query_uses_suburb_summary_prefix(self):
+        rag = make_rag()
+        svc = make_service(rag=rag)
+        await svc.get_suburb_summary(["Bondi"])
+        query = rag.aretrieve.call_args.args[0]
+        assert query.startswith("suburb summary")
+
     async def test_context_block_labelled_by_suburb(self):
         rag = make_rag(nodes=[make_node("coastal vibes")])
         llm = make_llm()
