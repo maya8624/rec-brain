@@ -102,7 +102,7 @@ class SearchService:
             return SuburbSummaryResponse()
 
         results = await asyncio.gather(
-            *[self._rag.aretrieve(f"suburb profile {s}", doc_type="guide") for s in suburbs],
+            *[self._rag.aretrieve(f"suburb summary {suburb}", doc_type="guide") for suburb in suburbs],
             return_exceptions=True,
         )
 
