@@ -28,7 +28,7 @@ from app.agents.nodes._fast_path import (
     fast_path_intent,
 )
 from app.agents.state import ConversationPhase, IntentClassification, RealEstateAgentState
-from app.core.constants import IntentConfig, StateKeys
+from app.core.constants import Intent, IntentConfig, StateKeys
 from app.infrastructure.llm import get_llm
 from app.prompts.intent import INTENT_CLASSIFICATION_PROMPT
 
@@ -41,7 +41,7 @@ async def intent_node(state: RealEstateAgentState) -> dict[str, Any]:
     """
     message = last_human_message(state).lower()
     if not message:
-        return {StateKeys.USER_INTENT: "general"}
+        return {StateKeys.USER_INTENT: Intent.GENERAL}
 
     obvious = fast_path_intent(message, state)
     if obvious:
@@ -51,11 +51,11 @@ async def intent_node(state: RealEstateAgentState) -> dict[str, Any]:
 
     # TODO: should be in _fast_path
     if is_booking_continuation(state, message):
-        return {StateKeys.USER_INTENT: "booking"}
+        return {StateKeys.USER_INTENT: Intent.BOOKING}
 
     # TODO: should be in _fast_path
     if is_cancellation_continuation(state, message):
-        return {StateKeys.USER_INTENT: "cancellation"}
+        return {StateKeys.USER_INTENT: Intent.CANCELLATION}
 
     return await _classify_with_llm(state)
 
@@ -112,7 +112,7 @@ async def _classify_with_llm(state: RealEstateAgentState) -> dict[str, Any]:
         classification: IntentClassification = await llm.ainvoke(prompt)
     except Exception as exc:
         logger.error("intent_node | LLM classification failed: %s", exc)
-        return {StateKeys.USER_INTENT: "general"}
+        return {StateKeys.USER_INTENT: Intent.GENERAL}
 
     return _build_intent_state_update(state, classification)
 
@@ -133,7 +133,7 @@ def _build_intent_state_update(
         StateKeys.INTENT_COMPLETED: False,
     }
 
-    if classification.intent in ("general", "document_query"):
+    if classification.intent in (Intent.GENERAL, Intent.DOCUMENT_QUERY):
         return update
 
     entities = _extract_entities(classification)

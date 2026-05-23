@@ -62,7 +62,8 @@ def _handle_check_availability(_state: RealEstateAgentState, result: dict) -> di
         StateKeys.BOOKING_CONTEXT: BookingContext(
             available_slots=slots,
             property_id=result.get("property_id", ""),
-        )
+        ),
+        StateKeys.PHASE: ConversationPhase.BOOKING_PENDING,
     }
 
 

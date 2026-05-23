@@ -2,16 +2,22 @@ import asyncio
 import logging
 from typing import Any
 
+from fastapi import HTTPException
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage
-from langchain_core.runnables import Runnable
 
 from app.services.sql_service import SqlViewService
 from app.services.rag_service import RagRetriever
 from app.prompts.sql import build_search_summary_prompt
-from app.prompts.rag import build_suburb_summary_prompt
+from app.prompts.rag import build_suburb_summary_prompt, build_tenancy_details_prompt
 from app.schemas.property import Listing
-from app.schemas.search import TenantPreference, PreferenceSearchResponse, SuburbSummaryResponse, SuburbProfile
+from app.schemas.search import (
+    TenantPreference,
+    PreferenceSearchResponse,
+    SuburbSummaryResponse,
+    TenancyDetails,
+    TenancyDocsResponse
+)
 
 logger = logging.getLogger(__name__)
 
@@ -124,3 +130,25 @@ class SearchService:
             SuburbSummaryResponse)
         result: SuburbSummaryResponse = await structured_llm.ainvoke([HumanMessage(content=prompt)])
         return result
+
+    async def get_tenancy_docs(self, property_id: str, user_id: str) -> TenancyDocsResponse:
+        nodes = await self._rag.aretrieve(
+            query="TENANCY DETAILS agreement type commencement rent bond",
+            doc_type="contract",
+            file_name="tenancy_agreement_47_Harrington_Street_Cronulla.pdf"
+        )
+
+        if not nodes:
+            raise HTTPException(
+                status_code=404, detail="Tenancy document not found")
+
+        context = "\n".join(n.node.get_content() for n in nodes)
+        prompt = build_tenancy_details_prompt(context)
+        structured_llm = self._llm.with_structured_output(TenancyDetails)
+        try:
+            tenancy: TenancyDetails = await structured_llm.ainvoke([HumanMessage(content=prompt)])
+        except Exception as exc:
+            print(exc)
+            raise HTTPException(
+                status_code=422, detail="Failed to extract tenancy details from document")
+        return TenancyDocsResponse(tenancy=tenancy)

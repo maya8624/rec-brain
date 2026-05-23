@@ -21,6 +21,7 @@ from typing import Annotated, Literal, Sequence, TypedDict
 import operator
 from langchain_core.messages import BaseMessage
 from pydantic import BaseModel
+from app.core.constants import Intent
 
 UserIntent = Literal[
     "search",
@@ -43,6 +44,10 @@ class ConversationPhase(str, Enum):
     DEPOSIT_PENDING = "deposit_pending"
     DEPOSIT_CONFIRMED = "deposit_confirmed"
     CANCELLATION_PENDING = "cancellation_pending"
+    # SUBURB_SUMMARY = "suburb_summary"
+    # MARKET_TRENDS = "market_trends"
+    # SCHOOL_CATCHMENTS = "school_catchments"
+    # TENANCY_DOCS = "tenancy_docs"
 
 
 class PropertyContext(TypedDict, total=False):
@@ -159,7 +164,7 @@ def initial_state() -> RealEstateAgentState:
     """
     return RealEstateAgentState(
         messages=[],
-        user_intent="unknown",
+        user_intent=Intent.UNKNOWN,
         property_context=PropertyContext(),
         booking_context=BookingContext(
             available_slots=[],

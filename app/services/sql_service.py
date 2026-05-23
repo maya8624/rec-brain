@@ -29,7 +29,7 @@ _SEARCH_ERROR = SearchResult(
 _SELECT_COLS = (
     "SELECT listing_id, property_id, listing_type, listing_status, price, bedrooms, bathrooms, "
     "car_spaces, property_type, title, description, address_line1, address_line2, suburb, state, "
-    "postcode, available_from_utc, land_size_sqm, building_size_sqm, year_built, image_url, "
+    "pet_friendly, postcode, available_from_utc, land_size_sqm, building_size_sqm, year_built, image_url, "
     "agent_first_name, agent_last_name, agent_email, agent_phone, agency_name, agency_phone"
 )
 

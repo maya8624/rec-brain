@@ -116,11 +116,6 @@ class Settings(BaseSettings):
         "llama-3.3-70b-versatile",
         description="Model for general chat — quality matters for UX",
     )
-    AGENT_TOOL_CALL_MODEL: str = Field(
-        "llama-3.3-70b-versatile",
-        description="Model for tool calling agent",
-    )
-
     LLM_TEMPERATURE: float = Field(
         0.0,
         description="0.0 = best for tool calling, 1.0 = creative",
@@ -128,10 +123,6 @@ class Settings(BaseSettings):
     LLM_MAX_TOKENS: int = Field(
         2048,
         description="Max tokens in LLM response — 2048 needed for RAG synthesis",
-    )
-    AGENT_TIMEOUT_SECONDS: int = Field(
-        30,
-        description="Max seconds before agent call times out",
     )
     MAX_ERRORS_BEFORE_ESCALATION: int = Field(
         3,

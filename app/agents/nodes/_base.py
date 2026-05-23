@@ -116,10 +116,12 @@ def slim_rows(rows: list[dict]) -> list[dict]:
             "property_type":  row.get("property_type", ""),
             "listing_type":   row.get("listing_type", ""),
             "listing_status": row.get("listing_status", ""),
+            "pet_friendly":   row.get("pet_friendly", False),
             "agent_name":     f"{row.get('agent_first_name', '')} {row.get('agent_last_name', '')}".strip(),
             "agent_phone":    row.get("agent_phone", ""),
             "agency_name":    row.get("agency_name", ""),
             "property_url":   f"{base}{InternalRoutes.property_detail(str(row['property_id']))}" if row.get("property_id") else "",
+            "image_url":      row.get("image_url"),
         }
         for row in rows
     ]
@@ -140,6 +142,7 @@ def format_listings(rows: list[dict]) -> str:
             f"   - Price: {price_str}\n"
             f"   - Bedrooms: {row['bedrooms']}\n"
             f"   - Bathrooms: {row['bathrooms']}\n"
+            f"   - Pet friendly: {'Yes' if row.get('pet_friendly') else 'No'}\n"
             f"   - Agent: {row['agent_name']} {row['agent_phone']}"
         )
     return header + "\n\n" + "\n\n".join(blocks)

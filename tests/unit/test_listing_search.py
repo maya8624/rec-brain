@@ -53,21 +53,33 @@ class TestListingSearchSuccess:
         svc.search_listings.assert_called_once_with(question)
 
     async def test_context_path_uses_search_from_context(self, make_sql_service, make_config):
-        """When search_context has a location, use search_from_context — no LLM call."""
+        """When search_context has a property_id, use search_from_context — no LLM call."""
         svc = make_sql_service()
+        pid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
         state = {
-            "messages": [HumanMessage(content="3 bed houses in Sydney under $800k")],
+            "messages": [HumanMessage(content="show me that property")],
+            "search_context": {"property_id": pid},
+        }
+        await listing_search_node(state, make_config(sql_service=svc))
+
+        svc.search_from_context.assert_called_once_with({"property_id": pid})
+        svc.search_listings.assert_not_called()
+
+    async def test_location_only_context_uses_llm_path(self, make_sql_service, make_config):
+        """Location-only context (no property_id) goes through the LLM SQL path."""
+        svc = make_sql_service()
+        question = "3 bed houses in Sydney under $800k"
+        state = {
+            "messages": [HumanMessage(content=question)],
             "search_context": {"location": "Sydney", "property_type": "House", "bedrooms": 3},
         }
         await listing_search_node(state, make_config(sql_service=svc))
 
-        svc.search_from_context.assert_called_once_with(
-            {"location": "Sydney", "property_type": "House", "bedrooms": 3}
-        )
-        svc.search_listings.assert_not_called()
+        svc.search_listings.assert_called_once_with(question)
+        svc.search_from_context.assert_not_called()
 
-    async def test_no_location_falls_back_to_llm(self, make_sql_service, make_config):
-        """Without a location in search_context, fall back to sql_service LLM path."""
+    async def test_no_context_falls_back_to_llm(self, make_sql_service, make_config):
+        """Without search_context, fall back to sql_service LLM path."""
         svc = make_sql_service()
         question = "properties near good schools"
         state = {

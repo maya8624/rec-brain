@@ -6,7 +6,7 @@ Called by intent_node before falling through to _classify_with_llm.
 
 import re
 from app.agents.state import ConversationPhase, RealEstateAgentState, UserIntent
-from app.core.constants import IntentConfig, StateKeys
+from app.core.constants import Intent, IntentConfig, StateKeys
 
 
 def fast_path_intent(message: str, state: RealEstateAgentState) -> UserIntent | None:
@@ -15,21 +15,21 @@ def fast_path_intent(message: str, state: RealEstateAgentState) -> UserIntent | 
     """
     if (matches_keywords(message, IntentConfig.CANCELLATION_KEYWORDS) and
             not matches_keywords(message, IntentConfig.SEARCH_KEYWORDS)):
-        return "cancellation"
+        return Intent.CANCELLATION
 
     if (matches_keywords(message, IntentConfig.LOOKUP_KEYWORDS) and
             not matches_keywords(message, IntentConfig.CANCELLATION_KEYWORDS)):
-        return "booking_lookup"
+        return Intent.BOOKING_LOOKUP
 
     if (matches_keywords(message, IntentConfig.BOOKING_KEYWORDS) and
             not matches_keywords(message, IntentConfig.SEARCH_KEYWORDS)):
-        return "booking"
+        return Intent.BOOKING
 
     if matches_keywords(message, IntentConfig.DEPOSIT_KEYWORDS):
-        return "deposit_payment"
+        return Intent.DEPOSIT_PAYMENT
 
     if matches_keywords(message, IntentConfig.DOCUMENT_KEYWORDS):
-        return "document_query"
+        return Intent.DOCUMENT_QUERY
 
     return None
 

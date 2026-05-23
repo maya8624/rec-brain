@@ -1,8 +1,8 @@
 """
 Unit tests for intent_node and its helpers.
 
-Fast path (obvious_intent): pure keyword matching — no DB or LLM required.
-LLM path (intent_node):      patched LLM — tests state mutations and entity extraction.
+Fast path (fast_path_intent): pure keyword matching — no DB or LLM required.
+LLM path (intent_node):       patched LLM — tests state mutations and entity extraction.
 """
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -13,93 +13,93 @@ from app.agents.nodes.intent import intent_node
 from app.agents.nodes._fast_path import (
     is_booking_continuation,
     is_cancellation_continuation,
-    obvious_intent,
+    fast_path_intent,
 )
-from app.agents.state import IntentClassification
+from app.agents.state import ConversationPhase, IntentClassification
 
 
-# ── obvious_intent ────────────────────────────────────────────────────────────
+# ── fast_path_intent ──────────────────────────────────────────────────────────
 
-class TestObviousIntent:
+class TestFastPathIntent:
     def test_cancel_keyword(self):
-        assert obvious_intent("I want to cancel my inspection") == "cancellation"
+        assert fast_path_intent("I want to cancel my inspection", {}) == "cancellation"
 
     def test_cancellation_keyword(self):
-        assert obvious_intent("I need a cancellation") == "cancellation"
+        assert fast_path_intent("I need a cancellation", {}) == "cancellation"
 
     def test_withdraw_keyword(self):
-        assert obvious_intent("I'd like to withdraw my booking") == "cancellation"
+        assert fast_path_intent("I'd like to withdraw my booking", {}) == "cancellation"
 
     def test_no_longer_available_keyword(self):
-        assert obvious_intent("I'm no longer available for the inspection") == "cancellation"
+        assert fast_path_intent("I'm no longer available for the inspection", {}) == "cancellation"
 
     def test_dont_want_to_attend_keyword(self):
-        assert obvious_intent("I don't want to attend the inspection") == "cancellation"
+        assert fast_path_intent("I don't want to attend the inspection", {}) == "cancellation"
 
     def test_no_longer_want_not_cancellation(self):
         """'no longer want' alone is too vague — must fall through to LLM."""
-        assert obvious_intent("I no longer want 3 bedrooms") is None
+        assert fast_path_intent("I no longer want 3 bedrooms", {}) is None
 
     def test_dont_want_not_cancellation(self):
         """'don't want' alone is too vague — must fall through to LLM."""
-        assert obvious_intent("I don't want a property near a highway") is None
+        assert fast_path_intent("I don't want a property near a highway", {}) is None
 
     def test_book_keyword_alone(self):
-        assert obvious_intent("I'd like to book an inspection") == "booking"
+        assert fast_path_intent("I'd like to book an inspection", {}) == "booking"
 
     def test_schedule_keyword_alone(self):
-        assert obvious_intent("Can we schedule a viewing?") == "booking"
+        assert fast_path_intent("Can we schedule a viewing?", {}) == "booking"
 
     def test_open_home_keyword(self):
-        assert obvious_intent("When is the next open home?") == "booking"
+        assert fast_path_intent("When is the next open home?", {}) == "booking"
 
     def test_book_with_search_returns_none(self):
         """search + booking → not obvious, needs LLM to detect search_then_book."""
-        assert obvious_intent("find houses in sydney and book an inspection") is None
+        assert fast_path_intent("find houses in sydney and book an inspection", {}) is None
 
     def test_cancel_with_search_returns_none(self):
         """search + cancellation → compound, needs LLM."""
-        assert obvious_intent("show me apartments and cancel my booking") is None
+        assert fast_path_intent("show me apartments and cancel my booking", {}) is None
 
     def test_search_returns_none(self):
         """Search always goes to LLM for entity extraction."""
-        assert obvious_intent("Show me 3 bedroom houses in Sydney") is None
+        assert fast_path_intent("Show me 3 bedroom houses in Sydney", {}) is None
 
     def test_general_returns_none(self):
-        assert obvious_intent("Hello, how are you?") is None
+        assert fast_path_intent("Hello, how are you?", {}) is None
 
     def test_empty_message_returns_none(self):
-        assert obvious_intent("") is None
+        assert fast_path_intent("", {}) is None
 
     def test_follow_up_returns_none(self):
-        assert obvious_intent("what about his number?") is None
+        assert fast_path_intent("what about his number?", {}) is None
 
     def test_deposit_keyword_without_search_keyword_is_deposit_payment(self):
-        """obvious_intent is keyword-only — state-based upgrade happens in intent_node."""
-        assert obvious_intent(
-            "i think i need to pay holding deposit, i'm not sure the address. can you check it for me?",
+        """fast_path_intent is keyword-only — state-based upgrade happens in intent_node."""
+        assert fast_path_intent(
+            "i think i need to pay holding deposit, i'm not sure the address. can you check it for me?", {},
         ) == "deposit_payment"
 
     def test_deposit_follow_up_with_specific_address_is_deposit_payment(self):
-        assert obvious_intent(
-            "i want to pay the holding deposit for 155 market st",
+        assert fast_path_intent(
+            "i want to pay the holding deposit for 155 market st", {},
         ) == "deposit_payment"
 
 
-# ── obvious_intent: lookup ────────────────────────────────────────────────────
+# ── fast_path_intent: lookup ──────────────────────────────────────────────────
 
-class TestObviousIntentLookup:
+class TestFastPathIntentLookup:
     def test_my_booking_keyword(self):
-        assert obvious_intent("show me my booking") == "booking_lookup"
+        assert fast_path_intent("show me my booking", {}) == "booking_lookup"
 
     def test_booking_status_keyword(self):
-        assert obvious_intent("what's my booking status?") == "booking_lookup"
+        assert fast_path_intent("what's my booking status?", {}) == "booking_lookup"
 
     def test_check_my_booking_keyword(self):
-        assert obvious_intent("can you check my booking?") == "booking_lookup"
+        assert fast_path_intent("can you check my booking?", {}) == "booking_lookup"
 
     def test_i_booked_keyword(self):
-        assert obvious_intent("I booked an inspection yesterday") == "booking_lookup"
+        assert fast_path_intent("I booked an inspection yesterday", {}) == "booking_lookup"
 
 
 # ── is_booking_continuation ───────────────────────────────────────────────────
@@ -136,37 +136,29 @@ class TestIsBookingContinuation:
     def test_returns_false_when_message_has_cancellation_keywords(self):
         assert is_booking_continuation(_state_with_slots(), "cancel") is False
 
-    def test_returns_false_when_booking_confirmed(self):
-        state = _state_with_slots(booking_status={"confirmed": True, "cancelled": False, "awaiting_confirmation": False})
-        assert is_booking_continuation(state, "what are the trading hours") is False
-
-    def test_returns_false_when_booking_cancelled(self):
-        state = _state_with_slots(booking_status={"confirmed": False, "cancelled": True, "awaiting_confirmation": False})
-        assert is_booking_continuation(state, "show me more properties") is False
+    def test_returns_false_when_message_has_search_keywords_2(self):
+        assert is_booking_continuation(_state_with_slots(), "show me more properties") is False
 
 
 class TestIsCancellationContinuation:
     def test_returns_true_for_go_ahead_with_confirmation_id(self):
         state = {
             "booking_context": {"confirmation_id": "CONF-12345"},
-            "booking_status": {"cancelled": False},
-            "last_intent": "booking_lookup",
+            "phase": ConversationPhase.CANCELLATION_PENDING,
         }
         assert is_cancellation_continuation(state, "go ahead") is True
 
     def test_returns_false_without_confirmation_id(self):
         state = {
             "booking_context": {},
-            "booking_status": {"cancelled": False},
-            "last_intent": "booking_lookup",
+            "phase": ConversationPhase.CANCELLATION_PENDING,
         }
         assert is_cancellation_continuation(state, "go ahead") is False
 
-    def test_returns_false_after_cancellation(self):
+    def test_returns_false_when_phase_is_not_pending(self):
         state = {
             "booking_context": {"confirmation_id": "CONF-12345"},
-            "booking_status": {"cancelled": True},
-            "last_intent": "cancellation",
+            "phase": ConversationPhase.IDLE,
         }
         assert is_cancellation_continuation(state, "go ahead") is False
 
@@ -210,8 +202,7 @@ class TestIntentNodeFastPath:
         state = {
             "messages": [HumanMessage(content="go ahead")],
             "booking_context": {"confirmation_id": "CONF-12345"},
-            "booking_status": {"cancelled": False},
-            "last_intent": "booking_lookup",
+            "phase": ConversationPhase.CANCELLATION_PENDING,
         }
         with patch("app.agents.nodes.intent.get_llm") as mock_get_llm:
             result = await intent_node(state)
@@ -239,21 +230,16 @@ class TestIntentNodeFastPath:
         result = await intent_node(state)
         assert result["user_intent"] == "general"
 
-    async def test_deposit_follow_up_with_search_results_skips_llm(self):
+    async def test_deposit_follow_up_skips_llm(self):
         state = {
             "messages": [HumanMessage(
                 content="I think I need to pay holding deposit, I'm not sure the address. can you check it for me?"
             )],
-            "search_results": [
-                {"address": "150 Bond St"},
-                {"address": "155 Market St"},
-                {"address": "92 George St"},
-            ],
         }
         with patch("app.agents.nodes.intent.get_llm") as mock_get_llm:
             result = await intent_node(state)
             mock_get_llm.assert_not_called()
-        assert result["user_intent"] == "search_then_deposit"
+        assert result["user_intent"] == "deposit_payment"
 
 
 # ── intent_node LLM path ───────────────────────────────────────────────────────
@@ -308,16 +294,16 @@ class TestIntentNodeLLMPath:
         result = await intent_node(state)
         assert result["user_intent"] == "document_query"
 
-    async def test_search_then_book_intent(self, mock_get_llm):
+    async def test_hybrid_search_intent(self, mock_get_llm):
         mock_get_llm.return_value = _make_llm_mock(IntentClassification(
-            intent="search_then_book",
+            intent="hybrid_search",
             location="Sydney",
         ))
         state = {"messages": [HumanMessage(
-            content="Find me houses in Sydney and book an inspection"
+            content="Find me houses in Sydney and tell me about the strata"
         )]}
         result = await intent_node(state)
-        assert result["user_intent"] == "search_then_book"
+        assert result["user_intent"] == "hybrid_search"
 
     async def test_compound_sets_early_response(self, mock_get_llm):
         mock_get_llm.return_value = _make_llm_mock(IntentClassification(
@@ -332,16 +318,17 @@ class TestIntentNodeLLMPath:
         assert result["user_intent"] == "general"
         assert result["early_response"]
 
-    async def test_out_of_scope_general_suppresses_early_response(self, mock_get_llm):
+    async def test_out_of_scope_general_passes_through_early_response(self, mock_get_llm):
+        early = "Please pick one action: ask about office hours, agency address, or booking a flight."
         mock_get_llm.return_value = _make_llm_mock(IntentClassification(
             intent="general",
-            early_response="Please pick one action: ask about office hours, agency address, or booking a flight.",
+            early_response=early,
         ))
         state = {"messages": [HumanMessage(content="Can you book me a flight to Bali?")]}
         result = await intent_node(state)
 
         assert result["user_intent"] == "general"
-        assert result["early_response"] is None
+        assert result["early_response"] == early
 
     async def test_entities_merged_with_existing_search_context(self, mock_get_llm):
         """New entities merge with existing context — previous filters preserved."""

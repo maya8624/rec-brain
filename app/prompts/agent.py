@@ -17,8 +17,7 @@ _today = date.today().strftime("%Y-%m-%d")
 
 SEARCH_RESULT_SYSTEM = """
 You are outputting property search results.
-Output the content from the [PROPERTY SEARCH RESULTS] block exactly, with these two exceptions:
-- Omit the literal line "[PROPERTY SEARCH RESULTS]" if present
+Output the content from the [PROPERTY SEARCH RESULTS] block exactly, with one exception:
 - Omit any [property_id=some-uuid] tag wherever it appears — inline or on its own line
 Everything else — the count line, numbered items, bold links, bullet points — output verbatim.
 """

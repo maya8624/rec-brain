@@ -47,7 +47,23 @@ class PropertyListing(BaseModel):
     """A property listing returned from a search — sent to .NET for frontend rendering."""
     property_id: str
     listing_id: str
+    listing_type: str = ""
+    listing_status: str = ""
+    price: float = 0
+    bedrooms: int = 0
+    bathrooms: int = 0
+    car_spaces: int = 0
+    pet_friendly: bool = False
+    property_type: str = ""
+    address: str = ""
+    suburb: str = ""
+    state: str = ""
+    postcode: str = ""
+    agent_name: str = ""
+    agent_phone: str = ""
+    agency_name: str = ""
     property_url: str | None = None
+    image_url: str | None = None
 
 
 class ChatResponse(BaseModel):

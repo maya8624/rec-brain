@@ -14,7 +14,7 @@ import json
 import logging
 from langchain_core.messages import AIMessage, ToolMessage
 from app.agents.state import ConversationPhase, RealEstateAgentState
-from app.core.constants import ToolNames, Node, StateKeys
+from app.core.constants import Intent, ToolNames, Node, StateKeys
 
 logger = logging.getLogger(__name__)
 
@@ -32,21 +32,21 @@ def route_intent_output(state: RealEstateAgentState) -> str:
     if state.get(StateKeys.EARLY_RESPONSE):
         return Node.END
 
-    intent = state.get(StateKeys.USER_INTENT, "general")
+    intent = state.get(StateKeys.USER_INTENT, Intent.GENERAL)
     phase = state.get(StateKeys.PHASE, ConversationPhase.IDLE)
 
-    if (intent in ("booking", "deposit_payment") and phase != ConversationPhase.SEARCH_RESULTS_SHOWN):
+    if (intent in (Intent.BOOKING, Intent.DEPOSIT_PAYMENT) and phase != ConversationPhase.SEARCH_RESULTS_SHOWN):
         return Node.LISTING_SEARCH
 
     route = {
-        "search":           Node.LISTING_SEARCH,
-        "document_query":   Node.VECTOR_SEARCH,
-        "hybrid_search":    Node.HYBRID_SEARCH,
-        "booking":          Node.AGENT,
-        "cancellation":     Node.AGENT,
-        "booking_lookup":   Node.AGENT,
-        "deposit_payment":  Node.AGENT,
-        "general":          Node.AGENT,
+        Intent.SEARCH:          Node.LISTING_SEARCH,
+        Intent.DOCUMENT_QUERY:  Node.VECTOR_SEARCH,
+        Intent.HYBRID_SEARCH:   Node.HYBRID_SEARCH,
+        Intent.BOOKING:         Node.AGENT,
+        Intent.CANCELLATION:    Node.AGENT,
+        Intent.BOOKING_LOOKUP:  Node.AGENT,
+        Intent.DEPOSIT_PAYMENT: Node.AGENT,
+        Intent.GENERAL:         Node.AGENT,
     }.get(intent, Node.AGENT)
 
     return route

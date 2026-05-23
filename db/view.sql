@@ -31,6 +31,7 @@ SELECT
     p.building_size_sqm,
     p.year_built,
     p.is_active,
+    p.pet_friendly,
     -- Property Type
     pt.name                     AS property_type,
     -- Address

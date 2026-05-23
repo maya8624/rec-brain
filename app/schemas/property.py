@@ -23,6 +23,7 @@ class Listing(BaseModel):
     bedrooms: int = 0
     bathrooms: int = 0
     car_spaces: int = 0
+    pet_friendly: bool = False
     property_type: str
     title: str = ""
     description: str | None = None

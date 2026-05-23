@@ -20,7 +20,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 
 from app.agents.nodes._base import format_listings
 from app.agents.state import BookingContext, ConversationPhase, RealEstateAgentState, UserIntent
-from app.core.constants import IntentConfig, PromptLabels, StateKeys
+from app.core.constants import Intent, IntentConfig, PromptLabels, StateKeys
 from app.infrastructure.llm import get_llm
 from app.prompts.agent import REAL_ESTATE_AGENT_SYSTEM, SEARCH_RESULT_SYSTEM
 from app.tools import get_all_tools
@@ -32,7 +32,7 @@ async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
     """Routes to tool-bound or plain LLM based on intent and message type, then updates state."""
     needs_tools = _needs_tools(state)
     llm = _get_tool_llm() if needs_tools else _get_plain_llm()
-    intent = state.get(StateKeys.USER_INTENT, "general")
+    intent = state.get(StateKeys.USER_INTENT, Intent.GENERAL)
     history_limit = IntentConfig.HISTORY_BY_INTENT.get(intent, 6)
     history = list(state["messages"])[-history_limit:]
 
@@ -84,7 +84,7 @@ def _update_state_keys(
     )
 
     state_keys = {
-        "messages":                 [response],
+        "messages": [response],
         StateKeys.RETRIEVED_DOCS:   None,
         StateKeys.INTENT_COMPLETED: is_complete
     }
@@ -92,13 +92,13 @@ def _update_state_keys(
     phase = state.get(StateKeys.PHASE, ConversationPhase.IDLE)
 
     # User said no to cancellation — reset phase to IDLE
-    if intent == "general" and phase == ConversationPhase.CANCELLATION_PENDING:
+    if intent == Intent.GENERAL and phase == ConversationPhase.CANCELLATION_PENDING:
         state_keys.update({
             StateKeys.PHASE: ConversationPhase.IDLE,
             StateKeys.INTENT_COMPLETED: True,
         })
     # Agent asked user to confirm cancellation — waiting for yes/no
-    elif intent == "cancellation" and not response.tool_calls:
+    elif intent == Intent.CANCELLATION and not response.tool_calls:
         state_keys.update({
             StateKeys.PHASE: ConversationPhase.CANCELLATION_PENDING,
             StateKeys.INTENT_COMPLETED: False,
@@ -112,7 +112,7 @@ def _build_prompt(
         intent: str,
         history: list) -> list:
 
-    system = SEARCH_RESULT_SYSTEM if intent == "search" else REAL_ESTATE_AGENT_SYSTEM
+    system = SEARCH_RESULT_SYSTEM if intent == Intent.SEARCH else REAL_ESTATE_AGENT_SYSTEM
 
     docs_msg = _get_retrieved_docs_msg(state.get(
         StateKeys.RETRIEVED_DOCS)) if intent in IntentConfig.DOC_INTENTS else None
@@ -152,12 +152,11 @@ def _get_retrieved_docs_msg(retrieved_docs: str) -> SystemMessage | None:
 
 def _get_search_msg(intent: str, search_results: list[dict]) -> SystemMessage | None:
     if not search_results:
-        if intent == "search":
+        if intent == Intent.SEARCH:
             return SystemMessage(content="No results found.")
         return None
 
-    label = "" if intent == "search" else f"{PromptLabels.PROPERTY_SEARCH_RESULTS}\n"
-    return SystemMessage(content=f"{label}{format_listings(search_results)}")
+    return SystemMessage(content=f"{PromptLabels.PROPERTY_SEARCH_RESULTS}\n{format_listings(search_results)}")
 
 
 def _get_plain_llm():
@@ -170,7 +169,7 @@ def _get_tool_llm():
 
 def _needs_tools(state: RealEstateAgentState) -> bool:
     """True on the first (tool-calling) pass only: action intent with HumanMessage last."""
-    intent = state.get(StateKeys.USER_INTENT, "general")
+    intent = state.get(StateKeys.USER_INTENT, Intent.GENERAL)
     if intent not in IntentConfig.TOOL_INTENTS:
         return False
 

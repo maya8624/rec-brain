@@ -14,7 +14,7 @@ from langchain_core.runnables import RunnableConfig
 from app.agents.state import initial_state
 from app.api.dependencies import get_agent, verify_internal_key, CompiledStateGraph
 from app.core.constants import AppStateKeys, Messages, StateKeys
-from app.schemas.chat import ChatErrorResponse, ChatRequest, ChatResponse
+from app.schemas.chat import ChatErrorResponse, ChatRequest, ChatResponse, PropertyListing
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -150,7 +150,7 @@ async def _event_generator(request: ChatRequest, http_request: Request, agent):
         search_results = final_state.get("search_results", [])
         yield _sse("result",
                    thread_id=request.thread_id,
-                   listings=[],
+                   listings=[l.model_dump() for l in _to_listings(search_results)],
                    property_id=_extract_single_property_id(search_results),
                    deposit=final_state.get("deposit_result"))
 
@@ -225,7 +225,7 @@ def _build_response(thread_id: str, final_state: dict) -> ChatResponse:
     return ChatResponse(
         reply=reply,
         thread_id=thread_id,
-        listings=[],
+        listings=_to_listings(search_results),
         property_id=_extract_single_property_id(search_results),
         deposit=final_state.get("deposit_result"),
     )
@@ -238,5 +238,35 @@ def _extract_single_property_id(search_results: list[dict]) -> str | None:
         return str(pid) if pid else None
 
     return None
+
+
+def _to_listings(search_results: list[dict]) -> list[PropertyListing]:
+    listings = []
+    for row in search_results:
+        try:
+            listings.append(PropertyListing(
+                property_id=row.get("property_id", ""),
+                listing_id=row.get("listing_id", ""),
+                listing_type=row.get("listing_type", ""),
+                listing_status=row.get("listing_status", ""),
+                price=float(row.get("price", 0)),
+                bedrooms=row.get("bedrooms", 0),
+                bathrooms=row.get("bathrooms", 0),
+                car_spaces=row.get("car_spaces", 0),
+                pet_friendly=row.get("pet_friendly", False),
+                property_type=row.get("property_type", ""),
+                address=row.get("address", ""),
+                suburb=row.get("suburb", ""),
+                state=row.get("state", ""),
+                postcode=row.get("postcode", ""),
+                agent_name=row.get("agent_name", ""),
+                agent_phone=row.get("agent_phone", ""),
+                agency_name=row.get("agency_name", ""),
+                property_url=row.get("property_url"),
+                image_url=row.get("image_url"),
+            ))
+        except Exception:
+            logger.warning("_to_listings | skipped malformed row: %s", row.get("property_id"))
+    return listings
 
 

@@ -18,6 +18,21 @@ def build_suburb_summary_prompt(suburb_str: str, context: str) -> str:
     )
 
 
+def build_tenancy_details_prompt(context: str) -> str:
+    return (
+        "Extract the following tenancy details from the document below.\n"
+        "Return ONLY these fields: agreement_type, commencement, end_date, "
+        "rent_amount, rent_frequency, rent_due_day, payment_method, payment_bsb, "
+        "payment_account, bond_amount, bond_receipt_no.\n"
+        "Use exact values as they appear in the document. "
+        "If a field is not present, set it to null — do NOT invent values.\n\n"
+        "For payment fields: payment_method is the transfer type only (e.g. 'Direct bank transfer'), "
+        "payment_bsb is the BSB number (e.g. '062-000'), "
+        "payment_account is the account number (e.g. '1234 5678').\n\n"
+        f"{context}"
+    )
+
+
 RAG_SYSTEM_PROMPT = """
 You are a helpful real estate assistant with access to property documents.
 

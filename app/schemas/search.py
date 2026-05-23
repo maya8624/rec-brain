@@ -1,4 +1,6 @@
-from pydantic import BaseModel
+from datetime import date, datetime
+
+from pydantic import BaseModel, field_validator
 
 from app.schemas.property import Listing
 
@@ -40,3 +42,38 @@ class SuburbProfile(BaseModel):
 
 class SuburbSummaryResponse(BaseModel):
     suburbs: list[SuburbProfile] = []
+
+
+class TenancyDocsRequest(BaseModel):
+    property_id: str
+    tenant_id: str
+
+
+class TenancyDetails(BaseModel):
+    agreement_type: str
+    commencement: date
+    end_date: date
+    rent_amount: float
+    rent_frequency: str
+    rent_due_day: str
+    payment_method: str
+    payment_bsb: str | None = None
+    payment_account: str | None = None
+    bond_amount: float
+    bond_receipt_no: str
+
+    @field_validator("commencement", "end_date", mode="before")
+    @classmethod
+    def parse_date(cls, v: str) -> date:
+        if isinstance(v, date):
+            return v
+        for fmt in ("%d %B %Y", "%d %b %Y", "%Y-%m-%d"):
+            try:
+                return datetime.strptime(v, fmt).date()
+            except ValueError:
+                continue
+        raise ValueError(f"Unrecognised date format: {v}")
+
+
+class TenancyDocsResponse(BaseModel):
+    tenancy: TenancyDetails | None = None

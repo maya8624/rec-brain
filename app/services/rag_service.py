@@ -45,15 +45,17 @@ class RagRetriever:
         self,
         query: str,
         doc_type: str | None = None,
+        file_name: str | None = None,
     ) -> list[NodeWithScore]:
         if not query.strip():
             raise ValueError("Query cannot be empty.")
 
-        filters = None
+        filter_list = []
         if doc_type:
-            filters = MetadataFilters(filters=[
-                MetadataFilter(key="doc_type", value=doc_type)
-            ])
+            filter_list.append(MetadataFilter(key="doc_type", value=doc_type))
+        if file_name:
+            filter_list.append(MetadataFilter(key="file_name", value=file_name))
 
+        filters = MetadataFilters(filters=filter_list) if filter_list else None
         retriever = self._build_retriever(filters=filters)
         return await retriever.aretrieve(query)

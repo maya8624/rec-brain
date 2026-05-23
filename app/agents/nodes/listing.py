@@ -36,7 +36,7 @@ async def listing_search_node(
         )
 
         ctx = state.get(StateKeys.SEARCH_CONTEXT)
-        if ctx and (ctx.get("property_id") or ctx.get("location") or ctx.get("address")):
+        if ctx and ctx.get("property_id"):
             logger.debug("listing_search_node | ctx=%s", ctx)
             result = await sql_service.search_from_context(ctx)
         else:
@@ -47,7 +47,7 @@ async def listing_search_node(
         return {
             StateKeys.SEARCH_RESULTS: rows,
             StateKeys.RETRIEVED_DOCS: None,
-            StateKeys.PHASE:          ConversationPhase.SEARCH_RESULTS_SHOWN,
+            StateKeys.PHASE: ConversationPhase.SEARCH_RESULTS_SHOWN,
         }
 
     except Exception as exc:

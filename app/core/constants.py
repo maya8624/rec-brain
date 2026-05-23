@@ -92,17 +92,29 @@ class AppStateKeys:
     RAG_SERVICE = "rag_service"
 
 
+class Intent:
+    SEARCH          = "search"
+    DOCUMENT_QUERY  = "document_query"
+    HYBRID_SEARCH   = "hybrid_search"
+    BOOKING         = "booking"
+    CANCELLATION    = "cancellation"
+    BOOKING_LOOKUP  = "booking_lookup"
+    DEPOSIT_PAYMENT = "deposit_payment"
+    GENERAL         = "general"
+    UNKNOWN         = "unknown"
+
+
 class IntentConfig:
     CLASSIFIER_HISTORY_LIMIT: int = 4
 
     HISTORY_BY_INTENT: dict[str, int] = {
-        "booking": 12,
-        "cancellation": 12,
-        "booking_lookup": 6,
-        "search": 6,
-        "hybrid_search": 6,
-        "document_query": 4,
-        "general": 4,
+        Intent.BOOKING:         12,
+        Intent.CANCELLATION:    12,
+        Intent.BOOKING_LOOKUP:  6,
+        Intent.SEARCH:          6,
+        Intent.HYBRID_SEARCH:   6,
+        Intent.DOCUMENT_QUERY:  4,
+        Intent.GENERAL:         4,
     }
 
     CANCELLATION_KEYWORDS = frozenset([
@@ -169,26 +181,26 @@ class IntentConfig:
     ])
 
     BOOKING_INTENTS = frozenset([
-        "booking",
-        "cancellation",
-        "booking_lookup"
+        Intent.BOOKING,
+        Intent.CANCELLATION,
+        Intent.BOOKING_LOOKUP,
     ])
 
     DOC_INTENTS = frozenset([
-        "document_query",
-        "hybrid_search"
+        Intent.DOCUMENT_QUERY,
+        Intent.HYBRID_SEARCH,
     ])
 
     TOOL_INTENTS = frozenset([
-        "booking",
-        "cancellation",
-        "booking_lookup",
-        "deposit_payment"
+        Intent.BOOKING,
+        Intent.CANCELLATION,
+        Intent.BOOKING_LOOKUP,
+        Intent.DEPOSIT_PAYMENT,
     ])
 
     SEARCH_INTENTS = TOOL_INTENTS | frozenset([
-        "search",
-        "hybrid_search"
+        Intent.SEARCH,
+        Intent.HYBRID_SEARCH,
     ])
 
 
