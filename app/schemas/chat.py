@@ -6,16 +6,26 @@ These are the contract between the .NET backend and the Python AI service.
 from pydantic import BaseModel, Field
 
 
+class ChatMetadata(BaseModel):
+    suburbs: list[str] | None = None
+    intent: str | None = None
+    budget_max: int | None = None
+    pet_friendly: bool | None = None
+    bedrooms_min: int | None = None
+    bedrooms_max: int | None = None
+    available_within_days: int | None = None
+
+
 class ChatRequest(BaseModel):
     """
     Incoming chat message from .NET backend.
 
     thread_id maps to the user's session in .NET.
     LangGraph uses it to isolate and rehydrate conversation state.
+
     """
     message: str = Field(
-        ...,
-        min_length=1,
+        default="",
         max_length=1000,
         description="User's message text",
     )
@@ -41,6 +51,8 @@ class ChatRequest(BaseModel):
         default=False,
         description="True = new thread, initialise fresh state. False = continue existing.",
     )
+
+    metadata: ChatMetadata | None = None
 
 
 class PropertyListing(BaseModel):

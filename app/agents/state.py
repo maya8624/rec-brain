@@ -31,6 +31,7 @@ UserIntent = Literal[
     "cancellation",
     "booking_lookup",
     "deposit_payment",
+    "suburb_summary",
     "general",
     "unknown"
 ]
@@ -149,6 +150,7 @@ class RealEstateAgentState(TypedDict):
     early_response: str | None
     search_results: list[dict]
     deposit_result: dict | None
+    suburb_summary_result: dict | None
     retrieved_docs: str | None
     requires_human: bool                # True → escalate to human agent
     error_count: int                    # consecutive tool failures this session
@@ -178,6 +180,7 @@ def initial_state() -> RealEstateAgentState:
         ),
         search_results=[],
         deposit_result=None,
+        suburb_summary_result=None,
         retrieved_docs=None,
         requires_human=False,
         error_count=0,

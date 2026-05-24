@@ -20,6 +20,7 @@ Strategy: hybrid keyword + LLM
 import logging
 from typing import Any
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.runnables import RunnableConfig
 
 from app.agents.nodes._base import last_human_message
 from app.agents.nodes._fast_path import (
@@ -28,17 +29,23 @@ from app.agents.nodes._fast_path import (
     fast_path_intent,
 )
 from app.agents.state import ConversationPhase, IntentClassification, RealEstateAgentState
-from app.core.constants import Intent, IntentConfig, StateKeys
+from app.core.constants import AppStateKeys, Intent, IntentConfig, StateKeys
 from app.infrastructure.llm import get_llm
 from app.prompts.intent import INTENT_CLASSIFICATION_PROMPT
 
 logger = logging.getLogger(__name__)
 
 
-async def intent_node(state: RealEstateAgentState) -> dict[str, Any]:
+async def intent_node(state: RealEstateAgentState, config: RunnableConfig) -> dict[str, Any]:
     """
     Classifies intent from the latest HumanMessage.
     """
+    forced = config.get(AppStateKeys.CONFIGURABLE, {}
+                        ).get(AppStateKeys.FORCED_INTENT)
+
+    if forced:
+        return {StateKeys.USER_INTENT: forced}
+
     message = last_human_message(state).lower()
     if not message:
         return {StateKeys.USER_INTENT: Intent.GENERAL}
@@ -58,26 +65,6 @@ async def intent_node(state: RealEstateAgentState) -> dict[str, Any]:
         return {StateKeys.USER_INTENT: Intent.CANCELLATION}
 
     return await _classify_with_llm(state)
-
-
-# def _maybe_search_then_deposit(message: str, state: RealEstateAgentState) -> str:
-#     """
-#     Upgrade deposit_payment → search_then_deposit when prior search results are
-#     present but no specific address from those results appears in the message.
-#     This lets the user pick from the list rather than failing a deposit lookup
-#     with no identified property.
-#     """
-#     search_results = state.get(StateKeys.SEARCH_RESULTS) or []
-#     if len(search_results) <= 1:
-#         return "deposit_payment"
-#     known_addresses = {
-#         r.get("address", "").lower()
-#         for r in search_results
-#         if r.get("address")
-#     }
-#     if any(addr and addr in message for addr in known_addresses):
-#         return "deposit_payment"
-#     return "search_then_deposit"
 
 
 async def _classify_with_llm(state: RealEstateAgentState) -> dict[str, Any]:

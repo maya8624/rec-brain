@@ -126,8 +126,7 @@ class SearchService:
         context = "\n\n".join(context_blocks)
         prompt = build_suburb_summary_prompt(suburb_str, context)
 
-        structured_llm = self._llm.with_structured_output(
-            SuburbSummaryResponse)
+        structured_llm = self._llm.with_structured_output(SuburbSummaryResponse)
         result: SuburbSummaryResponse = await structured_llm.ainvoke([HumanMessage(content=prompt)])
         return result
 

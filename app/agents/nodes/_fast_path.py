@@ -8,6 +8,8 @@ import re
 from app.agents.state import ConversationPhase, RealEstateAgentState, UserIntent
 from app.core.constants import Intent, IntentConfig, StateKeys
 
+# TODO: refactor
+
 
 def fast_path_intent(message: str, state: RealEstateAgentState) -> UserIntent | None:
     """

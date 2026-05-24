@@ -27,14 +27,6 @@ class InternalRoutes:
     def my_deposit(listing_id: str, user_id: str) -> str:
         return f"deposit/my/{listing_id}/{user_id}"
 
-# class InspectionBookingEndpoints:
-#     """
-#     Constants for the .NET backend API.
-#     """
-#     AVAILABLE = "/api/internal/inspection-bookings/available"
-#     BOOK = "/api/internal/inspection-bookings"
-#     CANCEL = "/api/internal/inspection-bookings/{id}/cancel"
-
 
 class ToolNames:
     """
@@ -61,24 +53,6 @@ class TableNames:
     V_LISTINGS = "v_listings"
 
 
-class StateKeys:
-    """
-    Constants for state keys used in the AI agent.
-    """
-    USER_INTENT = "user_intent"
-    INTENT_COMPLETED = "intent_completed"
-    EARLY_RESPONSE = "early_response"
-    SEARCH_CONTEXT = "search_context"
-    SEARCH_RESULTS = "search_results"
-    RETRIEVED_DOCS = "retrieved_docs"
-    DEPOSIT_RESULT = "deposit_result"
-    BOOKING_CONTEXT = "booking_context"
-    # BOOKING_STATUS = "booking_status"
-    ERROR_COUNT = "error_count"
-    REQUIRES_HUMAN = "requires_human"
-    PHASE = "phase"
-
-
 class AppStateKeys:
     """
     Keys for services stored on FastAPI app.state, accessed via RunnableConfig.
@@ -90,18 +64,22 @@ class AppStateKeys:
     BOOKING_SERVICE = "booking_service"
     SQL_VIEW_SERVICE = "sql_view_service"
     RAG_SERVICE = "rag_service"
+    SEARCH_SERVICE = "search_service"
+    FORCED_INTENT = "forced_intent"
+    SUBURBS = "suburbs"
 
 
 class Intent:
-    SEARCH          = "search"
-    DOCUMENT_QUERY  = "document_query"
-    HYBRID_SEARCH   = "hybrid_search"
-    BOOKING         = "booking"
-    CANCELLATION    = "cancellation"
-    BOOKING_LOOKUP  = "booking_lookup"
+    SEARCH = "search"
+    DOCUMENT_QUERY = "document_query"
+    HYBRID_SEARCH = "hybrid_search"
+    BOOKING = "booking"
+    CANCELLATION = "cancellation"
+    BOOKING_LOOKUP = "booking_lookup"
     DEPOSIT_PAYMENT = "deposit_payment"
-    GENERAL         = "general"
-    UNKNOWN         = "unknown"
+    SUBURB_SUMMARY = "suburb_summary"
+    GENERAL = "general"
+    UNKNOWN = "unknown"
 
 
 class IntentConfig:
@@ -114,6 +92,7 @@ class IntentConfig:
         Intent.SEARCH:          6,
         Intent.HYBRID_SEARCH:   6,
         Intent.DOCUMENT_QUERY:  4,
+        Intent.SUBURB_SUMMARY:  4,
         Intent.GENERAL:         4,
     }
 
@@ -189,6 +168,7 @@ class IntentConfig:
     DOC_INTENTS = frozenset([
         Intent.DOCUMENT_QUERY,
         Intent.HYBRID_SEARCH,
+        Intent.SUBURB_SUMMARY,
     ])
 
     TOOL_INTENTS = frozenset([
@@ -218,6 +198,25 @@ class PromptLabels:
     BOOKING_CONTEXT = "[BOOKING CONTEXT]"
 
 
+class StateKeys:
+    """
+    Constants for state keys used in the AI agent.
+    """
+    USER_INTENT = "user_intent"
+    INTENT_COMPLETED = "intent_completed"
+    EARLY_RESPONSE = "early_response"
+    SEARCH_CONTEXT = "search_context"
+    SEARCH_RESULTS = "search_results"
+    RETRIEVED_DOCS = "retrieved_docs"
+    DEPOSIT_RESULT = "deposit_result"
+    SUBURB_SUMMARY_RESULT = "suburb_summary_result"
+    BOOKING_CONTEXT = "booking_context"
+    # BOOKING_STATUS = "booking_status"
+    ERROR_COUNT = "error_count"
+    REQUIRES_HUMAN = "requires_human"
+    PHASE = "phase"
+
+
 class Node:
     """
     Constants for graph node names.
@@ -228,6 +227,7 @@ class Node:
     VECTOR_SEARCH = "vector_search"
     HYBRID_SEARCH = "hybrid_search"
     SQL_SEARCH = "sql_search"
+    SUBURB_SUMMARY = "suburb_summary"
     TOOLS = "tools"
     CONTEXT_UPDATE = "context_update"
     SAFETY = "safety"

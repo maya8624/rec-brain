@@ -10,7 +10,6 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
-
 from app.agents.state import initial_state
 from app.api.dependencies import get_agent, verify_internal_key, CompiledStateGraph
 from app.core.constants import AppStateKeys, Messages, StateKeys
@@ -38,15 +37,23 @@ async def chat(
                 AppStateKeys.DEPOSIT_SERVICE: http_request.app.state.deposit_service,
                 AppStateKeys.SQL_VIEW_SERVICE: http_request.app.state.sql_view_service,
                 AppStateKeys.RAG_SERVICE:     http_request.app.state.rag_service,
+                AppStateKeys.SEARCH_SERVICE:  http_request.app.state.search_service,
+                AppStateKeys.FORCED_INTENT:   request.metadata.intent if request.metadata else None,
+                AppStateKeys.SUBURBS:         request.metadata.suburbs if request.metadata else None,
             }
         }
 
+        suburbs = request.metadata.suburbs if request.metadata else None
+        message = request.message or (
+            f"Tell me about {', '.join(suburbs)}" if suburbs else ""
+        )
+
         if request.is_new_conversation:
             input_state = initial_state()
-            input_state["messages"] = [HumanMessage(content=request.message)]
+            input_state["messages"] = [HumanMessage(content=message)]
         else:
             # LangGraph reload existing state from checkpointer automatically
-            input_state = {"messages": [HumanMessage(content=request.message)]}
+            input_state = {"messages": [HumanMessage(content=message)]}
 
         final_state = await agent.ainvoke(input=input_state, config=config)
         chat_response = _build_response(request.thread_id, final_state)
@@ -111,6 +118,9 @@ async def _event_generator(request: ChatRequest, http_request: Request, agent):
                 AppStateKeys.DEPOSIT_SERVICE: http_request.app.state.deposit_service,
                 AppStateKeys.SQL_VIEW_SERVICE: http_request.app.state.sql_view_service,
                 AppStateKeys.RAG_SERVICE:     http_request.app.state.rag_service,
+                AppStateKeys.SEARCH_SERVICE:  http_request.app.state.search_service,
+                AppStateKeys.FORCED_INTENT:   request.metadata.intent if request.metadata else None,
+                AppStateKeys.SUBURBS:         request.metadata.suburbs if request.metadata else None,
             }
         }
 
@@ -152,7 +162,8 @@ async def _event_generator(request: ChatRequest, http_request: Request, agent):
                    thread_id=request.thread_id,
                    listings=[l.model_dump() for l in _to_listings(search_results)],
                    property_id=_extract_single_property_id(search_results),
-                   deposit=final_state.get("deposit_result"))
+                   deposit=final_state.get("deposit_result"),
+                   suburb_summary=final_state.get("suburb_summary_result"))
 
         yield "data: [DONE]\n\n"
 

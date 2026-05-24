@@ -57,6 +57,7 @@ from app.agents.nodes.hybrid import hybrid_search_node
 from app.agents.nodes.intent import intent_node
 from app.agents.nodes.listing import listing_search_node
 from app.agents.nodes.safety import safety_node
+from app.agents.nodes.suburb_summary import suburb_summary_node
 from app.agents.nodes.vector import vector_search_node
 from app.agents.router import (
     route_intent_output,
@@ -92,6 +93,7 @@ def build_graph(checkpointer: BaseCheckpointSaver) -> CompiledStateGraph:
     graph.add_node(Node.LISTING_SEARCH,  listing_search_node)
     graph.add_node(Node.VECTOR_SEARCH,   vector_search_node)
     graph.add_node(Node.HYBRID_SEARCH,   hybrid_search_node)
+    graph.add_node(Node.SUBURB_SUMMARY,  suburb_summary_node)
     graph.add_node(Node.AGENT,           agent_node)
     graph.add_node(Node.TOOLS,           tool_node)
     graph.add_node(Node.CONTEXT_UPDATE,  context_update_node)
@@ -106,11 +108,12 @@ def build_graph(checkpointer: BaseCheckpointSaver) -> CompiledStateGraph:
         source=Node.INTENT,
         path=route_intent_output,
         path_map={
-            Node.LISTING_SEARCH: Node.LISTING_SEARCH,
-            Node.VECTOR_SEARCH:  Node.VECTOR_SEARCH,
-            Node.HYBRID_SEARCH:  Node.HYBRID_SEARCH,
-            Node.AGENT:          Node.AGENT,
-            Node.END:            END,
+            Node.LISTING_SEARCH:  Node.LISTING_SEARCH,
+            Node.VECTOR_SEARCH:   Node.VECTOR_SEARCH,
+            Node.HYBRID_SEARCH:   Node.HYBRID_SEARCH,
+            Node.SUBURB_SUMMARY:  Node.SUBURB_SUMMARY,
+            Node.AGENT:           Node.AGENT,
+            Node.END:             END,
         },
     )
 
@@ -118,6 +121,7 @@ def build_graph(checkpointer: BaseCheckpointSaver) -> CompiledStateGraph:
     # listing_search → agent (format)
     # vector_search  → agent (format)
     # hybrid_search  → agent (format)
+    # suburb_summary → agent (stream)
     # ------------------------
     graph.add_conditional_edges(
         source=Node.LISTING_SEARCH,
@@ -133,6 +137,12 @@ def build_graph(checkpointer: BaseCheckpointSaver) -> CompiledStateGraph:
 
     graph.add_conditional_edges(
         source=Node.HYBRID_SEARCH,
+        path=route_after_search,
+        path_map={Node.AGENT: Node.AGENT, Node.END: END},
+    )
+
+    graph.add_conditional_edges(
+        source=Node.SUBURB_SUMMARY,
         path=route_after_search,
         path_map={Node.AGENT: Node.AGENT, Node.END: END},
     )

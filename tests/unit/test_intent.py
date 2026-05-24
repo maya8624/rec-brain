@@ -169,21 +169,21 @@ class TestIntentNodeFastPath:
     async def test_cancellation_skips_llm(self):
         state = {"messages": [HumanMessage(content="cancel my inspection")]}
         with patch("app.agents.nodes.intent.get_llm") as mock_get_llm:
-            result = await intent_node(state)
+            result = await intent_node(state, {"configurable": {}})
             mock_get_llm.assert_not_called()
         assert result["user_intent"] == "cancellation"
 
     async def test_booking_skips_llm(self):
         state = {"messages": [HumanMessage(content="I'd like to book a viewing")]}
         with patch("app.agents.nodes.intent.get_llm") as mock_get_llm:
-            result = await intent_node(state)
+            result = await intent_node(state, {"configurable": {}})
             mock_get_llm.assert_not_called()
         assert result["user_intent"] == "booking"
 
     async def test_booking_lookup_skips_llm(self):
         state = {"messages": [HumanMessage(content="show me my booking")]}
         with patch("app.agents.nodes.intent.get_llm") as mock_get_llm:
-            result = await intent_node(state)
+            result = await intent_node(state, {"configurable": {}})
             mock_get_llm.assert_not_called()
         assert result["user_intent"] == "booking_lookup"
 
@@ -194,7 +194,7 @@ class TestIntentNodeFastPath:
             "booking_context": {"available_slots": ["Mon 10am", "Tue 2pm"]},
         }
         with patch("app.agents.nodes.intent.get_llm") as mock_get_llm:
-            result = await intent_node(state)
+            result = await intent_node(state, {"configurable": {}})
             mock_get_llm.assert_not_called()
         assert result["user_intent"] == "booking"
 
@@ -205,7 +205,7 @@ class TestIntentNodeFastPath:
             "phase": ConversationPhase.CANCELLATION_PENDING,
         }
         with patch("app.agents.nodes.intent.get_llm") as mock_get_llm:
-            result = await intent_node(state)
+            result = await intent_node(state, {"configurable": {}})
             mock_get_llm.assert_not_called()
         assert result["user_intent"] == "cancellation"
 
@@ -221,13 +221,13 @@ class TestIntentNodeFastPath:
                 intent="general",
                 early_response="No problem, I've cancelled the booking process.",
             ))
-            result = await intent_node(state)
+            result = await intent_node(state, {"configurable": {}})
             mock_get_llm.assert_called()
         assert result["user_intent"] == "general"
 
     async def test_empty_messages_returns_general(self):
         state = {"messages": []}
-        result = await intent_node(state)
+        result = await intent_node(state, {"configurable": {}})
         assert result["user_intent"] == "general"
 
     async def test_deposit_follow_up_skips_llm(self):
@@ -237,7 +237,7 @@ class TestIntentNodeFastPath:
             )],
         }
         with patch("app.agents.nodes.intent.get_llm") as mock_get_llm:
-            result = await intent_node(state)
+            result = await intent_node(state, {"configurable": {}})
             mock_get_llm.assert_not_called()
         assert result["user_intent"] == "deposit_payment"
 
@@ -263,7 +263,7 @@ class TestIntentNodeLLMPath:
             max_price=800000,
         ))
         state = {"messages": [HumanMessage(content="Show me 3 bedroom houses in Sydney under $800k")]}
-        result = await intent_node(state)
+        result = await intent_node(state, {"configurable": {}})
 
         assert result["user_intent"] == "search"
         assert result["search_context"]["location"] == "Sydney"
@@ -277,7 +277,7 @@ class TestIntentNodeLLMPath:
             early_response="Which suburb or area are you looking in?",
         ))
         state = {"messages": [HumanMessage(content="Find apartments with 2 bathrooms for rent")]}
-        result = await intent_node(state)
+        result = await intent_node(state, {"configurable": {}})
 
         assert result["user_intent"] == "search"
         assert result["early_response"]
@@ -291,7 +291,7 @@ class TestIntentNodeLLMPath:
             AIMessage(content="Sam Jones is the principal agent."),
             HumanMessage(content="what is his number?"),
         ]}
-        result = await intent_node(state)
+        result = await intent_node(state, {"configurable": {}})
         assert result["user_intent"] == "document_query"
 
     async def test_hybrid_search_intent(self, mock_get_llm):
@@ -302,7 +302,7 @@ class TestIntentNodeLLMPath:
         state = {"messages": [HumanMessage(
             content="Find me houses in Sydney and tell me about the strata"
         )]}
-        result = await intent_node(state)
+        result = await intent_node(state, {"configurable": {}})
         assert result["user_intent"] == "hybrid_search"
 
     async def test_compound_sets_early_response(self, mock_get_llm):
@@ -314,7 +314,7 @@ class TestIntentNodeLLMPath:
         state = {"messages": [HumanMessage(
             content="Show me apartments and cancel my booking"
         )]}
-        result = await intent_node(state)
+        result = await intent_node(state, {"configurable": {}})
         assert result["user_intent"] == "general"
         assert result["early_response"]
 
@@ -325,7 +325,7 @@ class TestIntentNodeLLMPath:
             early_response=early,
         ))
         state = {"messages": [HumanMessage(content="Can you book me a flight to Bali?")]}
-        result = await intent_node(state)
+        result = await intent_node(state, {"configurable": {}})
 
         assert result["user_intent"] == "general"
         assert result["early_response"] == early
@@ -340,7 +340,7 @@ class TestIntentNodeLLMPath:
             "messages": [HumanMessage(content="actually make it under $600k")],
             "search_context": {"location": "Sydney", "bedrooms": 3},
         }
-        result = await intent_node(state)
+        result = await intent_node(state, {"configurable": {}})
 
         ctx = result["search_context"]
         assert ctx["location"] == "Sydney"    # preserved from previous turn
@@ -352,7 +352,7 @@ class TestIntentNodeLLMPath:
             intent="general",
         ))
         state = {"messages": [HumanMessage(content="Hello!")]}
-        result = await intent_node(state)
+        result = await intent_node(state, {"configurable": {}})
         assert "search_context" not in result
 
     async def test_llm_failure_falls_back_to_general(self, mock_get_llm):
@@ -362,7 +362,7 @@ class TestIntentNodeLLMPath:
         )
         mock_get_llm.return_value = llm
         state = {"messages": [HumanMessage(content="show me something nice")]}
-        result = await intent_node(state)
+        result = await intent_node(state, {"configurable": {}})
         assert result["user_intent"] == "general"
 
     async def test_explicit_count_stored_as_limit(self, mock_get_llm):
@@ -376,7 +376,7 @@ class TestIntentNodeLLMPath:
         state = {"messages": [HumanMessage(
             content="Show me 3 properties for rent in Castle Hill"
         )]}
-        result = await intent_node(state)
+        result = await intent_node(state, {"configurable": {}})
 
         assert result["search_context"]["limit"] == 3
 
@@ -388,6 +388,6 @@ class TestIntentNodeLLMPath:
             limit=50,
         ))
         state = {"messages": [HumanMessage(content="Show me 50 properties in Sydney")]}
-        result = await intent_node(state)
+        result = await intent_node(state, {"configurable": {}})
 
         assert result["search_context"]["limit"] == 10

@@ -42,6 +42,7 @@ def route_intent_output(state: RealEstateAgentState) -> str:
         Intent.SEARCH:          Node.LISTING_SEARCH,
         Intent.DOCUMENT_QUERY:  Node.VECTOR_SEARCH,
         Intent.HYBRID_SEARCH:   Node.HYBRID_SEARCH,
+        Intent.SUBURB_SUMMARY:  Node.SUBURB_SUMMARY,
         Intent.BOOKING:         Node.AGENT,
         Intent.CANCELLATION:    Node.AGENT,
         Intent.BOOKING_LOOKUP:  Node.AGENT,
