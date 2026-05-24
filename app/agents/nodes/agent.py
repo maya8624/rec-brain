@@ -91,6 +91,10 @@ def _update_state_keys(
 
     phase = state.get(StateKeys.PHASE, ConversationPhase.IDLE)
 
+    if intent == Intent.SUBURB_SUMMARY:
+        state_keys.update({
+            StateKeys.INTENT_COMPLETED: False
+        })
     # User said no to cancellation — reset phase to IDLE
     if intent == Intent.GENERAL and phase == ConversationPhase.CANCELLATION_PENDING:
         state_keys.update({

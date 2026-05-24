@@ -40,9 +40,7 @@ async def intent_node(state: RealEstateAgentState, config: RunnableConfig) -> di
     """
     Classifies intent from the latest HumanMessage.
     """
-    forced = config.get(AppStateKeys.CONFIGURABLE, {}
-                        ).get(AppStateKeys.FORCED_INTENT)
-
+    forced = config.get(AppStateKeys.CONFIGURABLE, {}).get(AppStateKeys.FORCED_INTENT)
     if forced:
         return {StateKeys.USER_INTENT: forced}
 

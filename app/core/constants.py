@@ -214,6 +214,7 @@ class StateKeys:
     # BOOKING_STATUS = "booking_status"
     ERROR_COUNT = "error_count"
     REQUIRES_HUMAN = "requires_human"
+    LOCATION = "location"
     PHASE = "phase"
 
 
