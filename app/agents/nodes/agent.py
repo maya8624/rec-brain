@@ -23,6 +23,7 @@ from app.agents.state import BookingContext, ConversationPhase, RealEstateAgentS
 from app.core.constants import Intent, IntentConfig, PromptLabels, StateKeys
 from app.infrastructure.llm import get_llm
 from app.prompts.agent import REAL_ESTATE_AGENT_SYSTEM, SEARCH_RESULT_SYSTEM
+from app.prompts.rag import DOCUMENT_QUERY_PROMPT
 from app.tools import get_all_tools
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,7 @@ async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
     """Routes to tool-bound or plain LLM based on intent and message type, then updates state."""
     needs_tools = _needs_tools(state)
     llm = _get_tool_llm() if needs_tools else _get_plain_llm()
+
     intent = state.get(StateKeys.USER_INTENT, Intent.GENERAL)
     history_limit = IntentConfig.HISTORY_BY_INTENT.get(intent, 6)
     history = list(state["messages"])[-history_limit:]
@@ -48,8 +50,7 @@ async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
         logger.error("agent_node | OpenAI rate limit hit: %s", exc)
         raise
     except APIStatusError as exc:
-        logger.error("agent_node | OpenAI API error %s: %s",
-                     exc.status_code, exc.message)
+        logger.error("agent_node | OpenAI API error %s: %s", exc.status_code, exc.message)
         raise
 
     state_keys = _update_state_keys(intent, state, response, needs_tools)
@@ -116,7 +117,12 @@ def _build_prompt(
         intent: str,
         history: list) -> list:
 
-    system = SEARCH_RESULT_SYSTEM if intent == Intent.SEARCH else REAL_ESTATE_AGENT_SYSTEM
+    if intent == Intent.SEARCH:
+        system = SEARCH_RESULT_SYSTEM
+    elif intent == Intent.DOCUMENT_QUERY:
+        system = DOCUMENT_QUERY_PROMPT
+    else:
+        system = REAL_ESTATE_AGENT_SYSTEM
 
     docs_msg = _get_retrieved_docs_msg(state.get(
         StateKeys.RETRIEVED_DOCS)) if intent in IntentConfig.DOC_INTENTS else None
@@ -146,11 +152,11 @@ def _get_booking_ctx_msg(booking_ctx: BookingContext) -> SystemMessage | None:
     )
 
 
-def _get_retrieved_docs_msg(retrieved_docs: str) -> SystemMessage | None:
+def _get_retrieved_docs_msg(retrieved_docs) -> SystemMessage | None:
     if not retrieved_docs:
         return None
     return SystemMessage(
-        content=f"{PromptLabels.RETRIEVED_DOCUMENTS}\n{retrieved_docs}"
+        content=f"{PromptLabels.RETRIEVED_DOCUMENTS}\n{retrieved_docs['docs']}"
     )
 
 

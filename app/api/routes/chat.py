@@ -158,12 +158,14 @@ async def _event_generator(request: ChatRequest, http_request: Request, agent):
             yield _sse("token", content=msg)
 
         search_results = final_state.get("search_results", [])
+        retrieved_docs = final_state.get("retrieved_docs")
         yield _sse("result",
                    thread_id=request.thread_id,
                    listings=[l.model_dump() for l in _to_listings(search_results)],
                    property_id=_extract_single_property_id(search_results),
                    deposit=final_state.get("deposit_result"),
-                   suburb_summary=final_state.get("suburb_summary_result"))
+                   suburb_summary=final_state.get("suburb_summary_result"),
+                   sources=[c.model_dump() for c in retrieved_docs["sources"]] if retrieved_docs else [])
 
         yield "data: [DONE]\n\n"
 
@@ -233,12 +235,15 @@ def _build_response(thread_id: str, final_state: dict) -> ChatResponse:
 
     search_results = final_state.get("search_results", [])
 
+    retrieved_docs = final_state.get("retrieved_docs")
+
     return ChatResponse(
         reply=reply,
         thread_id=thread_id,
         listings=_to_listings(search_results),
         property_id=_extract_single_property_id(search_results),
         deposit=final_state.get("deposit_result"),
+        sources=retrieved_docs["sources"] if retrieved_docs else [],
     )
 
 

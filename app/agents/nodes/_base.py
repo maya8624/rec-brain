@@ -8,6 +8,9 @@ from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
+from llama_index.core.schema import NodeWithScore
+
+from app.schemas.rag import SourceChunk
 
 from app.agents.state import RealEstateAgentState
 from app.core.config import settings
@@ -53,11 +56,9 @@ def resolve_app_service(config: RunnableConfig, attr: str, caller: str) -> Any:
         if service is None:
             raise ValueError(f"'{attr}' not found in configurable")
         return service
-
     except Exception as exc:
         logger.error("%s | could not resolve %s: %s", caller, attr, exc)
-        raise RuntimeError(
-            f"{caller} | service '{attr}' not available") from exc
+        raise RuntimeError(f"{caller} | service '{attr}' not available") from exc
 
 
 def build_tool_message(tool_call_id: str, name: str, content: dict) -> ToolMessage:
@@ -79,20 +80,38 @@ def error_content(error: Exception) -> dict:
     return {"success": False, "error": str(error)}
 
 
-def nodes_to_dicts(nodes: list) -> list[dict]:
+def extract_sources(nodes: list[NodeWithScore]) -> list[SourceChunk]:
+    """Returns one SourceChunk per retrieved node, preserving retrieval order."""
     return [
-        {
-            "text": n.node.get_content(),
-            "score": n.score,
-            "metadata": n.node.metadata,
-        }
+        SourceChunk(
+            file_name=n.node.metadata.get("file_name", ""),
+            page=_parse_page(n.node.metadata),
+            score=round(n.score or 0.0, 4),
+            text=n.node.get_content(),
+        )
         for n in nodes
     ]
 
 
-def vector_payload(nodes: list) -> dict:
+def _parse_page(metadata: dict) -> int | None:
+    raw = metadata.get("page_label") or metadata.get("page_number") or metadata.get("page")
+    try:
+        return int(raw) if raw is not None else None
+    except (ValueError, TypeError):
+        return None
+
+
+def vector_payload(nodes: list[NodeWithScore]) -> dict:
+    result = [{
+        "text": n.node.get_content(),
+        "score": n.score,
+        "metadata": n.node.metadata
+        }
+        for n in nodes
+    ]
+
     return {
-        "results": nodes_to_dicts(nodes),
+        "results": result,
         "result_count": len(nodes),
         "source": "vector_db",
     }

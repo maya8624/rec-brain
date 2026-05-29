@@ -22,6 +22,7 @@ import operator
 from langchain_core.messages import BaseMessage
 from pydantic import BaseModel
 from app.core.constants import Intent
+from app.schemas.rag import SourceChunk
 
 UserIntent = Literal[
     "search",
@@ -99,6 +100,11 @@ class BookingContext(TypedDict, total=False):
     cancellation_reason: str
 
 
+class RetrievedDocs(TypedDict):
+    docs: str
+    sources: list[SourceChunk]
+
+
 class SearchContext(TypedDict, total=False):
     """
     Current property search criteria, built up across turns.
@@ -151,7 +157,7 @@ class RealEstateAgentState(TypedDict):
     search_results: list[dict]
     deposit_result: dict | None
     suburb_summary_result: dict | None
-    retrieved_docs: str | None
+    retrieved_docs: RetrievedDocs | None
     requires_human: bool                # True → escalate to human agent
     error_count: int                    # consecutive tool failures this session
     intent_completed: bool              # True → last intent's tool flow finished

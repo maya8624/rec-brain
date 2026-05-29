@@ -1,5 +1,5 @@
 """
-enquiry_intent — classifies the intent of a tenant/owner enquiry.
+rag_intent — classifies the intent of a tenant/owner enquiry.
 
 Strategy: hybrid keyword + LLM
 
@@ -15,7 +15,7 @@ Strategy: hybrid keyword + LLM
 
     LLM path (everything else):
         - Ambiguous or multi-topic enquiries
-        - Returns EnquiryClassification via with_structured_output
+        - Returns RagClassification via with_structured_output
         - Falls back to "general" on any LLM error
 """
 
@@ -26,21 +26,21 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from app.agents.nodes._fast_path import matches_keywords
 from app.prompts.enquiry import ENQUIRY_CLASSIFICATION_PROMPT
 from app.infrastructure.llm import get_llm
-from app.schemas.enquiry import ENQUIRY_KEYWORD_MAP, EnquiryClassification, EnquiryIntent
+from app.schemas.rag import RAG_KEYWORD_MAP, RagClassification, RagIntent
 
 logger = logging.getLogger(__name__)
 
-def _keyword_intent(message: str) -> EnquiryIntent | None:
-    for intent, keywords in ENQUIRY_KEYWORD_MAP.items():
+def _keyword_intent(message: str) -> RagIntent | None:
+    for intent, keywords in RAG_KEYWORD_MAP.items():
         if matches_keywords(message, keywords):
             return intent
     return None
 
 
-async def classify_enquiry_intent(enquiry: str) -> EnquiryIntent:
-    """Classifies a tenant/owner message into an EnquiryIntent."""
+async def classify_rag_intent(enquiry: str) -> RagIntent:
+    """Classifies a tenant/owner message into an RagIntent."""
     if not enquiry:
-        return EnquiryIntent.GENERAL
+        return RagIntent.GENERAL
 
     fast = _keyword_intent(enquiry.lower())
     if fast:
@@ -52,10 +52,10 @@ async def classify_enquiry_intent(enquiry: str) -> EnquiryIntent:
     ]
 
     try:
-        llm = get_llm().with_structured_output(EnquiryClassification)
-        classification: EnquiryClassification = await llm.ainvoke(prompt)
+        llm = get_llm().with_structured_output(RagClassification)
+        classification: RagClassification = await llm.ainvoke(prompt)
     except Exception as exc:
-        logger.error("classify_enquiry_intent | LLM classification failed: %s", exc)
-        return EnquiryIntent.GENERAL
+        logger.error("classify_rag_intent | LLM classification failed: %s", exc)
+        return RagIntent.GENERAL
 
     return classification.intent

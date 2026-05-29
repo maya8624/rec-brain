@@ -5,6 +5,8 @@ These are the contract between the .NET backend and the Python AI service.
 
 from pydantic import BaseModel, Field
 
+from app.schemas.rag import SourceChunk
+
 
 class ChatMetadata(BaseModel):
     suburbs: list[str] | None = None
@@ -125,6 +127,11 @@ class ChatResponse(BaseModel):
     deposit: dict | None = Field(
         default=None,
         description="Holding deposit data — present when get_deposit succeeds. Frontend uses session_url to open Stripe popup.",
+    )
+
+    sources: list[SourceChunk] = Field(
+        default_factory=list,
+        description="Retrieved document chunks — present on document_query responses.",
     )
 
 

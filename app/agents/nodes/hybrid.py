@@ -11,7 +11,7 @@ from typing import Any
 
 from langchain_core.runnables import RunnableConfig
 
-from app.agents.state import RealEstateAgentState
+from app.agents.state import RealEstateAgentState, RetrievedDocs
 from app.core.constants import AppStateKeys, Node, StateKeys
 from app.schemas.property import SearchResult
 from app.agents.nodes._base import (
@@ -61,13 +61,14 @@ async def hybrid_search_node(state: RealEstateAgentState, config: RunnableConfig
     }
 
 
-def _build_vector_docs(vector: dict) -> str | None:
+def _build_vector_docs(vector: dict) -> RetrievedDocs | None:
     if not vector.get("success") or not vector.get("results"):
         return None
-    return "\n\n".join(
+    docs = "\n\n".join(
         f"[excerpt {i + 1}]\n{r['text']}"
         for i, r in enumerate(vector["results"])
     )
+    return RetrievedDocs(docs=docs, sources=[])
 
 
 def _unwrap_sql(outcome: Any) -> SearchResult:
