@@ -49,12 +49,7 @@ class Settings(BaseSettings):
         description="PostgreSQL connection string — used by SQL agent and app",
     )
 
-    CHROMA_PATH: str = Field(
-        "./chroma_db",
-        description="Local path to ChromaDB storage directory",
-    )
-
-    # Shared by both Chroma and pgvector
+    # pgvector
     SIMILARITY_THRESHOLD: float = Field(
         0.7,
         description="Minimum similarity score for RAG retrieval (0.0 - 1.0)",
@@ -65,8 +60,8 @@ class Settings(BaseSettings):
         description="HuggingFace embedding model — used if OPENAI_API_KEY not set",
     )
     EMBEDDING_DIM: int = Field(
-        384,
-        description="Embedding vector dimension — 384 for all-MiniLM-L6-v2",
+        1024,
+        description="Embedding vector dimension — 1024 for BAAI/bge-m3",
     )
     VECTOR_TABLE: str = Field(
         "property_documents",

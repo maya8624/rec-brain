@@ -40,6 +40,7 @@ async def chat(
                 AppStateKeys.SEARCH_SERVICE:  http_request.app.state.search_service,
                 AppStateKeys.FORCED_INTENT:   request.metadata.intent if request.metadata else None,
                 AppStateKeys.SUBURBS:         request.metadata.suburbs if request.metadata else None,
+                AppStateKeys.PROPERTY_ID:     request.property_id,
             }
         }
 

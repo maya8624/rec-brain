@@ -47,10 +47,7 @@ class EnquiryService:
 
         doc_types = INTENT_DOC_TYPES.get(intent)
         if doc_types is None:
-            logger.error(
-                "EnquiryService.draft_response | No doc types mapped for intent: %s",
-                intent,
-            )
+            logger.error("EnquiryService.draft_response | No doc types mapped for intent: %s", intent)
             doc_types = frozenset()
 
         docs: list[NodeWithScore] = []

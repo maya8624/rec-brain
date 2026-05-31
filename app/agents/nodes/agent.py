@@ -72,7 +72,6 @@ def _filter_booking_messages(
 
     return history
 
-
 def _update_state_keys(
         intent: UserIntent,
         state: RealEstateAgentState,
@@ -83,34 +82,25 @@ def _update_state_keys(
         intent not in IntentConfig.TOOL_INTENTS
         or (not needs_tools and intent in IntentConfig.TOOL_INTENTS)
     )
-
-    state_keys = {
-        "messages": [response],
-        StateKeys.RETRIEVED_DOCS:   None,
-        StateKeys.INTENT_COMPLETED: is_complete
-    }
-
     phase = state.get(StateKeys.PHASE, ConversationPhase.IDLE)
 
+    retrieved_docs = state.get(StateKeys.RETRIEVED_DOCS) if intent in {Intent.DOCUMENT_QUERY, Intent.HYBRID_SEARCH} else None
+    state_keys = {
+        "messages":                 [response],
+        StateKeys.RETRIEVED_DOCS:   retrieved_docs,
+        StateKeys.INTENT_COMPLETED: is_complete,
+    }
+
     if intent == Intent.SUBURB_SUMMARY:
-        state_keys.update({
-            StateKeys.INTENT_COMPLETED: False
-        })
-    # User said no to cancellation — reset phase to IDLE
-    if intent == Intent.GENERAL and phase == ConversationPhase.CANCELLATION_PENDING:
-        state_keys.update({
-            StateKeys.PHASE: ConversationPhase.IDLE,
-            StateKeys.INTENT_COMPLETED: True,
-        })
-    # Agent asked user to confirm cancellation — waiting for yes/no
+        state_keys[StateKeys.INTENT_COMPLETED] = False
+    elif intent == Intent.GENERAL and phase == ConversationPhase.CANCELLATION_PENDING:
+        # User said no to cancellation — reset phase to IDLE
+        state_keys.update({StateKeys.PHASE: ConversationPhase.IDLE, StateKeys.INTENT_COMPLETED: True})
     elif intent == Intent.CANCELLATION and not response.tool_calls:
-        state_keys.update({
-            StateKeys.PHASE: ConversationPhase.CANCELLATION_PENDING,
-            StateKeys.INTENT_COMPLETED: False,
-        })
+        # Agent asked user to confirm cancellation — waiting for yes/no
+        state_keys.update({StateKeys.PHASE: ConversationPhase.CANCELLATION_PENDING, StateKeys.INTENT_COMPLETED: False})
 
     return state_keys
-
 
 def _build_prompt(
         state: RealEstateAgentState,

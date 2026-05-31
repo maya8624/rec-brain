@@ -24,7 +24,7 @@ import logging
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from app.agents.nodes._fast_path import matches_keywords
-from app.prompts.enquiry import ENQUIRY_CLASSIFICATION_PROMPT
+from app.prompts.rag import RAG_CLASSIFICATION_PROMPT
 from app.infrastructure.llm import get_llm
 from app.schemas.rag import RAG_KEYWORD_MAP, RagClassification, RagIntent
 
@@ -47,7 +47,7 @@ async def classify_rag_intent(enquiry: str) -> RagIntent:
         return fast
 
     prompt = [
-        SystemMessage(content=ENQUIRY_CLASSIFICATION_PROMPT),
+        SystemMessage(content=RAG_CLASSIFICATION_PROMPT),
         HumanMessage(content=enquiry),
     ]
 

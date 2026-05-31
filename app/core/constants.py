@@ -67,6 +67,7 @@ class AppStateKeys:
     SEARCH_SERVICE = "search_service"
     FORCED_INTENT = "forced_intent"
     SUBURBS = "suburbs"
+    PROPERTY_ID = "property_id"
 
 
 class Intent:

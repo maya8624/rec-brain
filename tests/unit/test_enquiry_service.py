@@ -111,7 +111,7 @@ class TestDraftResponse:
 
         rag.aretrieve.assert_called_once()
         call_kwargs = rag.aretrieve.call_args.kwargs
-        assert call_kwargs["doc_types"] == frozenset(["maintenance_log", "lease"])
+        assert call_kwargs["doc_types"] == frozenset(["maintenance_log", "lease", "legislation"])
 
     async def test_retrieved_docs_included_in_prompt(self, mock_classify, mock_get_llm):
         mock_classify.return_value = RagIntent.BOND
@@ -190,20 +190,20 @@ class TestDraftResponse:
 
         result = await EnquiryService(rag=rag).draft_response(_make_request())
 
-        assert result.sources == ["lease_2024.pdf", "bond_form.pdf"]
+        assert [s.file_name for s in result.sources] == ["lease_2024.pdf", "bond_form.pdf"]
 
-    async def test_sources_deduplicates_same_file(self, mock_classify, mock_get_llm):
+    async def test_sources_preserves_all_chunks_for_same_file(self, mock_classify, mock_get_llm):
         mock_classify.return_value = RagIntent.MAINTENANCE
         mock_get_llm.return_value = _make_llm_mock()
         node1 = _make_node(doc_type="lease", content="clause 1")
         node1.node.metadata["file_name"] = "lease_2024.pdf"
         node2 = _make_node(doc_type="lease", content="clause 2")
-        node2.node.metadata["file_name"] = "lease_2024.pdf"  # same file
+        node2.node.metadata["file_name"] = "lease_2024.pdf"
         rag = _make_rag(nodes=[node1, node2])
 
         result = await EnquiryService(rag=rag).draft_response(_make_request())
 
-        assert result.sources == ["lease_2024.pdf"]  # deduplicated
+        assert [s.file_name for s in result.sources] == ["lease_2024.pdf", "lease_2024.pdf"]
 
     async def test_sources_empty_when_no_docs(self, mock_classify, mock_get_llm):
         mock_classify.return_value = RagIntent.GENERAL
@@ -342,7 +342,7 @@ class TestStreamDraftResponse:
         )
 
         result = next(e for e in events if e["type"] == "result")
-        assert result["sources"] == ["bond_form.pdf"]
+        assert [s["file_name"] for s in result["sources"]] == ["bond_form.pdf"]
 
     async def test_done_sentinel_is_emitted(self, mock_classify, mock_get_llm):
         """Generator always ends with data: [DONE]."""

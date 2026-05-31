@@ -75,6 +75,7 @@ async def lifespan(_app: FastAPI):
         _app.state.rag_service = RagRetriever(
             vector_store_service=PgVectorStoreService(),
             embedding_service=EmbeddingService(),
+            similarity_cutoff=settings.SIMILARITY_THRESHOLD,
         )
         _app.state.search_service = SearchService(
             sql=_app.state.sql_view_service,

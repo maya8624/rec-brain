@@ -122,13 +122,13 @@ INTENT_COMPLIANCE_RULES: dict[RagIntent, str] = {
 }
 
 INTENT_DOC_TYPES: dict[RagIntent, frozenset[str]] = {
-    RagIntent.WATER_BILL:       frozenset(["water_bill", "lease"]),
-    RagIntent.INSPECTION:       frozenset(["inspection_notice", "lease"]),
-    RagIntent.LEASE_RENEWAL:    frozenset(["lease", "renewal_offer"]),
-    RagIntent.MAINTENANCE:      frozenset(["maintenance_log", "lease"]),
-    RagIntent.BOND:             frozenset(["bond_lodgement", "lease"]),
-    RagIntent.RENT_PAYMENT:     frozenset(["rent_ledger", "lease"]),
-    RagIntent.LEASE_CLAUSE:     frozenset(["lease"]),
+    RagIntent.WATER_BILL:       frozenset(["water_bill", "lease", "legislation"]),
+    RagIntent.INSPECTION:       frozenset(["inspection_notice", "lease", "legislation"]),
+    RagIntent.LEASE_RENEWAL:    frozenset(["lease", "renewal_offer", "legislation"]),
+    RagIntent.MAINTENANCE:      frozenset(["maintenance_log", "lease", "legislation"]),
+    RagIntent.BOND:             frozenset(["bond_lodgement", "lease", "legislation"]),
+    RagIntent.RENT_PAYMENT:     frozenset(["rent_ledger", "lease", "legislation"]),
+    RagIntent.LEASE_CLAUSE:     frozenset(["lease", "legislation"]),
     RagIntent.DOCUMENT_REQUEST: frozenset(["lease", "notice", "inspection_notice", "bond_lodgement", "rent_ledger"]),
-    RagIntent.GENERAL:          frozenset(["lease", "policy", "faq", "guide"]),
+    RagIntent.GENERAL:          frozenset(["lease", "policy", "faq", "guide", "legislation"]),
 }

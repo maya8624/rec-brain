@@ -46,9 +46,10 @@ async def hybrid_search_node(state: RealEstateAgentState, config: RunnableConfig
     else:
         sql_task = sql_service.search_listings(question)
 
+    property_id = config.get(AppStateKeys.CONFIGURABLE, {}).get(AppStateKeys.PROPERTY_ID)
     sql_outcome, vector_outcome = await asyncio.gather(
         sql_task,
-        rag_service.aretrieve(question),
+        rag_service.aretrieve(question, property_id=property_id),
         return_exceptions=True,
     )
 

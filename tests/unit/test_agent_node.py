@@ -202,7 +202,7 @@ class TestAgentNode:
             "messages": [HumanMessage(content="what are your opening hours?")],
             "user_intent": "document_query",
             "error_count": 0,
-            "retrieved_docs": "excerpt from agency documents",
+            "retrieved_docs": {"docs": "excerpt from agency documents", "sources": []},
         }
         await agent_node(state)
         call_messages = mock_llm.ainvoke.call_args.args[0]
@@ -211,17 +211,44 @@ class TestAgentNode:
             for m in call_messages
         )
 
-    async def test_retrieved_docs_cleared_in_return(self, mock_get_llm, mock_llm):
-        """agent_node always returns retrieved_docs=None to clear it for next turn."""
+    async def test_retrieved_docs_cleared_for_non_doc_intents(self, mock_get_llm, mock_llm):
+        """Non-doc intents (search, general, booking) always clear retrieved_docs."""
         mock_get_llm.return_value = mock_llm
+        for intent in ("search", "general", "booking"):
+            state = {
+                "messages": [HumanMessage(content="test")],
+                "user_intent": intent,
+                "error_count": 0,
+                "retrieved_docs": {"docs": "some docs", "sources": []},
+            }
+            result = await agent_node(state)
+            assert result["retrieved_docs"] is None, f"expected None for intent={intent}"
+
+    async def test_retrieved_docs_preserved_for_document_query(self, mock_get_llm, mock_llm):
+        """document_query preserves retrieved_docs so chat.py can return sources."""
+        mock_get_llm.return_value = mock_llm
+        docs = {"docs": "lease excerpt", "sources": []}
         state = {
-            "messages": [HumanMessage(content="show me houses")],
-            "user_intent": "search",
+            "messages": [HumanMessage(content="what are the water charges?")],
+            "user_intent": "document_query",
             "error_count": 0,
-            "retrieved_docs": "[PROPERTY SEARCH RESULTS — 2 listing(s) found.]\n...",
+            "retrieved_docs": docs,
         }
         result = await agent_node(state)
-        assert result["retrieved_docs"] is None
+        assert result["retrieved_docs"] is docs
+
+    async def test_retrieved_docs_preserved_for_hybrid_search(self, mock_get_llm, mock_llm):
+        """hybrid_search preserves retrieved_docs so chat.py can return sources."""
+        mock_get_llm.return_value = mock_llm
+        docs = {"docs": "hybrid results", "sources": []}
+        state = {
+            "messages": [HumanMessage(content="find lease info")],
+            "user_intent": "hybrid_search",
+            "error_count": 0,
+            "retrieved_docs": docs,
+        }
+        result = await agent_node(state)
+        assert result["retrieved_docs"] is docs
 
     async def test_no_retrieved_docs_prompt_has_no_extra_system_message(self, mock_get_llm, mock_llm, base_state):
         """When retrieved_docs is absent, the prompt is just system + history."""

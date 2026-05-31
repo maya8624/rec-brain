@@ -24,7 +24,8 @@ class TestHybridSearchSuccess:
             {"messages": [HumanMessage(content=_QUESTION)]}, config
         )
         assert "retrieved_docs" in result
-        assert isinstance(result["retrieved_docs"], str)
+        assert isinstance(result["retrieved_docs"], dict)
+        assert "docs" in result["retrieved_docs"]
 
     async def test_search_results_has_one_item(self, make_sql_service, make_rag_service, make_config):
         config = make_config(make_sql_service(), make_rag_service())
@@ -34,12 +35,12 @@ class TestHybridSearchSuccess:
         assert len(result["search_results"]) == 1
 
     async def test_retrieved_docs_contains_excerpt(self, make_sql_service, make_rag_service, make_config):
-        """Vector results appear as [excerpt N] blocks in retrieved_docs."""
+        """Vector results appear as [excerpt N] blocks in retrieved_docs["docs"]."""
         config = make_config(make_sql_service(), make_rag_service())
         result = await hybrid_search_node(
             {"messages": [HumanMessage(content=_QUESTION)]}, config
         )
-        assert "[excerpt 1]" in result["retrieved_docs"]
+        assert "[excerpt 1]" in result["retrieved_docs"]["docs"]
 
     async def test_calls_both_services_with_question(
         self, make_sql_service, make_rag_service, make_config
@@ -52,7 +53,7 @@ class TestHybridSearchSuccess:
             make_config(sql, rag),
         )
         sql.search_listings.assert_called_once_with(question)
-        rag.aretrieve.assert_called_once_with(question)
+        rag.aretrieve.assert_called_once_with(question, property_id=None)
 
     async def test_uses_context_path_when_location_set(
         self, make_sql_service, make_rag_service, make_config

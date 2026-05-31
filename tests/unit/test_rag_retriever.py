@@ -5,6 +5,7 @@ VectorStoreIndex is patched so no real PG connection is needed.
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from llama_index.core.schema import NodeWithScore
 from llama_index.core.vector_stores import MetadataFilter, MetadataFilters
 from llama_index.core.vector_stores.types import VectorStoreQueryMode
 
@@ -22,48 +23,49 @@ def mock_index():
         yield index
 
 
-def make_retriever(similarity_top_k: int = 3, mmr_threshold: float = 0.7) -> RagRetriever:
+def make_retriever(similarity_top_k: int = 5, similarity_cutoff: float = 0.4) -> RagRetriever:
     return RagRetriever(
         vector_store_service=MagicMock(),
         embedding_service=MagicMock(),
         similarity_top_k=similarity_top_k,
-        mmr_threshold=mmr_threshold,
+        similarity_cutoff=similarity_cutoff,
     )
+
+
+def make_node(score: float) -> NodeWithScore:
+    node = MagicMock(spec=NodeWithScore)
+    node.score = score
+    return node
 
 
 # ── Init / defaults ───────────────────────────────────────────────────────────
 
 class TestRagRetrieverInit:
-    def test_default_mmr_threshold(self, mock_index):
-        assert make_retriever()._mmr_threshold == 0.7
+    def test_default_similarity_cutoff(self, mock_index):
+        assert make_retriever()._similarity_cutoff == 0.4
 
-    def test_custom_mmr_threshold(self, mock_index):
-        assert make_retriever(mmr_threshold=0.5)._mmr_threshold == 0.5
+    def test_custom_similarity_cutoff(self, mock_index):
+        assert make_retriever(similarity_cutoff=0.6)._similarity_cutoff == 0.6
 
     def test_default_similarity_top_k(self, mock_index):
-        assert make_retriever()._similarity_top_k == 3
+        assert make_retriever()._similarity_top_k == 5
 
     def test_custom_similarity_top_k(self, mock_index):
-        assert make_retriever(similarity_top_k=5)._similarity_top_k == 5
+        assert make_retriever(similarity_top_k=3)._similarity_top_k == 3
 
 
 # ── _build_retriever ──────────────────────────────────────────────────────────
 
 class TestBuildRetriever:
-    def test_mmr_mode_always_set(self, mock_index):
+    def test_default_mode_always_set(self, mock_index):
         make_retriever()._build_retriever()
         kwargs = mock_index.as_retriever.call_args.kwargs
-        assert kwargs["vector_store_query_mode"] == VectorStoreQueryMode.MMR
-
-    def test_mmr_threshold_forwarded(self, mock_index):
-        make_retriever(mmr_threshold=0.55)._build_retriever()
-        kwargs = mock_index.as_retriever.call_args.kwargs
-        assert kwargs["mmr_threshold"] == 0.55
+        assert kwargs["vector_store_query_mode"] == VectorStoreQueryMode.DEFAULT
 
     def test_similarity_top_k_forwarded(self, mock_index):
-        make_retriever(similarity_top_k=5)._build_retriever()
+        make_retriever(similarity_top_k=3)._build_retriever()
         kwargs = mock_index.as_retriever.call_args.kwargs
-        assert kwargs["similarity_top_k"] == 5
+        assert kwargs["similarity_top_k"] == 3
 
     def test_filters_none_when_not_provided(self, mock_index):
         make_retriever()._build_retriever()
@@ -101,15 +103,47 @@ class TestAretrieve:
         assert filters.filters[0].key == "doc_type"
         assert filters.filters[0].value == "guide"
 
-    async def test_returns_retriever_results(self, mock_index):
-        node = MagicMock()
-        retriever = AsyncMock(aretrieve=AsyncMock(return_value=[node]))
+    async def test_doc_types_builds_or_filter(self, mock_index):
+        retriever = AsyncMock(aretrieve=AsyncMock(return_value=[]))
         mock_index.as_retriever.return_value = retriever
-        result = await make_retriever().aretrieve("suburb query")
-        assert result == [node]
+        await make_retriever().aretrieve("water query", doc_types=frozenset(["lease", "water_bill"]))
+        filters = mock_index.as_retriever.call_args.kwargs["filters"]
+        assert filters is not None
+        keys = {f.value for f in filters.filters}
+        assert keys == {"lease", "water_bill"}
 
     async def test_retriever_called_with_query(self, mock_index):
         retriever = AsyncMock(aretrieve=AsyncMock(return_value=[]))
         mock_index.as_retriever.return_value = retriever
         await make_retriever().aretrieve("lease conditions")
         retriever.aretrieve.assert_called_once_with("lease conditions")
+
+    async def test_nodes_above_cutoff_returned(self, mock_index):
+        nodes = [make_node(0.8), make_node(0.5), make_node(0.4)]
+        retriever = AsyncMock(aretrieve=AsyncMock(return_value=nodes))
+        mock_index.as_retriever.return_value = retriever
+        result = await make_retriever(similarity_cutoff=0.4).aretrieve("query")
+        assert result == nodes  # all at or above 0.4
+
+    async def test_nodes_below_cutoff_filtered_out(self, mock_index):
+        nodes = [make_node(0.8), make_node(0.3), make_node(0.1)]
+        retriever = AsyncMock(aretrieve=AsyncMock(return_value=nodes))
+        mock_index.as_retriever.return_value = retriever
+        result = await make_retriever(similarity_cutoff=0.4).aretrieve("query")
+        assert len(result) == 1
+        assert result[0].score == 0.8
+
+    async def test_nodes_with_none_score_filtered_out(self, mock_index):
+        nodes = [make_node(0.8), make_node(None)]
+        retriever = AsyncMock(aretrieve=AsyncMock(return_value=nodes))
+        mock_index.as_retriever.return_value = retriever
+        result = await make_retriever(similarity_cutoff=0.4).aretrieve("query")
+        assert len(result) == 1
+        assert result[0].score == 0.8
+
+    async def test_all_nodes_filtered_returns_empty(self, mock_index):
+        nodes = [make_node(0.1), make_node(0.2)]
+        retriever = AsyncMock(aretrieve=AsyncMock(return_value=nodes))
+        mock_index.as_retriever.return_value = retriever
+        result = await make_retriever(similarity_cutoff=0.4).aretrieve("hello")
+        assert result == []

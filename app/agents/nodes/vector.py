@@ -44,9 +44,10 @@ async def vector_search_node(
             config, AppStateKeys.RAG_SERVICE, Node.VECTOR_SEARCH
         )
 
+        property_id = config.get(AppStateKeys.CONFIGURABLE, {}).get(AppStateKeys.PROPERTY_ID)
         rag_intent = await classify_rag_intent(question)
         doc_types = INTENT_DOC_TYPES.get(rag_intent)
-        nodes = await rag_service.aretrieve(query=question, doc_types=doc_types)
+        nodes = await rag_service.aretrieve(query=question, doc_types=doc_types, property_id=property_id)
 
         payload = json.dumps(vector_payload(nodes))
         docs = (
@@ -54,7 +55,10 @@ async def vector_search_node(
             f"Answer the customer's question using only this retrieved content.]\n{payload}"
         )
 
-        return {StateKeys.RETRIEVED_DOCS: RetrievedDocs(docs=docs, sources=extract_sources(nodes))}
+        sources = extract_sources(nodes)
+        docs = RetrievedDocs(docs=docs, sources=sources)
+        result = {StateKeys.RETRIEVED_DOCS: docs}
+        return result
     except Exception as exc:
         logger.exception("vector_search_node | failed | %s", exc)
         return {}

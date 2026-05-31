@@ -10,8 +10,8 @@ from app.agents.nodes.vector import vector_search_node
 
 
 def _parse_docs(result: dict) -> dict:
-    """Extract the JSON payload from retrieved_docs (after the header line)."""
-    return json.loads(result["retrieved_docs"].split("]\n", 1)[1])
+    """Extract the JSON payload from retrieved_docs["docs"] (after the header line)."""
+    return json.loads(result["retrieved_docs"]["docs"].split("]\n", 1)[1])
 
 
 class TestVectorSearchSuccess:
@@ -21,14 +21,16 @@ class TestVectorSearchSuccess:
             make_config(rag_service=make_rag_service()),
         )
         assert "retrieved_docs" in result
-        assert isinstance(result["retrieved_docs"], str)
+        assert isinstance(result["retrieved_docs"], dict)
+        assert "docs" in result["retrieved_docs"]
+        assert "sources" in result["retrieved_docs"]
 
     async def test_retrieved_docs_contains_header(self, make_rag_service, make_config):
         result = await vector_search_node(
             {"messages": [HumanMessage(content="What are the lease conditions?")]},
             make_config(rag_service=make_rag_service()),
         )
-        assert "[DOCUMENT SEARCH RESULTS" in result["retrieved_docs"]
+        assert "[DOCUMENT SEARCH RESULTS" in result["retrieved_docs"]["docs"]
 
     async def test_result_structure(self, make_rag_service, make_config):
         result = await vector_search_node(
@@ -81,15 +83,15 @@ class TestVectorSearchSuccess:
         assert content["result_count"] == 0
         assert content["results"] == []
 
-    async def test_calls_retrieve_with_exact_question(self, make_rag_service, make_config):
+    async def test_calls_retrieve_with_question(self, make_rag_service, make_config):
         rag = make_rag_service()
         question = "Explain the strata by-laws"
         await vector_search_node(
             {"messages": [HumanMessage(content=question)]},
             make_config(rag_service=rag),
         )
-        rag.aretrieve.assert_called_once_with(question)
-
+        call_kwargs = rag.aretrieve.call_args.kwargs
+        assert call_kwargs["query"] == question
 
 
 class TestVectorSearchGuards:
