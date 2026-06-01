@@ -9,7 +9,7 @@ from app.agents.nodes._base import extract_sources
 from app.agents.nodes.rag_intent import classify_rag_intent
 from app.core.config import settings
 from app.infrastructure.llm import get_llm
-from app.prompts.enquiry import ENQUIRY_DRAFT_PROMPT
+from app.prompts.enquiry import ENQUIRY_DRAFT_PROMPT, ENQUIRY_NO_DOCS_PROMPT
 from app.schemas.enquiry import EnquiryRequest, EnquiryResponse
 from app.schemas.rag import INTENT_COMPLIANCE_RULES, INTENT_DOC_TYPES
 from app.services.rag_service import RagRetriever
@@ -37,6 +37,17 @@ def _format_docs(nodes: list[NodeWithScore]) -> str:
     return "\n\n".join(parts)
 
 
+def _build_prompt(docs: list[NodeWithScore], intent, body: str) -> list:
+    prompt = [SystemMessage(content=ENQUIRY_DRAFT_PROMPT)]
+    if docs:
+        prompt.append(SystemMessage(content=f"Relevant tenancy documents:\n\n{_format_docs(docs)}"))
+    else:
+        prompt.append(SystemMessage(content=ENQUIRY_NO_DOCS_PROMPT))
+
+    prompt.append(HumanMessage(content=f"[intent: {intent.value}]\n\n{body}"))
+    return prompt
+
+
 class EnquiryService:
     def __init__(self, rag: RagRetriever) -> None:
         self._rag = rag
@@ -53,14 +64,11 @@ class EnquiryService:
         docs: list[NodeWithScore] = []
         if doc_types:
             try:
-                docs = await self._rag.aretrieve(query=enquiry.body, doc_types=doc_types)
+                docs = await self._rag.aretrieve(query=enquiry.body, doc_types=doc_types, property_id=enquiry.property_id)
             except Exception as exc:
                 logger.error("EnquiryService.draft_response | RAG retrieval failed for intent %s: %s", intent, exc)
 
-        prompt = [SystemMessage(content=ENQUIRY_DRAFT_PROMPT)]
-        if docs:
-            prompt.append(SystemMessage(content=f"Relevant tenancy documents:\n\n{_format_docs(docs)}"))
-        prompt.append(HumanMessage(content=f"[intent: {intent.value}]\n\n{enquiry.body}"))
+        prompt = _build_prompt(docs, intent, enquiry.body)
 
         try:
             llm = get_llm().bind(max_tokens=400)
@@ -121,12 +129,7 @@ class EnquiryService:
             )
 
         # ── Step 3: LLM draft ────────────────────────────────────────────────────
-        prompt = [SystemMessage(content=ENQUIRY_DRAFT_PROMPT)]
-        if docs:
-            prompt.append(
-                SystemMessage(content=f"Relevant tenancy documents:\n\n{_format_docs(docs)}")
-            )
-        prompt.append(HumanMessage(content=f"[intent: {intent.value}]\n\n{enquiry.body}"))
+        prompt = _build_prompt(docs, intent, enquiry.body)
 
         t0 = time.monotonic()
         try:

@@ -51,7 +51,7 @@ class Settings(BaseSettings):
 
     # pgvector
     SIMILARITY_THRESHOLD: float = Field(
-        0.7,
+        0.5,
         description="Minimum similarity score for RAG retrieval (0.0 - 1.0)",
     )
 

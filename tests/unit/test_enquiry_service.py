@@ -139,8 +139,9 @@ class TestDraftResponse:
 
         call_args = llm_mock.bind.return_value.ainvoke.call_args
         prompt = call_args.args[0]
-        # System + human only — no docs message
-        assert len(prompt) == 2
+        # System + no-docs fallback message + human
+        assert len(prompt) == 3
+        assert "No relevant tenancy documents" in prompt[1].content
 
     async def test_rag_failure_logs_error_and_continues(self, mock_classify, mock_get_llm, caplog):
         mock_classify.return_value = RagIntent.MAINTENANCE
@@ -486,7 +487,7 @@ class TestStreamDraftResponse:
         assert "Bond amount: $2000" in prompt[1].content
 
     async def test_no_docs_context_when_rag_returns_empty(self, mock_classify, mock_get_llm):
-        """No docs SystemMessage is added when RAG returns no documents."""
+        """No-docs fallback SystemMessage is injected when RAG returns no documents."""
         mock_classify.return_value = RagIntent.GENERAL
         llm_mock = _make_llm_mock()
         mock_get_llm.return_value = llm_mock
@@ -496,7 +497,9 @@ class TestStreamDraftResponse:
         )
 
         prompt = llm_mock.bind.return_value.ainvoke.call_args.args[0]
-        assert len(prompt) == 2  # system + human only
+        # System + no-docs fallback message + human
+        assert len(prompt) == 3
+        assert "No relevant tenancy documents" in prompt[1].content
 
     async def test_intent_label_included_in_human_message(self, mock_classify, mock_get_llm):
         """The HumanMessage always carries a [intent: <value>] prefix."""

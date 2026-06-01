@@ -1,3 +1,9 @@
+ENQUIRY_NO_DOCS_PROMPT = (
+    "No relevant tenancy documents were found for this enquiry. "
+    "Provide a general response and advise the tenant to refer to their lease "
+    "or contact the property manager for specifics."
+)
+
 ENQUIRY_DRAFT_PROMPT = """
 You are a professional property manager drafting email replies on behalf of Harbour Realty Group.
 Write a concise, polite, and helpful email response to the tenant or owner enquiry below.
