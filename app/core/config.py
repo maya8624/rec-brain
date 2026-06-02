@@ -201,7 +201,8 @@ try:
 
     print(
         f"Settings loaded | env={settings.ENVIRONMENT} "
-        f"model={settings.OPENAI_MODEL_NAME}"
+        f"model={settings.OPENAI_MODEL_NAME} "
+        f"embedding={settings.EMBEDDING_MODEL}"
     )
 except ValidationError as exc:
     print(f"Configuration error:\n{exc}")
