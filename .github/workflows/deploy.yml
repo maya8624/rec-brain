@@ -77,4 +77,10 @@ jobs:
           resourceGroup: ${{ secrets.AZURE_RESOURCE_GROUP }}
           containerAppName: ${{ secrets.CONTAINER_APP_NAME }}
           imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/rec-brain:${{ github.sha }}
-          environmentVariables: EMBEDDING_MODEL=BAAI/bge-m3 EMBEDDING_DIM=1024
+          environmentVariables: >
+            EMBEDDING_MODEL=BAAI/bge-m3
+            EMBEDDING_DIM=1024
+            POSTGRES_URL=${{ secrets.POSTGRES_URL }}
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            BACKEND_API_KEY=${{ secrets.BACKEND_API_KEY }}
+            BACKEND_BASE_URL=${{ secrets.BACKEND_BASE_URL }}
