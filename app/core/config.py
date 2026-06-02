@@ -56,7 +56,7 @@ class Settings(BaseSettings):
     )
 
     EMBEDDING_MODEL: str = Field(
-        "sentence-transformers/all-MiniLM-L6-v2",
+        "BAAI/bge-m3",
         description="HuggingFace embedding model — used if OPENAI_API_KEY not set",
     )
     EMBEDDING_DIM: int = Field(
