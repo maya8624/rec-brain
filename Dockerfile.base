@@ -16,5 +16,5 @@ COPY requirements.base.txt .
 RUN pip install --no-cache-dir --timeout 120 --retries 5 -r requirements.base.txt
 
 # Pre-download BAAI/bge-m3 model weights into the image — avoids slow HuggingFace download at container startup
-RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('BAAI/bge-m3')"
+RUN python -c "from huggingface_hub import snapshot_download; snapshot_download('BAAI/bge-m3')"
 
