@@ -126,8 +126,9 @@ class SqlViewService:
             addr = ctx["address"].replace("'", "")
             conditions.append(f"address_line1 ILIKE '%{addr}%'")
 
-        if ctx.get("listing_type") in ("Sale", "Rent"):
-            conditions.append(f"listing_type = '{ctx['listing_type']}'")
+        listing_type_map = {"Sale": 1, "Rent": 2}
+        if ctx.get("listing_type") in listing_type_map:
+            conditions.append(f"listing_type = {listing_type_map[ctx['listing_type']]}")
 
         if ctx.get("property_type"):
             pt = ctx["property_type"].replace("'", "")
