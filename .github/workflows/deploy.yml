@@ -78,8 +78,8 @@ jobs:
           containerAppName: ${{ secrets.CONTAINER_APP_NAME }}
           imageToDeploy: ${{ secrets.ACR_LOGIN_SERVER }}/rec-brain:${{ github.sha }}
           environmentVariables: >
-            EMBEDDING_MODEL=BAAI/bge-m3
-            EMBEDDING_DIM=1024
+            EMBEDDING_MODEL=text-embedding-3-small
+            EMBEDDING_DIM=1536
             POSTGRES_URL=${{ secrets.POSTGRES_URL }}
             OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
             BACKEND_API_KEY=${{ secrets.BACKEND_API_KEY }}

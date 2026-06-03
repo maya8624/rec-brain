@@ -40,7 +40,6 @@ async def chat(
                 AppStateKeys.SEARCH_SERVICE:  http_request.app.state.search_service,
                 AppStateKeys.FORCED_INTENT:   request.metadata.intent if request.metadata else None,
                 AppStateKeys.SUBURBS:         request.metadata.suburbs if request.metadata else None,
-                AppStateKeys.PROPERTY_ID:     request.property_id,
             }
         }
 
@@ -55,6 +54,9 @@ async def chat(
         else:
             # LangGraph reload existing state from checkpointer automatically
             input_state = {"messages": [HumanMessage(content=message)]}
+
+        if request.property_id:
+            input_state[AppStateKeys.PROPERTY_CONTEXT] = {"property_id": request.property_id}
 
         final_state = await agent.ainvoke(input=input_state, config=config)
         chat_response = _build_response(request.thread_id, final_state)
@@ -130,6 +132,9 @@ async def _event_generator(request: ChatRequest, http_request: Request, agent):
             input_state["messages"] = [HumanMessage(content=request.message)]
         else:
             input_state = {"messages": [HumanMessage(content=request.message)]}
+
+        if request.property_id:
+            input_state[AppStateKeys.PROPERTY_CONTEXT] = {"property_id": request.property_id}
 
         emitted_tokens = False
         final_state: dict = {}

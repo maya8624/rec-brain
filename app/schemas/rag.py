@@ -57,12 +57,13 @@ RAG_KEYWORD_MAP: dict[RagIntent, frozenset[str]] = {
         "electrician",
     ]),
     RagIntent.BOND: frozenset([
-        "bond",
         "bond refund",
         "bond return",
         "bond claim",
         "security deposit",
         "bond lodgement",
+        "about the bond",
+        "my bond",
     ]),
     RagIntent.RENT_PAYMENT: frozenset([
         "pay rent",
@@ -83,6 +84,7 @@ RAG_KEYWORD_MAP: dict[RagIntent, frozenset[str]] = {
     ]),
     RagIntent.INSPECTION: frozenset([
         "routine inspection",
+        "outgoing inspection",
         "inspection notice",
         "entry notice",
         "move-out inspection",

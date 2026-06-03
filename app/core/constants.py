@@ -68,6 +68,7 @@ class AppStateKeys:
     FORCED_INTENT = "forced_intent"
     SUBURBS = "suburbs"
     PROPERTY_ID = "property_id"
+    PROPERTY_CONTEXT = "property_context"
 
 
 class Intent:

@@ -56,12 +56,12 @@ class Settings(BaseSettings):
     )
 
     EMBEDDING_MODEL: str = Field(
-        "BAAI/bge-m3",
-        description="HuggingFace embedding model — used if OPENAI_API_KEY not set",
+        "text-embedding-3-small",
+        description="OpenAI embedding model",
     )
     EMBEDDING_DIM: int = Field(
-        1024,
-        description="Embedding vector dimension — 1024 for BAAI/bge-m3",
+        1536,
+        description="Embedding vector dimension — 1536 for text-embedding-3-small",
     )
     VECTOR_TABLE: str = Field(
         "property_documents",

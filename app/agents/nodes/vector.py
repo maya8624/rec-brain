@@ -44,7 +44,7 @@ async def vector_search_node(
             config, AppStateKeys.RAG_SERVICE, Node.VECTOR_SEARCH
         )
 
-        property_id = config.get(AppStateKeys.CONFIGURABLE, {}).get(AppStateKeys.PROPERTY_ID)
+        property_id = (state.get("property_context") or {}).get("property_id")
         rag_intent = await classify_rag_intent(question)
         doc_types = INTENT_DOC_TYPES.get(rag_intent)
         nodes = await rag_service.aretrieve(query=question, doc_types=doc_types, property_id=property_id)
