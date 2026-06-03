@@ -48,6 +48,10 @@ class Settings(BaseSettings):
         ...,
         description="PostgreSQL connection string — used by SQL agent and app",
     )
+    POSTGRES_SSL: bool = Field(
+        False,
+        description="Set to true in production — Azure Database for PostgreSQL requires SSL",
+    )
 
     # pgvector
     SIMILARITY_THRESHOLD: float = Field(

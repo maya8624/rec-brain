@@ -16,6 +16,8 @@ class PgVectorStoreService:
         if not parsed.hostname or not parsed.path or not parsed.username:
             raise ValueError("Invalid POSTGRES_URL configuration")
 
+        engine_kwargs = {"connect_args": {"ssl": True}} if settings.POSTGRES_SSL else {}
+
         return PGVectorStore.from_params(
             database=parsed.path.lstrip("/"),
             host=parsed.hostname,
@@ -25,4 +27,5 @@ class PgVectorStoreService:
             table_name=settings.VECTOR_TABLE,
             embed_dim=settings.EMBEDDING_DIM,
             perform_setup=True,
+            create_engine_kwargs=engine_kwargs,
         )
