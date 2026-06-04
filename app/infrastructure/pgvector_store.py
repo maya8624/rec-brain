@@ -10,7 +10,7 @@ class PgVectorStoreService:
     """
 
     def create_vector_store(self) -> PGVectorStore:
-        conn_str = settings.POSTGRES_URL
+        conn_str = str(settings.POSTGRES_URL)
 
         async_conn_str = (
             conn_str
