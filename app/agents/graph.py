@@ -44,7 +44,7 @@ search results (see app/agents/nodes/agent.py):
       document_query / general →  4 turns
 
 """
-import logging
+import structlog
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph import END, StateGraph
@@ -70,7 +70,7 @@ from app.agents.router import (
 from app.agents.state import RealEstateAgentState
 from app.tools import get_all_tools
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def build_graph(checkpointer: BaseCheckpointSaver) -> CompiledStateGraph:
@@ -195,9 +195,9 @@ def build_graph(checkpointer: BaseCheckpointSaver) -> CompiledStateGraph:
     compiled = graph.compile(checkpointer=checkpointer)
 
     logger.info(
-        "LangGraph compiled | nodes=%s | checkpointer=%s",
-        list(graph.nodes),
-        type(checkpointer).__name__,
+        "langgraph_compiled",
+        nodes=list(graph.nodes),
+        checkpointer=type(checkpointer).__name__,
     )
 
     return compiled

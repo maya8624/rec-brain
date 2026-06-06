@@ -6,7 +6,7 @@ _handle_*                   — one handler per tool, returns partial updates di
 """
 
 import json
-import logging
+import structlog
 from typing import Any
 from langchain_core.messages import AIMessage, ToolMessage
 
@@ -17,7 +17,7 @@ from app.agents.state import (
     RealEstateAgentState,
 )
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def context_update_node(state: RealEstateAgentState) -> dict[str, Any]:
@@ -29,13 +29,13 @@ def context_update_node(state: RealEstateAgentState) -> dict[str, Any]:
     recent_tool_results = _collect_tool_results(state["messages"])
 
     if not recent_tool_results:
-        logger.debug("context_update_node | no tool results found")
+        logger.debug("context_update_no_tool_results")
         return {}
 
     context_result: dict[str, Any] = {}
 
     for tool_name, tool_result in recent_tool_results:
-        logger.info("context_update_node | processing tool=%s", tool_name)
+        logger.info("context_update_processing_tool", tool=tool_name)
 
         handler = _TOOL_HANDLERS.get(tool_name)
         if handler:

@@ -2,7 +2,7 @@
 HTTP client for the .NET backend booking API.
 All booking state is owned by .NET — Python never stores booking records.
 """
-import logging
+import structlog
 
 from app.core.constants import InternalRoutes
 from app.services.backend_client import BackendClient
@@ -16,7 +16,7 @@ from app.schemas.booking import (
     CancellationConfirmation,
 )
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class BookingService:

@@ -13,6 +13,7 @@ AI orchestration service for a real estate platform. Handles multi-turn conversa
 | Database | PostgreSQL (asyncpg) |
 | Backend | .NET REST API (httpx) |
 | Embeddings | `sentence-transformers/all-MiniLM-L6-v2` |
+| Logging | structlog (structured JSON in production, colored in development) |
 
 ## Architecture
 
@@ -36,6 +37,25 @@ POST /api/chat  or  POST /api/chat/stream
 ```
 
 State is persisted across turns in PostgreSQL via LangGraph's `PostgresSaver`, keyed by `thread_id`.
+
+## Error Handling
+
+Exceptions are handled centrally in `app/core/error_handlers.py`, mirroring .NET's `ExceptionHandlingMiddleware` pattern.
+
+`to_http_response()` maps exception types to structured responses via `match/case`:
+
+| Exception | HTTP status | `name` field |
+|---|---|---|
+| `ToolValidationError` | 422 | `VALIDATION_ERROR` |
+| `BookingServiceError` | 503 | `BOOKING_ERROR` |
+| `DepositServiceError` | 503 | `DEPOSIT_ERROR` |
+| `BackendClientError` | 502 | `BACKEND_ERROR` |
+| `AIServiceError` | 500 | `AI_SERVICE_ERROR` |
+| anything else | 500 | `UNEXPECTED_ERROR` |
+
+All error responses follow the shape `{ name, code, message, thread_id }`.
+
+Exceptions caught inside the LangGraph graph (nodes, tools) are handled locally for graceful degradation and do not reach this handler. Streaming SSE endpoints handle errors internally to comply with the SSE protocol.
 
 ## Setup
 

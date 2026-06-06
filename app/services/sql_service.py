@@ -8,8 +8,9 @@ Flow:
     4. Validate query (SELECT only, v_listings only)
     5. Run query against DB and return results
 """
-import logging
 import re
+
+import structlog
 
 from sqlalchemy import text
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -19,7 +20,7 @@ from app.prompts.sql import SQL_GENERATION_PROMPT
 from app.agents.state import SearchContext
 from app.schemas.property import SearchResult
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 _SEARCH_ERROR = SearchResult(
     success=False, error="Property search is temporarily unavailable."
@@ -55,11 +56,11 @@ class SqlViewService:
             return SearchResult(success=True, output=rows, result_count=len(rows))
 
         except SqlValidationError as exc:
-            logger.error("SqlViewService | validation failed | %s", exc)
+            logger.exception("sql_validation_failed", error=str(exc))
             return _SEARCH_ERROR
 
         except Exception as exc:
-            logger.exception("SqlViewService | failed | %s", exc)
+            logger.exception("sql_search_failed", error=str(exc))
             return _SEARCH_ERROR
 
     async def search_from_context(self, ctx: SearchContext) -> SearchResult:
@@ -73,9 +74,7 @@ class SqlViewService:
             return SearchResult(success=True, output=rows, result_count=len(rows))
 
         except Exception as exc:
-            logger.exception(
-                "SqlViewService.search_from_context | failed | %s", exc
-            )
+            logger.exception("sql_search_from_context_failed", error=str(exc))
             return _SEARCH_ERROR
 
     def _execute_sql(self, sql: str) -> list[dict]:

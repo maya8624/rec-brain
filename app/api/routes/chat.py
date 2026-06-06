@@ -4,18 +4,18 @@ No AI logic here — only HTTP concerns
 """
 
 import json
-import logging
+import structlog
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from app.agents.state import initial_state
 from app.api.dependencies import get_agent, verify_internal_key, CompiledStateGraph
 from app.core.constants import AppStateKeys, Messages, StateKeys
-from app.schemas.chat import ChatErrorResponse, ChatRequest, ChatResponse, PropertyListing
+from app.schemas.chat import ChatRequest, ChatResponse, PropertyListing
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 
@@ -27,53 +27,40 @@ async def chat(
     """
     Main chat endpoint — called by .NET backend for every user message.
     """
+    # Stash thread_id so the centralised error handler can echo it back
+    http_request.state.thread_id = request.thread_id
 
-    try:
-        config: RunnableConfig = {
-            AppStateKeys.CONFIGURABLE: {
-                AppStateKeys.THREAD_ID:       request.thread_id,
-                AppStateKeys.USER_ID:         request.user_id,
-                AppStateKeys.BOOKING_SERVICE: http_request.app.state.booking_service,
-                AppStateKeys.DEPOSIT_SERVICE: http_request.app.state.deposit_service,
-                AppStateKeys.SQL_VIEW_SERVICE: http_request.app.state.sql_view_service,
-                AppStateKeys.RAG_SERVICE:     http_request.app.state.rag_service,
-                AppStateKeys.SEARCH_SERVICE:  http_request.app.state.search_service,
-                AppStateKeys.FORCED_INTENT:   request.metadata.intent if request.metadata else None,
-                AppStateKeys.SUBURBS:         request.metadata.suburbs if request.metadata else None,
-            }
+    config: RunnableConfig = {
+        AppStateKeys.CONFIGURABLE: {
+            AppStateKeys.THREAD_ID:       request.thread_id,
+            AppStateKeys.USER_ID:         request.user_id,
+            AppStateKeys.BOOKING_SERVICE: http_request.app.state.booking_service,
+            AppStateKeys.DEPOSIT_SERVICE: http_request.app.state.deposit_service,
+            AppStateKeys.SQL_VIEW_SERVICE: http_request.app.state.sql_view_service,
+            AppStateKeys.RAG_SERVICE:     http_request.app.state.rag_service,
+            AppStateKeys.SEARCH_SERVICE:  http_request.app.state.search_service,
+            AppStateKeys.FORCED_INTENT:   request.metadata.intent if request.metadata else None,
+            AppStateKeys.SUBURBS:         request.metadata.suburbs if request.metadata else None,
         }
+    }
 
-        suburbs = request.metadata.suburbs if request.metadata else None
-        message = request.message or (
-            f"Tell me about {', '.join(suburbs)}" if suburbs else ""
-        )
+    suburbs = request.metadata.suburbs if request.metadata else None
+    message = request.message or (
+        f"Tell me about {', '.join(suburbs)}" if suburbs else ""
+    )
 
-        if request.is_new_conversation:
-            input_state = initial_state()
-            input_state["messages"] = [HumanMessage(content=message)]
-        else:
-            # LangGraph reload existing state from checkpointer automatically
-            input_state = {"messages": [HumanMessage(content=message)]}
+    if request.is_new_conversation:
+        input_state = initial_state()
+        input_state["messages"] = [HumanMessage(content=message)]
+    else:
+        # LangGraph reload existing state from checkpointer automatically
+        input_state = {"messages": [HumanMessage(content=message)]}
 
-        if request.property_id:
-            input_state[AppStateKeys.PROPERTY_CONTEXT] = {"property_id": request.property_id}
+    if request.property_id:
+        input_state[AppStateKeys.PROPERTY_CONTEXT] = {"property_id": request.property_id}
 
-        final_state = await agent.ainvoke(input=input_state, config=config)
-        chat_response = _build_response(request.thread_id, final_state)
-        return chat_response
-
-    except Exception as exc:
-        logger.exception(
-            "chat | error | thread_id=%s | %s",
-            request.thread_id, exc)
-
-        raise HTTPException(
-            status_code=500,
-            detail=ChatErrorResponse(
-                error="AI service error. Please try again.",
-                thread_id=request.thread_id,
-            ).model_dump(),  # convert Pydantic model to dict for JSON response
-        ) from exc
+    final_state = await agent.ainvoke(input=input_state, config=config)
+    return _build_response(request.thread_id, final_state)
 
 
 @router.post("/stream", dependencies=[Depends(verify_internal_key)])
@@ -96,8 +83,10 @@ async def chat_stream(
     request_id = getattr(http_request.state, "request_id", "unknown")
 
     logger.info(
-        "chat/stream | thread_id=%s | user=%s | id=%s",
-        request.thread_id, request.user_id, request_id,
+        "chat_stream_start",
+        thread_id=request.thread_id,
+        user_id=request.user_id,
+        request_id=request_id,
     )
 
     return StreamingResponse(
@@ -176,8 +165,7 @@ async def _event_generator(request: ChatRequest, http_request: Request, agent):
         yield "data: [DONE]\n\n"
 
     except Exception as exc:
-        logger.exception(
-            "chat/stream | error | thread_id=%s | %s", request.thread_id, exc)
+        logger.exception("chat_stream_error", thread_id=request.thread_id, error=str(exc))
         yield _sse("error", message="An unexpected error occurred.")
 
 
@@ -288,7 +276,5 @@ def _to_listings(search_results: list[dict]) -> list[PropertyListing]:
                 image_url=row.get("image_url"),
             ))
         except Exception:
-            logger.warning("_to_listings | skipped malformed row: %s", row.get("property_id"))
+            logger.warning("to_listings_skipped_row", property_id=row.get("property_id"))
     return listings
-
-

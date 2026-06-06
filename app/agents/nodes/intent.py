@@ -17,7 +17,7 @@ Strategy: hybrid keyword + LLM
         - Entities written to state["search_context"] for downstream nodes
 """
 
-import logging
+import structlog
 from typing import Any
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
@@ -33,7 +33,7 @@ from app.core.constants import AppStateKeys, Intent, IntentConfig, StateKeys
 from app.infrastructure.llm import get_llm
 from app.prompts.intent import INTENT_CLASSIFICATION_PROMPT
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 async def intent_node(state: RealEstateAgentState, config: RunnableConfig) -> dict[str, Any]:
@@ -96,7 +96,7 @@ async def _classify_with_llm(state: RealEstateAgentState) -> dict[str, Any]:
         llm = get_llm().with_structured_output(IntentClassification)
         classification: IntentClassification = await llm.ainvoke(prompt)
     except Exception as exc:
-        logger.error("intent_node | LLM classification failed: %s", exc)
+        logger.error("intent_llm_failed", error=str(exc))
         return {StateKeys.USER_INTENT: Intent.GENERAL}
 
     return _build_intent_state_update(state, classification)

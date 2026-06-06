@@ -12,7 +12,7 @@ Three roles:
 """
 
 import json
-import logging
+import structlog
 from typing import Any
 
 from openai import APIStatusError, RateLimitError
@@ -26,7 +26,7 @@ from app.prompts.agent import REAL_ESTATE_AGENT_SYSTEM, SEARCH_RESULT_SYSTEM
 from app.prompts.rag import DOCUMENT_QUERY_PROMPT
 from app.tools import get_all_tools
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
@@ -47,10 +47,10 @@ async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
     try:
         response: AIMessage = await llm.ainvoke(prompt)
     except RateLimitError as exc:
-        logger.error("agent_node | OpenAI rate limit hit: %s", exc)
+        logger.error("agent_node_rate_limit", error=str(exc))
         raise
     except APIStatusError as exc:
-        logger.error("agent_node | OpenAI API error %s: %s", exc.status_code, exc.message)
+        logger.error("agent_node_api_error", status_code=exc.status_code, error=exc.message)
         raise
 
     state_keys = _update_state_keys(intent, state, response, needs_tools)

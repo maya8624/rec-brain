@@ -6,7 +6,7 @@ agent_node injects both into the LLM prompt and synthesises the reply.
 """
 
 import asyncio
-import logging
+import structlog
 from typing import Any
 
 from langchain_core.runnables import RunnableConfig
@@ -23,13 +23,13 @@ from app.agents.nodes._base import (
 from app.services.rag_service import RagRetriever
 from app.services.sql_service import SqlViewService
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 async def hybrid_search_node(state: RealEstateAgentState, config: RunnableConfig) -> dict[str, Any]:
     question = last_human_message(state)
     if not question:
-        logger.warning("hybrid_search_node | no human message found")
+        logger.warning("hybrid_search_node_no_message")
         return {}
 
     sql_service: SqlViewService = resolve_app_service(
@@ -74,13 +74,13 @@ def _build_vector_docs(vector: dict) -> RetrievedDocs | None:
 
 def _unwrap_sql(outcome: Any) -> SearchResult:
     if isinstance(outcome, Exception):
-        logger.error("hybrid_search_node | sql failed | %s", outcome)
+        logger.error("hybrid_search_node_sql_failed", error=str(outcome))
         return SearchResult(success=False, error=str(outcome))
     return outcome
 
 
 def _unwrap_vector(outcome: Any) -> dict:
     if isinstance(outcome, Exception):
-        logger.error("hybrid_search_node | vector failed | %s", outcome)
+        logger.error("hybrid_search_node_vector_failed", error=str(outcome))
         return {"success": False, "error": str(outcome)}
     return {"success": True, **vector_payload(outcome)}

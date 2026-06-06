@@ -11,12 +11,12 @@ Router map:
 """
 
 import json
-import logging
+import structlog
 from langchain_core.messages import AIMessage, ToolMessage
 from app.agents.state import ConversationPhase, RealEstateAgentState
 from app.core.constants import Intent, ToolNames, Node, StateKeys
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 TOOL_ROUTES: dict[str, str] = {
     ToolNames.CHECK_AVAILABILITY:  Node.TOOLS,
@@ -69,10 +69,7 @@ def route_agent_output(state: RealEstateAgentState) -> str:
         if destination := TOOL_ROUTES.get(tool_call["name"]):
             return destination
 
-    logger.warning(
-        "route_agent_output | unrecognised tools=%s → end",
-        ai_message.tool_calls,
-    )
+    logger.warning("route_agent_unrecognised_tools", tools=ai_message.tool_calls)
     return Node.END
 
 
@@ -90,7 +87,7 @@ def route_after_tools(state: RealEstateAgentState) -> str:
     tool_results = _parse_tool_messages(list(state["messages"]))
 
     if not tool_results:
-        logger.warning("route_after_tools | no tool results → safety")
+        logger.warning("route_after_tools_no_results")
         return Node.SAFETY
 
     success_count = sum(1 for result in tool_results if result.get("success"))
@@ -116,7 +113,7 @@ def route_after_safety(state: RealEstateAgentState) -> str:
 
 def _requires_human(state: RealEstateAgentState, caller: str) -> bool:
     if state.get(StateKeys.REQUIRES_HUMAN):
-        logger.warning("%s | requires_human=True → end", caller)
+        logger.warning("route_requires_human", caller=caller)
         return True
     return False
 

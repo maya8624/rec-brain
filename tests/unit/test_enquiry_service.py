@@ -152,7 +152,7 @@ class TestDraftResponse:
         with caplog.at_level(logging.ERROR, logger="app.services.enquiry_service"):
             result = await EnquiryService(rag=rag).draft_response(_make_request())
 
-        assert "RAG retrieval failed" in caplog.text
+        assert "enquiry_rag_failed" in caplog.text
         assert result.draft == "Dear Tenant, ..."  # LLM still runs without docs
 
     async def test_missing_intent_in_doc_types_logs_error(self, mock_classify, mock_get_llm, caplog):
@@ -166,7 +166,7 @@ class TestDraftResponse:
             with caplog.at_level(logging.ERROR, logger="app.services.enquiry_service"):
                 await EnquiryService(rag=rag).draft_response(_make_request())
 
-        assert "No doc types mapped for intent" in caplog.text
+        assert "enquiry_no_doc_types" in caplog.text
 
     async def test_missing_intent_skips_rag(self, mock_classify, mock_get_llm):
         mock_classify.return_value = RagIntent.MAINTENANCE
@@ -430,7 +430,7 @@ class TestStreamDraftResponse:
                 .stream_draft_response(_make_request())
             )
 
-        assert "RAG retrieval failed" in caplog.text
+        assert "enquiry_stream_rag_failed" in caplog.text
 
     # ── LLM draft failure ──────────────────────────────────────────────────────
 

@@ -1,10 +1,10 @@
-import logging
+import structlog
 from langchain_community.utilities import SQLDatabase
 from sqlalchemy import create_engine
 from app.core.config import settings
 from app.core.constants import TableNames
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # Engine with optimized pooling for a production-ready AI Service
 engine = create_engine(
@@ -36,7 +36,7 @@ def get_db() -> SQLDatabase:
     prevent the model from discovering sensitive schema parts.
     """
     try:
-        logger.info("Initializing SQLDatabase wrapper.")
+        logger.info("db_init")
 
         return SQLDatabase(
             engine,
@@ -46,5 +46,5 @@ def get_db() -> SQLDatabase:
             sample_rows_in_table_info=3
         )
     except Exception as exc:
-        logger.exception("Failed to initialize SQLDatabase wrapper: %s", exc)
+        logger.exception("db_init_failed", error=str(exc))
         raise

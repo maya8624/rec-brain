@@ -1,4 +1,4 @@
-import logging
+import structlog
 
 from llama_index.core import VectorStoreIndex
 from llama_index.core.schema import NodeWithScore
@@ -8,7 +8,7 @@ from llama_index.core.vector_stores.types import FilterCondition, VectorStoreQue
 from app.infrastructure.embedding import EmbeddingService
 from app.infrastructure.pgvector_store import PgVectorStoreService
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 _GLOBAL_DOC_TYPES = frozenset(["legislation", "policy", "guide", "faq"])
 

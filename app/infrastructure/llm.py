@@ -1,19 +1,16 @@
-import logging
+import structlog
 from langchain_core.language_models import BaseChatModel
 from langchain_openai import ChatOpenAI
 from app.core.config import settings
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def get_llm() -> BaseChatModel:
     """Returns the configured LLM instance based on LLM_PROVIDER setting."""
 
     # if settings.LLM_PROVIDER == "openai":
-    logger.info(
-        "Initializing ChatOpenAI LLM: %s",
-        settings.OPENAI_MODEL_NAME
-    )
+    logger.info("llm_init", model=settings.OPENAI_MODEL_NAME)
 
     return ChatOpenAI(
         model=settings.OPENAI_MODEL_NAME,

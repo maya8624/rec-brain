@@ -1,5 +1,5 @@
 import asyncio
-import logging
+import structlog
 from typing import Any
 
 from fastapi import HTTPException
@@ -19,7 +19,7 @@ from app.schemas.search import (
     TenancyDocsResponse
 )
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 DISPLAY_COUNT = 4
 
@@ -147,7 +147,7 @@ class SearchService:
         try:
             tenancy: TenancyDetails = await structured_llm.ainvoke([HumanMessage(content=prompt)])
         except Exception as exc:
-            print(exc)
+            logger.exception("search_tenancy_llm_failed", error=str(exc))
             raise HTTPException(
                 status_code=422, detail="Failed to extract tenancy details from document")
         return TenancyDocsResponse(tenancy=tenancy)

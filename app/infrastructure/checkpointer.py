@@ -2,7 +2,7 @@
 PostgreSQL checkpointer service for LangGraph state persistence.
 Initialized once at app startup, closed on shutdown.
 """
-import logging
+import structlog
 
 from psycopg_pool import AsyncConnectionPool
 from psycopg.rows import dict_row
@@ -10,7 +10,7 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.checkpoint.memory import InMemorySaver
 from app.core.config import settings
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class PostgresCheckpointer:
@@ -37,18 +37,17 @@ class PostgresCheckpointer:
             checkpointer = AsyncPostgresSaver(conn=pool)
             await checkpointer.setup()
 
-            logger.info("AsyncPostgresSaver ready for use as checkpointer")
+            logger.info("checkpointer_ready")
             return cls(checkpointer, pool)
         except Exception as exc:
-            logger.critical(
-                "AsyncPostgresSaver failed: %s — falling back to InMemorySaver (state will NOT persist)", exc)
+            logger.critical("checkpointer_fallback_to_memory", error=str(exc))
             return cls(InMemorySaver())
 
     async def close(self) -> None:
         """Close the connection pool on app shutdown."""
         if self._pool is not None:
             await self._pool.close()
-            logger.info("AsyncPostgresSaver connection pool closed")
+            logger.info("checkpointer_pool_closed")
 
     @property
     def instance(self) -> AsyncPostgresSaver | InMemorySaver:

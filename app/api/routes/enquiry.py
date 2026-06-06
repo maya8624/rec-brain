@@ -1,4 +1,4 @@
-import logging
+import structlog
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
@@ -7,7 +7,7 @@ from app.api.dependencies import verify_internal_key
 from app.schemas.enquiry import EnquiryRequest, EnquiryResponse
 from app.services.enquiry_service import EnquiryService
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api/enquiry", tags=["enquiry"])
 
 

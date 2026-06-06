@@ -11,7 +11,7 @@ Never calls the LLM — agent_node handles synthesis.
 """
 
 import json
-import logging
+import structlog
 from typing import Any
 
 from langchain_core.runnables import RunnableConfig
@@ -24,7 +24,7 @@ from app.schemas.rag import INTENT_DOC_TYPES
 from app.services.rag_service import RagRetriever
 
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 async def vector_search_node(
@@ -36,7 +36,7 @@ async def vector_search_node(
     """
     question = last_human_message(state)
     if not question:
-        logger.warning("vector_search_node | no human message found")
+        logger.warning("vector_search_node_no_message")
         return {}
 
     try:
@@ -60,5 +60,5 @@ async def vector_search_node(
         result = {StateKeys.RETRIEVED_DOCS: docs}
         return result
     except Exception as exc:
-        logger.exception("vector_search_node | failed | %s", exc)
+        logger.exception("vector_search_node_failed", error=str(exc))
         return {}

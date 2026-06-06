@@ -3,7 +3,7 @@ Shared utilities for all agent nodes.
 """
 
 import json
-import logging
+import structlog
 from typing import Any
 
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
@@ -16,7 +16,7 @@ from app.agents.state import RealEstateAgentState
 from app.core.config import settings
 from app.core.constants import AppStateKeys, InternalRoutes, Messages, StateKeys
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def search_error_response() -> dict:
@@ -57,7 +57,7 @@ def resolve_app_service(config: RunnableConfig, attr: str, caller: str) -> Any:
             raise ValueError(f"'{attr}' not found in configurable")
         return service
     except Exception as exc:
-        logger.error("%s | could not resolve %s: %s", caller, attr, exc)
+        logger.error("service_resolve_failed", caller=caller, attr=attr, error=str(exc))
         raise RuntimeError(f"{caller} | service '{attr}' not available") from exc
 
 

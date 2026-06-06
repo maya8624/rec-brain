@@ -1,7 +1,7 @@
 """
 LangGraph @tool for fetching existing inspection booking details from the .NET backend.
 """
-import logging
+import structlog
 
 from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool
@@ -11,7 +11,7 @@ from app.core.exceptions import BookingServiceError
 from app.schemas.booking import BookingLookupResult
 from app.services.booking_service import BookingService
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 @tool
@@ -42,11 +42,11 @@ async def get_booking(config: RunnableConfig, confirmation_id: str = "") -> dict
         ).model_dump()
 
     except BookingServiceError as exc:
-        logger.error("get_booking | service error: %s", exc)
+        logger.error("get_booking_service_error", error=str(exc))
         return BookingLookupResult(success=False, error=str(exc)).model_dump()
 
     except Exception as exc:
-        logger.exception("get_booking | unexpected error: %s", exc)
+        logger.exception("get_booking_unexpected_error", error=str(exc))
         return BookingLookupResult(
             success=False,
             error="Could not retrieve booking details. Please try again.",

@@ -5,7 +5,7 @@ Sets search_results for agent_node to format and stream.
 Never builds a reply in code.
 """
 
-import logging
+import structlog
 from typing import Any
 
 from langchain_core.runnables import RunnableConfig
@@ -19,7 +19,7 @@ from app.agents.state import ConversationPhase, RealEstateAgentState
 from app.core.constants import AppStateKeys, Node, StateKeys
 from app.services.sql_service import SqlViewService
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 async def listing_search_node(
@@ -27,7 +27,7 @@ async def listing_search_node(
         config: RunnableConfig) -> dict[str, Any]:
     question = last_human_message(state)
     if not question:
-        logger.warning("listing_search_node | no human message found")
+        logger.warning("listing_search_no_message")
         return {}
 
     try:
@@ -37,7 +37,7 @@ async def listing_search_node(
 
         ctx = state.get(StateKeys.SEARCH_CONTEXT)
         if ctx and ctx.get("property_id"):
-            logger.debug("listing_search_node | ctx=%s", ctx)
+            logger.debug("listing_search_using_context", ctx=ctx)
             result = await sql_service.search_from_context(ctx)
         else:
             result = await sql_service.search_listings(question)
@@ -51,5 +51,5 @@ async def listing_search_node(
         }
 
     except Exception as exc:
-        logger.exception("listing_search_node | failed | %s", exc)
+        logger.exception("listing_search_failed", error=str(exc))
         return {}

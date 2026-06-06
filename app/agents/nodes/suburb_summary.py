@@ -6,7 +6,7 @@ Calls SearchService.get_suburb_summary() directly — no agent_node needed.
 Adds the formatted text as an AIMessage so follow-up questions have conversation context.
 """
 
-import logging
+import structlog
 from typing import Any
 
 from langchain_core.runnables import RunnableConfig
@@ -16,7 +16,7 @@ from app.core.constants import AppStateKeys, StateKeys
 from app.schemas.search import SuburbSummaryResponse
 from app.services.search_service import SearchService
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 async def suburb_summary_node(state: RealEstateAgentState, config: RunnableConfig) -> dict[str, Any]:
@@ -25,7 +25,7 @@ async def suburb_summary_node(state: RealEstateAgentState, config: RunnableConfi
     if not suburbs:
         location = (state.get(StateKeys.SEARCH_CONTEXT) or {}).get("location")
         if not location:
-            logger.warning("suburb_summary_node | no suburbs in config or state")
+            logger.warning("suburb_summary_no_suburbs")
             return {}
         suburbs = [location]
 
@@ -33,7 +33,7 @@ async def suburb_summary_node(state: RealEstateAgentState, config: RunnableConfi
         service: SearchService = config.get(AppStateKeys.CONFIGURABLE, {}).get(AppStateKeys.SEARCH_SERVICE)
         summary: SuburbSummaryResponse = await service.get_suburb_summary(suburbs)
     except Exception as exc:
-        logger.exception("suburb_summary_node | failed | %s", exc)
+        logger.exception("suburb_summary_failed", error=str(exc))
         return {}
 
     return {

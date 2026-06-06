@@ -3,7 +3,7 @@ LangGraph @tool wrapper that calls the .NET backend availability API
 via BookingService. Always call this BEFORE book_inspection
 so the user can choose from real available slots.
 """
-import logging
+import structlog
 import uuid
 
 from langchain_core.runnables import RunnableConfig
@@ -14,7 +14,7 @@ from app.schemas.booking import AvailabilityResult
 from app.services.booking_service import BookingService
 from app.tools._utils import fmt_dt_sydney
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 @tool
@@ -34,10 +34,7 @@ async def check_availability(property_id: str, config: RunnableConfig) -> dict:
     try:
         result = await booking_service.check_availability(property_id)
 
-        logger.info(
-            "check_availability | found %d slots for %s",
-            result.slot_count, property_id,
-        )
+        logger.info("check_availability_found_slots", slot_count=result.slot_count, property_id=property_id)
 
         for slot in result.available_slots:
             slot.start_at = fmt_dt_sydney(slot.start_at)
@@ -46,7 +43,7 @@ async def check_availability(property_id: str, config: RunnableConfig) -> dict:
         return result.model_dump()
 
     except BookingServiceError as exc:
-        logger.error("check_availability | BookingServiceError: %s", exc)
+        logger.error("check_availability_service_error", error=str(exc))
 
         return AvailabilityResult(
             success=False,
@@ -55,7 +52,7 @@ async def check_availability(property_id: str, config: RunnableConfig) -> dict:
         ).model_dump()
 
     except Exception as exc:
-        logger.exception("check_availability | unexpected error: %s", exc)
+        logger.exception("check_availability_unexpected_error", error=str(exc))
 
         return AvailabilityResult(
             success=False,

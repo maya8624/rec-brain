@@ -1,13 +1,13 @@
 """
 HTTP client for the .NET backend deposit API.
 """
-import logging
+import structlog
 from app.core.constants import InternalRoutes
 from app.core.exceptions import BackendClientError, DepositServiceError
 from app.schemas.deposit import DepositResult
 from app.services.backend_client import BackendClient
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 class DepositService:

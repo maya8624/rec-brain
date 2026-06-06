@@ -31,23 +31,6 @@ class DepositServiceError(AIServiceError):
         self.status_code = status_code
 
 
-class ToolExecutionError(AIServiceError):
-    """Raised when a LangChain tool fails to execute."""
-
-    def __init__(self, tool_name: str, reason: str):
-        super().__init__(f"Tool '{tool_name}' failed: {reason}")
-        self.tool_name = tool_name
-        self.reason = reason
-
-
-class AgentError(AIServiceError):
-    """Raised when the LangGraph agent fails to produce a response."""
-
-
-class ValidationError(AIServiceError):
-    """Raised when tool input validation fails."""
-
-
 def raise_for_booking_status(e: BackendClientError, confirmation_id: str | None = None) -> None:
     """Map common .NET HTTP error codes to BookingServiceError."""
     status = e.response.status_code

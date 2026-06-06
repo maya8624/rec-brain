@@ -1,5 +1,5 @@
 import json
-import logging
+import structlog
 import time
 
 from llama_index.core.schema import NodeWithScore
@@ -14,7 +14,7 @@ from app.schemas.enquiry import EnquiryRequest, EnquiryResponse
 from app.schemas.rag import INTENT_COMPLIANCE_RULES, INTENT_DOC_TYPES
 from app.services.rag_service import RagRetriever
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def _sse(type_: str, **kwargs) -> str:
@@ -58,7 +58,7 @@ class EnquiryService:
 
         doc_types = INTENT_DOC_TYPES.get(intent)
         if doc_types is None:
-            logger.error("EnquiryService.draft_response | No doc types mapped for intent: %s", intent)
+            logger.error("enquiry_no_doc_types", intent=intent)
             doc_types = frozenset()
 
         docs: list[NodeWithScore] = []
@@ -66,7 +66,7 @@ class EnquiryService:
             try:
                 docs = await self._rag.aretrieve(query=enquiry.body, doc_types=doc_types, property_id=enquiry.property_id)
             except Exception as exc:
-                logger.error("EnquiryService.draft_response | RAG retrieval failed for intent %s: %s", intent, exc)
+                logger.error("enquiry_rag_failed", intent=intent, error=str(exc))
 
         prompt = _build_prompt(docs, intent, enquiry.body)
 
@@ -75,7 +75,7 @@ class EnquiryService:
             result = await llm.ainvoke(prompt)
             return EnquiryResponse(draft=result.content, sources=extract_sources(docs))
         except Exception as exc:
-            logger.error("EnquiryService.draft_response | LLM failed: %s", exc)
+            logger.error("enquiry_llm_failed", error=str(exc))
             return EnquiryResponse(draft="", sources=extract_sources(docs))
 
     async def stream_draft_response(self, enquiry: EnquiryRequest):
@@ -95,9 +95,7 @@ class EnquiryService:
         try:
             intent = await classify_rag_intent(enquiry.body)
         except Exception as exc:
-            logger.error(
-                "EnquiryService.stream_draft_response | intent classification failed: %s", exc
-            )
+            logger.error("enquiry_stream_intent_failed", error=str(exc))
             yield _sse("error", message="Failed to classify enquiry intent.")
             yield "data: [DONE]\n\n"
             return
@@ -117,10 +115,7 @@ class EnquiryService:
             try:
                 docs = await self._rag.aretrieve(query=enquiry.body, doc_types=doc_types)
             except Exception as exc:
-                logger.error(
-                    "EnquiryService.stream_draft_response | RAG retrieval failed for intent %s: %s",
-                    intent, exc,
-                )
+                logger.error("enquiry_stream_rag_failed", intent=intent, error=str(exc))
             yield _sse(
                 "step",
                 step="rag_retrieval",
@@ -137,7 +132,7 @@ class EnquiryService:
             result = await llm.ainvoke(prompt)
             draft = result.content
         except Exception as exc:
-            logger.error("EnquiryService.stream_draft_response | LLM failed: %s", exc)
+            logger.error("enquiry_stream_llm_failed", error=str(exc))
             yield _sse("error", message="Failed to generate draft reply.")
             yield "data: [DONE]\n\n"
             return

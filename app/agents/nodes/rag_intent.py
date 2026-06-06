@@ -19,7 +19,7 @@ Strategy: hybrid keyword + LLM
         - Falls back to "general" on any LLM error
 """
 
-import logging
+import structlog
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -28,7 +28,7 @@ from app.prompts.rag import RAG_CLASSIFICATION_PROMPT
 from app.infrastructure.llm import get_llm
 from app.schemas.rag import RAG_KEYWORD_MAP, RagClassification, RagIntent
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 def _keyword_intent(message: str) -> RagIntent | None:
     for intent, keywords in RAG_KEYWORD_MAP.items():
@@ -55,7 +55,7 @@ async def classify_rag_intent(enquiry: str) -> RagIntent:
         llm = get_llm().with_structured_output(RagClassification)
         classification: RagClassification = await llm.ainvoke(prompt)
     except Exception as exc:
-        logger.error("classify_rag_intent | LLM classification failed: %s", exc)
+        logger.error("rag_intent_llm_failed", error=str(exc))
         return RagIntent.GENERAL
 
     return classification.intent

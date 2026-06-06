@@ -6,14 +6,14 @@ once the threshold is reached, sets requires_human=True so the router
 can exit gracefully instead of retrying forever.
 """
 
-import logging
+import structlog
 from typing import Any
 
 from app.agents.state import RealEstateAgentState
 from app.core.config import settings
 from app.core.constants import StateKeys
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 def safety_node(state: RealEstateAgentState) -> dict[str, Any]:
@@ -27,17 +27,14 @@ def safety_node(state: RealEstateAgentState) -> dict[str, Any]:
     new_error_count = current_errors + 1
 
     logger.warning(
-        "safety_node | error_count %d -> %d (threshold=%d)",
-        current_errors,
-        new_error_count,
-        settings.MAX_ERRORS_BEFORE_ESCALATION,
+        "safety_node_error_increment",
+        current=current_errors,
+        new=new_error_count,
+        threshold=settings.MAX_ERRORS_BEFORE_ESCALATION,
     )
 
     if new_error_count >= settings.MAX_ERRORS_BEFORE_ESCALATION:
-        logger.error(
-            "safety_node | escalating to human after %d consecutive errors",
-            new_error_count,
-        )
+        logger.error("safety_node_escalating", error_count=new_error_count)
 
         return {
             StateKeys.ERROR_COUNT:   min(new_error_count, settings.MAX_ERRORS_BEFORE_ESCALATION),

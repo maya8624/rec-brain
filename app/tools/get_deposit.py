@@ -3,7 +3,7 @@ LangGraph @tool that checks if a holding deposit exists for the current user
 against a specific listing. Returns deposit data for the frontend to open
 a payment popup, or a not-found result if no deposit exists.
 """
-import logging
+import structlog
 import uuid
 
 from langchain_core.runnables import RunnableConfig
@@ -14,7 +14,7 @@ from app.core.exceptions import DepositServiceError, ToolValidationError
 from app.schemas.deposit import DepositResult
 from app.services.deposit_service import DepositService
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 @tool
@@ -39,9 +39,9 @@ async def get_deposit(listing_id: str, config: RunnableConfig) -> dict:
         return result.model_dump()
 
     except DepositServiceError as exc:
-        logger.error("get_deposit | DepositServiceError: %s", exc)
+        logger.error("get_deposit_service_error", error=str(exc))
         return DepositResult(success=False, error=str(exc)).model_dump()
 
     except Exception as exc:
-        logger.exception("get_deposit | unexpected error: %s", exc)
+        logger.exception("get_deposit_unexpected_error", error=str(exc))
         return DepositResult(success=False, error="Could not retrieve deposit. Please try again.").model_dump()

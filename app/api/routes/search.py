@@ -1,4 +1,4 @@
-import logging
+import structlog
 
 from fastapi import APIRouter, Depends, Request
 
@@ -6,7 +6,7 @@ from app.api.dependencies import verify_internal_key
 from app.schemas.search import TenantPreference, PreferenceSearchResponse, SuburbSummaryRequest, SuburbSummaryResponse, TenancyDocsRequest, TenancyDocsResponse
 from app.services.search_service import SearchService
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api/search", tags=["search"])
 
 

@@ -14,6 +14,7 @@ from fastapi.openapi.utils import get_openapi
 
 from app.agents.graph import build_graph
 from app.infrastructure.checkpointer import PostgresCheckpointer
+from app.core.error_handlers import exception_handler
 from app.core.middleware import RequestLoggingMiddleware
 from app.api.routes import chat, enquiry, health, search
 from app.core.config import settings
@@ -139,6 +140,11 @@ def custom_openapi():
 
 
 app.openapi = custom_openapi
+
+# ------------------------------------
+# Exception handlers
+# ------------------------------------
+app.add_exception_handler(Exception, exception_handler)
 
 # ------------------------------------
 # Middleware
