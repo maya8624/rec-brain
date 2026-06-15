@@ -16,7 +16,7 @@ from app.agents.graph import build_graph
 from app.infrastructure.checkpointer import PostgresCheckpointer
 from app.core.error_handlers import exception_handler
 from app.core.middleware import RequestLoggingMiddleware
-from app.api.routes import chat, enquiry, health, search
+from app.api.routes import chat, documents, enquiry, health, search
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.infrastructure.embedding import EmbeddingService
@@ -29,6 +29,8 @@ from app.services.rag_service import RagRetriever
 from app.services.search_service import SearchService
 from app.services.backend_client import backend_client
 from app.services.enquiry_service import EnquiryService
+from app.infrastructure.azure_di_parser import AzureDocumentIntelligenceParser
+from app.services.document_ingestion_service import DocumentIngestionService
 
 logger = structlog.get_logger(__name__)
 
@@ -85,6 +87,12 @@ async def lifespan(_app: FastAPI):
         )
 
         _app.state.enquiry_service = EnquiryService(rag=_app.state.rag_service)
+
+        _app.state.document_ingestion_service = DocumentIngestionService(
+            di_parser=AzureDocumentIntelligenceParser(),
+            embedding_service=EmbeddingService(),
+            vector_store_service=PgVectorStoreService(),
+        )
 
         _app.state.checkpointer = await PostgresCheckpointer.create()
         _app.state.ai_agent = build_graph(_app.state.checkpointer.instance)
@@ -167,3 +175,4 @@ app.include_router(chat.router)
 app.include_router(enquiry.router)
 app.include_router(health.router)
 app.include_router(search.router)
+app.include_router(documents.router)

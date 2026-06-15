@@ -63,4 +63,9 @@ freezegun==1.5.1
 faker==37.1.0
 asgi-lifespan==2.1.0
 
+# ------------------------------------
+# Azure
+# ------------------------------------
+azure-ai-documentintelligence==1.0.2
+
 # redis>=5.2,<6.0

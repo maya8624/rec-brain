@@ -146,6 +146,16 @@ class Settings(BaseSettings):
         description="LLM provider: 'groq' or 'openai'",
     )
 
+    # ── Azure ─────────────────────────────────────────────────────────────────
+    AZURE_DOC_INTEL_ENDPOINT: str = Field(
+        "",
+        description="Azure Document Intelligence endpoint — required for document ingestion",
+    )
+    AZURE_DOC_INTEL_KEY: str = Field(
+        "",
+        description="Azure Document Intelligence API key — required for document ingestion",
+    )
+
     # ── LangSmith observability (optional) ────────────────────────────────────
     LANGCHAIN_TRACING_V2: bool = Field(False)
     LANGCHAIN_API_KEY: str = Field("")
