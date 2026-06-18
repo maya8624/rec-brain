@@ -9,6 +9,7 @@
 # ------------------------------------
 fastapi==0.115.12           # upgraded: 0.112.2 → 0.115.12 (bug fixes, Python 3.11 improvements)
 uvicorn[standard]==0.34.0   # upgraded: 0.30.6 → 0.34.0 (added [standard] for websocket + reload support)
+python-multipart==0.0.20    # required for FastAPI file/form uploads
 python-dotenv==1.0.1
 
 # ------------------------------------
