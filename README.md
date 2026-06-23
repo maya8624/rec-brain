@@ -13,6 +13,7 @@ AI orchestration service for a real estate platform. Handles multi-turn conversa
 | Database | PostgreSQL (asyncpg) |
 | Backend | .NET REST API (httpx) |
 | Embeddings | `sentence-transformers/all-MiniLM-L6-v2` |
+| Document parsing | Azure Document Intelligence (prebuilt-invoice + prebuilt-layout) |
 | Logging | structlog — colored console in development, JSON to rotating daily log files in all environments |
 
 ## Architecture
@@ -74,6 +75,8 @@ cp .env.mock .env                 # fill in the values below
 | `POSTGRES_URL` | Yes | pgvector-enabled PostgreSQL connection string |
 | `BACKEND_BASE_URL` | Yes | .NET backend API base URL |
 | `BACKEND_API_KEY` | Yes | .NET backend API key |
+| `AZURE_DOC_INTEL_ENDPOINT` | Yes | Azure Document Intelligence endpoint URL |
+| `AZURE_DOC_INTEL_KEY` | Yes | Azure Document Intelligence API key |
 | `OPENAI_MODEL_NAME` | No | Default: `gpt-4o-mini` |
 | `LLM_PROVIDER` | No | `openai` (default) \| `groq` |
 | `LLM_TEMPERATURE` | No | Default: `0.0` |
@@ -163,6 +166,46 @@ Parses, classifies, chunks, embeds, and upserts a document into pgvector. Called
   "message": "Ingested lease-agreement.pdf — 14 chunks stored"
 }
 ```
+
+### `POST /api/documents/invoice-extract`
+
+Extracts structured fields from an invoice PDF or image via Azure Document Intelligence (`prebuilt-invoice`). Requires the internal API key (`X-API-Key` header).
+
+**Request** — `multipart/form-data`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `file` | file | Yes | PDF, JPEG, PNG, TIFF, or BMP — max 20 MB |
+| `property_id` | string | No | Property this invoice belongs to |
+
+**Response**
+```json
+{
+  "tool_name": "save_invoice",
+  "success": true,
+  "filename": "CB-19847_invoice.pdf",
+  "property_id": "prop-123",
+  "data": {
+    "vendor_name": "CoolBreeze Air Conditioning",
+    "vendor_address": "12 Industrial Ave, Sydney NSW 2000",
+    "customer_name": "Acme Property Group",
+    "invoice_id": "INV-0042",
+    "invoice_date": "2026-06-01",
+    "due_date": "2026-06-30",
+    "subtotal": 1450.00,
+    "tax": 145.00,
+    "total": 1595.00,
+    "currency": "AUD",
+    "line_items": [
+      { "description": "Split system installation", "quantity": 1, "unit_price": 1450.00, "amount": 1450.00 }
+    ],
+    "confidence": 0.94
+  }
+}
+```
+
+- `currency` is an ISO 4217 code (e.g. `"AUD"`, `"USD"`)
+- `confidence` is `0.0–1.0`; a `invoice_low_confidence` warning is logged when below `0.8`
 
 ## Tools
 
