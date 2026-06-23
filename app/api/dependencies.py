@@ -8,11 +8,16 @@ from fastapi import HTTPException, Request
 from fastapi.params import Header
 from langgraph.graph.state import CompiledStateGraph
 from app.core.config import settings
+from app.services.invoice_service import InvoiceExtractionService
 
 
 def get_agent(request: Request) -> CompiledStateGraph:
     """Inject the LangGraph agent built at startup."""
     return request.app.state.ai_agent
+
+
+def get_invoice_service(request: Request) -> InvoiceExtractionService:
+    return request.app.state.invoice_extraction_service
 
 
 async def verify_internal_key(x_api_key: Annotated[str, Header(alias="X-API-Key")]) -> str:

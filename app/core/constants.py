@@ -200,6 +200,10 @@ class PromptLabels:
     BOOKING_CONTEXT = "[BOOKING CONTEXT]"
 
 
+class InvoiceToolNames:
+    SAVE_INVOICE = "save_invoice"
+
+
 class StateKeys:
     """
     Constants for state keys used in the AI agent.

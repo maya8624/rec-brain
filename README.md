@@ -13,7 +13,7 @@ AI orchestration service for a real estate platform. Handles multi-turn conversa
 | Database | PostgreSQL (asyncpg) |
 | Backend | .NET REST API (httpx) |
 | Embeddings | `sentence-transformers/all-MiniLM-L6-v2` |
-| Logging | structlog (structured JSON in production, colored in development) |
+| Logging | structlog — colored console in development, JSON to rotating daily log files in all environments |
 
 ## Architecture
 
@@ -62,8 +62,8 @@ Exceptions caught inside the LangGraph graph (nodes, tools) are handled locally 
 ```bash
 python -m venv .venv
 source .venv/Scripts/activate   # Windows
-pip install -r requirements.txt
-cp .env.mock .env               # fill in the values below
+pip install -r requirements.txt   # includes python-multipart for file uploads
+cp .env.mock .env                 # fill in the values below
 ```
 
 ## Environment Variables
@@ -139,6 +139,30 @@ Same request body. Returns tokens via Server-Sent Events.
 | `result` | `thread_id`, `listings`, `property_id`, `deposit` | Final metadata |
 | `error` | `message` | Unhandled error |
 | `[DONE]` | — | Stream complete |
+
+### `POST /api/documents/ingest`
+
+Parses, classifies, chunks, embeds, and upserts a document into pgvector. Called by an Azure Function when a file is uploaded to blob storage. Requires the internal API key (`X-Internal-Key` header).
+
+**Request** — `multipart/form-data`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `file` | file | Yes | PDF, TXT, or DOCX — max 20 MB |
+| `property_id` | string | No | Property this document belongs to; omit for global docs |
+| `doc_type` | string | No | Auto-classified if omitted |
+
+**Response**
+```json
+{
+  "success": true,
+  "filename": "lease-agreement.pdf",
+  "property_id": "prop-123",
+  "doc_type": "lease",
+  "chunk_count": 14,
+  "message": "Ingested lease-agreement.pdf — 14 chunks stored"
+}
+```
 
 ## Tools
 

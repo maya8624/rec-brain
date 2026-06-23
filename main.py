@@ -30,7 +30,9 @@ from app.services.search_service import SearchService
 from app.services.backend_client import backend_client
 from app.services.enquiry_service import EnquiryService
 from app.infrastructure.azure_di_parser import AzureDocumentIntelligenceParser
+from app.infrastructure.invoice_parser import AzureInvoiceParser
 from app.services.document_ingestion_service import DocumentIngestionService
+from app.services.invoice_service import InvoiceExtractionService
 
 logger = structlog.get_logger(__name__)
 
@@ -92,6 +94,10 @@ async def lifespan(_app: FastAPI):
             di_parser=AzureDocumentIntelligenceParser(),
             embedding_service=EmbeddingService(),
             vector_store_service=PgVectorStoreService(),
+        )
+
+        _app.state.invoice_extraction_service = InvoiceExtractionService(
+            parser=AzureInvoiceParser(),
         )
 
         _app.state.checkpointer = await PostgresCheckpointer.create()
