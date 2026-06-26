@@ -13,6 +13,7 @@ from app.infrastructure.invoice_parser import (
     _currency_symbol,
     _date,
     _line_items,
+    _receipt_line_items,
     _str,
 )
 
@@ -41,10 +42,10 @@ def _field(
     return f
 
 
-def _currency(amount: float, symbol: str = "$") -> MagicMock:
+def _currency(amount: float, currency_code: str = "$") -> MagicMock:
     cv = MagicMock()
     cv.amount = amount
-    cv.symbol = symbol
+    cv.currency_code = currency_code
     return cv
 
 
@@ -241,4 +242,80 @@ class TestLineItemsExtractor:
         null_item = _field(value_object=None)
         items = _line_items({"Items": _field(value_array=[null_item])})
         assert items[0].description is None
+        assert items[0].amount is None
+
+
+# ------------------------------------
+# _receipt_line_items
+# ------------------------------------
+
+def _receipt_item_field(
+    description: str | None = None,
+    quantity: float | None = None,
+    price: float | None = None,
+    total_price: float | None = None,
+) -> MagicMock:
+    """Build a mock DocumentField for a prebuilt-receipt Items[] entry."""
+    obj = {}
+    if description is not None:
+        obj["Description"] = _field(value_string=description)
+    if quantity is not None:
+        obj["Quantity"] = _field(value_number=quantity)
+    if price is not None:
+        obj["Price"] = _field(value_currency=_currency(price))
+    if total_price is not None:
+        obj["TotalPrice"] = _field(value_currency=_currency(total_price))
+    return _field(value_object=obj)
+
+
+@pytest.mark.unit
+class TestReceiptLineItemsExtractor:
+    def test_returns_empty_list_when_no_items_field(self):
+        assert _receipt_line_items({}) == []
+
+    def test_returns_empty_list_when_value_array_is_none(self):
+        assert _receipt_line_items({"Items": _field(value_array=None)}) == []
+
+    def test_maps_price_to_unit_price(self):
+        items = _receipt_line_items({
+            "Items": _field(value_array=[_receipt_item_field(price=12.99)])
+        })
+        assert items[0].unit_price == 12.99
+
+    def test_maps_total_price_to_amount(self):
+        items = _receipt_line_items({
+            "Items": _field(value_array=[_receipt_item_field(total_price=25.98)])
+        })
+        assert items[0].amount == 25.98
+
+    def test_description_and_quantity_mapped(self):
+        items = _receipt_line_items({
+            "Items": _field(value_array=[
+                _receipt_item_field(description="Timber", quantity=3.0, price=10.00, total_price=30.00)
+            ])
+        })
+        assert items[0].description == "Timber"
+        assert items[0].quantity == 3.0
+
+    def test_multiple_items_preserved(self):
+        items = _receipt_line_items({
+            "Items": _field(value_array=[
+                _receipt_item_field(description="Screw box", total_price=8.50),
+                _receipt_item_field(description="Paint brush", total_price=14.95),
+            ])
+        })
+        assert len(items) == 2
+        assert items[0].description == "Screw box"
+        assert items[1].description == "Paint brush"
+
+    def test_missing_price_is_none(self):
+        items = _receipt_line_items({
+            "Items": _field(value_array=[_receipt_item_field(description="Bolt")])
+        })
+        assert items[0].unit_price is None
+
+    def test_missing_total_price_is_none(self):
+        items = _receipt_line_items({
+            "Items": _field(value_array=[_receipt_item_field(description="Nail")])
+        })
         assert items[0].amount is None

@@ -194,10 +194,36 @@ class Messages:
     NO_RESULTS = "No properties matched your search. Try broadening your criteria — for example, a nearby suburb or a higher price range."
 
 
+class DocumentClassifierConfig:
+    LLM_TEXT_LIMIT: int = 600
+
+    RECEIPT_KEYWORDS: frozenset[str] = frozenset([
+        "receipt",
+        "transaction",
+        "cashier",
+        "sale tax invoice",
+        "eftpos",
+        "change due",
+        "change:",
+        "loyalty",
+    ])
+
+    INVOICE_KEYWORDS: frozenset[str] = frozenset([
+        "invoice id",
+        "invoice no",
+        "invoice number",
+        "bill to",
+        "due date",
+        "payment terms",
+        "purchase order",
+    ])
+
+
 class PromptLabels:
     RETRIEVED_DOCUMENTS = "[RETRIEVED DOCUMENTS]"
     PROPERTY_SEARCH_RESULTS = "[PROPERTY SEARCH RESULTS]"
     BOOKING_CONTEXT = "[BOOKING CONTEXT]"
+    DOCUMENT_TYPE_CLASSIFIER = "[DOCUMENT TYPE CLASSIFIER]"
 
 
 class InvoiceToolNames:

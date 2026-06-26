@@ -30,7 +30,8 @@ from app.services.search_service import SearchService
 from app.services.backend_client import backend_client
 from app.services.enquiry_service import EnquiryService
 from app.infrastructure.azure_di_parser import AzureDocumentIntelligenceParser
-from app.infrastructure.invoice_parser import AzureInvoiceParser
+from app.infrastructure.invoice_parser import AzureInvoiceParser, AzureReceiptParser
+from app.infrastructure.document_classifier import DocumentTypeClassifier
 from app.services.document_ingestion_service import DocumentIngestionService
 from app.services.invoice_service import InvoiceExtractionService
 
@@ -98,6 +99,8 @@ async def lifespan(_app: FastAPI):
 
         _app.state.invoice_extraction_service = InvoiceExtractionService(
             parser=AzureInvoiceParser(),
+            receipt_parser=AzureReceiptParser(),
+            classifier=DocumentTypeClassifier(),
         )
 
         _app.state.checkpointer = await PostgresCheckpointer.create()

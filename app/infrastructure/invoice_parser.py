@@ -81,6 +81,29 @@ def _line_items(fields: dict[str, DocumentField]) -> list[LineItem]:
     return rows
 
 
+def _receipt_line_items(fields: dict[str, DocumentField]) -> list[LineItem]:
+    items_field = fields.get("Items")
+    if not items_field or not items_field.value_array:
+        return []
+
+    rows: list[LineItem] = []
+    for item in items_field.value_array:
+        obj = item.value_object or {}
+        desc_f  = obj.get("Description")
+        qty_f   = obj.get("Quantity")
+        price_f = obj.get("Price")       # receipt uses "Price" not "UnitPrice"
+        total_f = obj.get("TotalPrice")  # receipt uses "TotalPrice" not "Amount"
+        rows.append(
+            LineItem(
+                description=desc_f.value_string if desc_f else None,
+                quantity=qty_f.value_number if qty_f else None,
+                unit_price=price_f.value_currency.amount if (price_f and price_f.value_currency) else None,
+                amount=total_f.value_currency.amount if (total_f and total_f.value_currency) else None,
+            )
+        )
+    return rows
+
+
 # ------------------------------------
 # Concrete Azure DI implementation
 # ------------------------------------
@@ -105,7 +128,7 @@ class AzureInvoiceParser:
 
         if not result.documents:
             logger.warning("invoice_no_documents_detected", filename=filename)
-            return InvoiceData()
+            return InvoiceData(doc_type="invoice")
 
         doc = result.documents[0]
         fields = doc.fields or {}
@@ -119,6 +142,7 @@ class AzureInvoiceParser:
             )
 
         return InvoiceData(
+            doc_type="invoice",
             vendor_name=_str(fields, "VendorName"),
             vendor_address=_address(fields, "VendorAddress"),
             customer_name=_str(fields, "CustomerName"),
@@ -130,5 +154,59 @@ class AzureInvoiceParser:
             total=_amount(fields, "InvoiceTotal"),
             currency=_currency_symbol(fields, "InvoiceTotal"),
             line_items=_line_items(fields),
+            confidence=confidence,
+        )
+
+
+# ------------------------------------
+# Receipt parser (prebuilt-receipt)
+# ------------------------------------
+
+class AzureReceiptParser:
+    def __init__(self) -> None:
+        self._client = DocumentIntelligenceClient(
+            endpoint=settings.AZURE_DOC_INTEL_ENDPOINT,
+            credential=AzureKeyCredential(settings.AZURE_DOC_INTEL_KEY),
+        )
+
+    async def parse(self, content: bytes, filename: str) -> InvoiceData:
+        return await asyncio.to_thread(self._extract, content, filename)
+
+    def _extract(self, content: bytes, filename: str) -> InvoiceData:
+        poller = self._client.begin_analyze_document(
+            "prebuilt-receipt",
+            body=io.BytesIO(content),
+            content_type="application/octet-stream",
+        )
+        result = poller.result()
+
+        if not result.documents:
+            logger.warning("receipt_no_documents_detected", filename=filename)
+            return InvoiceData(doc_type="receipt")
+
+        doc = result.documents[0]
+        fields = doc.fields or {}
+        confidence = doc.confidence or 0.0
+
+        if confidence < 0.8:
+            logger.warning(
+                "receipt_low_confidence",
+                filename=filename,
+                confidence=round(confidence, 3),
+            )
+
+        return InvoiceData(
+            doc_type="receipt",
+            vendor_name=_str(fields, "MerchantName"),
+            vendor_address=_address(fields, "MerchantAddress"),
+            customer_name=None,
+            invoice_id=None,
+            invoice_date=_date(fields, "TransactionDate"),
+            due_date=None,
+            subtotal=_amount(fields, "Subtotal"),
+            tax=_amount(fields, "Tax"),
+            total=_amount(fields, "Total"),
+            currency=_currency_symbol(fields, "Total"),
+            line_items=_receipt_line_items(fields),
             confidence=confidence,
         )

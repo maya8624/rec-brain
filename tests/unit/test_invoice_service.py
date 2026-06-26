@@ -45,8 +45,26 @@ def _default_invoice() -> InvoiceData:
     )
 
 
-def _make_service(parser=None, **parser_kwargs) -> InvoiceExtractionService:
-    return InvoiceExtractionService(parser=parser or _make_parser(**parser_kwargs))
+def _make_classifier(doc_type: str = "invoice", raise_error: Exception | None = None):
+    mock = AsyncMock()
+    if raise_error:
+        mock.classify.side_effect = raise_error
+    else:
+        mock.classify.return_value = doc_type
+    return mock
+
+
+def _make_service(
+    parser=None,
+    receipt_parser=None,
+    classifier=None,
+    **parser_kwargs,
+) -> InvoiceExtractionService:
+    return InvoiceExtractionService(
+        parser=parser or _make_parser(**parser_kwargs),
+        receipt_parser=receipt_parser or _make_parser(),
+        classifier=classifier or _make_classifier(),
+    )
 
 
 # ------------------------------------
@@ -82,7 +100,7 @@ class TestInvoiceExtractionSuccess:
 
     async def test_parser_called_with_content_and_filename(self):
         parser = _make_parser()
-        await InvoiceExtractionService(parser).extract(b"bytes", "inv.pdf", "prop-1")
+        await _make_service(parser=parser).extract(b"bytes", "inv.pdf", "prop-1")
         parser.parse.assert_called_once_with(b"bytes", "inv.pdf")
 
     async def test_empty_invoice_data_returned_without_error(self):
@@ -94,7 +112,7 @@ class TestInvoiceExtractionSuccess:
 
     async def test_property_id_default_is_empty_string(self):
         parser = _make_parser()
-        await InvoiceExtractionService(parser).extract(b"data", "inv.pdf")
+        await _make_service(parser=parser).extract(b"data", "inv.pdf")
         parser.parse.assert_called_once()
 
     async def test_multiple_line_items(self):
@@ -147,5 +165,47 @@ class TestInvoiceExtractionErrors:
     async def test_parser_called_once_on_failure(self):
         parser = _make_parser(raise_error=RuntimeError("fail"))
         with _PATCH_LOGGER, pytest.raises(InvoiceExtractionError):
-            await InvoiceExtractionService(parser).extract(b"data", "inv.pdf")
+            await _make_service(parser=parser).extract(b"data", "inv.pdf")
         parser.parse.assert_called_once()
+
+
+# ------------------------------------
+# Routing tests
+# ------------------------------------
+
+@pytest.mark.unit
+class TestInvoiceExtractionRouting:
+    async def test_routes_to_invoice_parser_when_classified_as_invoice(self):
+        invoice_parser = _make_parser()
+        receipt_parser = _make_parser()
+        svc = _make_service(
+            parser=invoice_parser,
+            receipt_parser=receipt_parser,
+            classifier=_make_classifier(doc_type="invoice"),
+        )
+        await svc.extract(b"data", "inv.pdf")
+        invoice_parser.parse.assert_called_once()
+        receipt_parser.parse.assert_not_called()
+
+    async def test_routes_to_receipt_parser_when_classified_as_receipt(self):
+        invoice_parser = _make_parser()
+        receipt_parser = _make_parser()
+        svc = _make_service(
+            parser=invoice_parser,
+            receipt_parser=receipt_parser,
+            classifier=_make_classifier(doc_type="receipt"),
+        )
+        await svc.extract(b"data", "receipt.jpg")
+        receipt_parser.parse.assert_called_once()
+        invoice_parser.parse.assert_not_called()
+
+    async def test_classifier_called_with_correct_content_and_filename(self):
+        classifier = _make_classifier()
+        await _make_service(classifier=classifier).extract(b"bytes", "scan.pdf", "prop-1")
+        classifier.classify.assert_called_once_with(b"bytes", "scan.pdf")
+
+    async def test_classifier_error_raises_invoice_extraction_error(self):
+        with _PATCH_LOGGER, pytest.raises(InvoiceExtractionError):
+            await _make_service(
+                classifier=_make_classifier(raise_error=RuntimeError("Azure DI down"))
+            ).extract(b"data", "doc.pdf")

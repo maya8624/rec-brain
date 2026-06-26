@@ -16,6 +16,7 @@ class LineItem(BaseModel):
 
 
 class InvoiceData(BaseModel):
+    doc_type: Literal["invoice", "receipt"] = "invoice"
     vendor_name: str | None = None
     vendor_address: str | None = None
     customer_name: str | None = None
