@@ -12,8 +12,8 @@ AI orchestration service for a real estate platform. Handles multi-turn conversa
 | Vector search | pgvector (LlamaIndex) + ChromaDB |
 | Database | PostgreSQL (asyncpg) |
 | Backend | .NET REST API (httpx) |
-| Embeddings | `sentence-transformers/all-MiniLM-L6-v2` |
-| Document parsing | Azure Document Intelligence (prebuilt-invoice + prebuilt-layout) |
+| Embeddings | OpenAI `text-embedding-3-small` (1536-dim) |
+| Document parsing | Azure Document Intelligence (prebuilt-invoice + prebuilt-receipt + prebuilt-layout + prebuilt-read) |
 | Logging | structlog — colored console in development, JSON to rotating daily log files in all environments |
 
 ## Architecture
@@ -75,15 +75,16 @@ cp .env.mock .env                 # fill in the values below
 | `POSTGRES_URL` | Yes | pgvector-enabled PostgreSQL connection string |
 | `BACKEND_BASE_URL` | Yes | .NET backend API base URL |
 | `BACKEND_API_KEY` | Yes | .NET backend API key |
-| `AZURE_DOC_INTEL_ENDPOINT` | Yes | Azure Document Intelligence endpoint URL |
+| `AZURE_DOC_INTEL_ENDPOINT` | Yes | Azure Document Intelligence endpoint URL (S0 tier required) |
 | `AZURE_DOC_INTEL_KEY` | Yes | Azure Document Intelligence API key |
 | `OPENAI_MODEL_NAME` | No | Default: `gpt-4o-mini` |
 | `LLM_PROVIDER` | No | `openai` (default) \| `groq` |
 | `LLM_TEMPERATURE` | No | Default: `0.0` |
 | `LLM_MAX_TOKENS` | No | Default: `2048` |
-| `CHROMA_PATH` | No | ChromaDB persistence directory |
-| `SIMILARITY_THRESHOLD` | No | RAG retrieval cutoff score |
-| `EMBEDDING_MODEL` | No | Default: `sentence-transformers/all-MiniLM-L6-v2` |
+| `SIMILARITY_THRESHOLD` | No | RAG retrieval cutoff — default `0.35` |
+| `SIMILARITY_TOP_K` | No | RAG candidates fetched before cutoff — default `3` |
+| `EMBEDDING_MODEL` | No | Default: `text-embedding-3-small` |
+| `EMBEDDING_DIM` | No | Default: `1536` (matches `text-embedding-3-small`) |
 | `ENVIRONMENT` | No | `development` \| `staging` \| `production` |
 | `ALLOWED_ORIGINS` | No | Comma-separated CORS origins |
 
@@ -169,14 +170,19 @@ Parses, classifies, chunks, embeds, and upserts a document into pgvector. Called
 
 ### `POST /api/documents/invoice-extract`
 
-Extracts structured fields from an invoice PDF or image via Azure Document Intelligence (`prebuilt-invoice`). Requires the internal API key (`X-API-Key` header).
+Extracts structured fields from an invoice or receipt via Azure Document Intelligence. The document type is classified automatically before parsing. Requires the internal API key (`X-API-Key` header).
+
+**Document type classification** — runs before parsing:
+1. Keyword fast-path: uses Azure DI `prebuilt-read` to extract text, then matches against receipt/invoice keyword sets
+2. LLM fallback (`with_structured_output`): used when keywords are ambiguous or absent
+3. Defaults to `"invoice"` if the LLM call fails
 
 **Request** — `multipart/form-data`
 
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `file` | file | Yes | PDF, JPEG, PNG, TIFF, or BMP — max 20 MB |
-| `property_id` | string | No | Property this invoice belongs to |
+| `property_id` | string | No | Property this document belongs to |
 
 **Response**
 ```json
@@ -186,6 +192,7 @@ Extracts structured fields from an invoice PDF or image via Azure Document Intel
   "filename": "CB-19847_invoice.pdf",
   "property_id": "prop-123",
   "data": {
+    "doc_type": "invoice",
     "vendor_name": "CoolBreeze Air Conditioning",
     "vendor_address": "12 Industrial Ave, Sydney NSW 2000",
     "customer_name": "Acme Property Group",
@@ -204,8 +211,9 @@ Extracts structured fields from an invoice PDF or image via Azure Document Intel
 }
 ```
 
+- `doc_type` is `"invoice"` or `"receipt"`
 - `currency` is an ISO 4217 code (e.g. `"AUD"`, `"USD"`)
-- `confidence` is `0.0–1.0`; a `invoice_low_confidence` warning is logged when below `0.8`
+- `confidence` is `0.0–1.0`; a low-confidence warning is logged when below `0.8`
 
 ## Tools
 

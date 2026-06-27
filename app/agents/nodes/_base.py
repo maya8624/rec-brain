@@ -117,6 +117,13 @@ def vector_payload(nodes: list[NodeWithScore]) -> dict:
     }
 
 
+def build_rag_query(question: str, summary: str | None) -> str:
+    """Enrich a RAG retrieval query with prior-conversation context when available."""
+    if not summary:
+        return question
+    return f"Conversation context: {summary}\n\nCurrent question: {question}"
+
+
 def slim_rows(rows: list[dict]) -> list[dict]:
     """Strip unused columns — keeps only what the LLM and frontend need."""
     base = str(settings.BACKEND_BASE_URL).rstrip("/")

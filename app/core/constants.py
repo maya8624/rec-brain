@@ -86,6 +86,7 @@ class Intent:
 
 class IntentConfig:
     CLASSIFIER_HISTORY_LIMIT: int = 4
+    DEFAULT_HISTORY_LIMIT: int = 6
 
     HISTORY_BY_INTENT: dict[str, int] = {
         Intent.BOOKING:         12,
@@ -185,6 +186,14 @@ class IntentConfig:
         Intent.HYBRID_SEARCH,
     ])
 
+    SUMMARY_INTENTS: frozenset[str] = frozenset([
+        Intent.DOCUMENT_QUERY,
+        Intent.HYBRID_SEARCH,
+        Intent.GENERAL,
+        Intent.SEARCH,
+        Intent.SUBURB_SUMMARY,
+    ])
+
 
 class Messages:
     """User-facing fallback messages returned when the agent cannot complete a request."""
@@ -224,6 +233,7 @@ class PromptLabels:
     PROPERTY_SEARCH_RESULTS = "[PROPERTY SEARCH RESULTS]"
     BOOKING_CONTEXT = "[BOOKING CONTEXT]"
     DOCUMENT_TYPE_CLASSIFIER = "[DOCUMENT TYPE CLASSIFIER]"
+    CONVERSATION_SUMMARY = "[PREVIOUS CONVERSATION SUMMARY]"
 
 
 class InvoiceToolNames:
@@ -248,6 +258,9 @@ class StateKeys:
     REQUIRES_HUMAN = "requires_human"
     LOCATION = "location"
     PHASE = "phase"
+    CONVERSATION_SUMMARY = "conversation_summary"
+    SUMMARY_MESSAGE_COUNT = "summary_message_count"
+    SUMMARY_PROPERTY_ID = "summary_property_id"
 
 
 class Node:
@@ -264,4 +277,5 @@ class Node:
     TOOLS = "tools"
     CONTEXT_UPDATE = "context_update"
     SAFETY = "safety"
+    SUMMARIZE = "summarize"
     END = END

@@ -162,6 +162,9 @@ class RealEstateAgentState(TypedDict):
     error_count: int                    # consecutive tool failures this session
     intent_completed: bool              # True → last intent's tool flow finished
     phase: ConversationPhase
+    conversation_summary: str | None    # rolling summary of turns beyond the history window
+    summary_message_count: int          # how many messages are already covered by the summary
+    summary_property_id: str | None     # property_id in context when summary was last built
 
 
 def initial_state() -> RealEstateAgentState:
@@ -191,5 +194,8 @@ def initial_state() -> RealEstateAgentState:
         requires_human=False,
         error_count=0,
         intent_completed=False,
-        phase=ConversationPhase.IDLE
+        phase=ConversationPhase.IDLE,
+        conversation_summary=None,
+        summary_message_count=0,
+        summary_property_id=None,
     )

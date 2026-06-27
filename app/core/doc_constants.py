@@ -108,14 +108,14 @@ LEGISLATION_KEYWORDS: Final[tuple[str, ...]] = (
 # Specific types ordered before general to avoid early mis-classification.
 CLASSIFICATION_RULES: Final[tuple[tuple[str, tuple[str, ...], bool], ...]] = (
     (DOC_TYPE_FAQ,               FAQ_KEYWORDS,               True),
+    (DOC_TYPE_LEGISLATION,       LEGISLATION_KEYWORDS,       False),
     (DOC_TYPE_INSPECTION_NOTICE, INSPECTION_NOTICE_KEYWORDS, False),
     (DOC_TYPE_RENEWAL_OFFER,     RENEWAL_OFFER_KEYWORDS,     False),
-    (DOC_TYPE_BOND_LODGEMENT,    BOND_LODGEMENT_KEYWORDS,    False),
-    (DOC_TYPE_RENT_LEDGER,       RENT_LEDGER_KEYWORDS,       False),
     (DOC_TYPE_WATER_BILL,        WATER_BILL_KEYWORDS,        False),
     (DOC_TYPE_MAINTENANCE_LOG,   MAINTENANCE_LOG_KEYWORDS,   False),
+    (DOC_TYPE_RENT_LEDGER,       RENT_LEDGER_KEYWORDS,       False),
+    (DOC_TYPE_BOND_LODGEMENT,    BOND_LODGEMENT_KEYWORDS,    False),
     (DOC_TYPE_NOTICE,            NOTICE_KEYWORDS,            False),
-    (DOC_TYPE_LEGISLATION,       LEGISLATION_KEYWORDS,       False),
     (DOC_TYPE_LEASE,             LEASE_KEYWORDS,             False),
     (DOC_TYPE_INVOICE,           INVOICE_KEYWORDS,           False),
     (DOC_TYPE_REPORT,            REPORT_KEYWORDS,            False),

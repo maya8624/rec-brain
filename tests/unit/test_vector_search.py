@@ -93,6 +93,33 @@ class TestVectorSearchSuccess:
         call_kwargs = rag.aretrieve.call_args.kwargs
         assert call_kwargs["query"] == question
 
+    async def test_query_enriched_with_summary(self, make_rag_service, make_config):
+        """When conversation_summary is set, the RAG query includes it as context."""
+        rag = make_rag_service()
+        summary = "Tenant asked about water bill charges for unit 4, Main St."
+        question = "What does it say about that?"
+        await vector_search_node(
+            {
+                "messages": [HumanMessage(content=question)],
+                "conversation_summary": summary,
+            },
+            make_config(rag_service=rag),
+        )
+        call_kwargs = rag.aretrieve.call_args.kwargs
+        assert summary in call_kwargs["query"]
+        assert question in call_kwargs["query"]
+
+    async def test_query_not_enriched_when_no_summary(self, make_rag_service, make_config):
+        """When conversation_summary is absent, the raw question is used unchanged."""
+        rag = make_rag_service()
+        question = "What are the break clause conditions?"
+        await vector_search_node(
+            {"messages": [HumanMessage(content=question)]},
+            make_config(rag_service=rag),
+        )
+        call_kwargs = rag.aretrieve.call_args.kwargs
+        assert call_kwargs["query"] == question
+
 
 class TestVectorSearchGuards:
     async def test_no_human_message_returns_empty(self, make_rag_service, make_config):

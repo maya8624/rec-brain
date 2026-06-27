@@ -14,7 +14,7 @@ import json
 import structlog
 from langchain_core.messages import AIMessage, ToolMessage
 from app.agents.state import ConversationPhase, RealEstateAgentState
-from app.core.constants import Intent, ToolNames, Node, StateKeys
+from app.core.constants import Intent, IntentConfig, ToolNames, Node, StateKeys
 
 logger = structlog.get_logger(__name__)
 
@@ -54,7 +54,8 @@ def route_intent_output(state: RealEstateAgentState) -> str:
 
 
 def route_agent_output(state: RealEstateAgentState) -> str:
-    """Routes to tools if the last AIMessage has tool calls, otherwise end."""
+    """Routes to tools if the last AIMessage has tool calls, to summarize when a
+    non-tool intent completes, otherwise end."""
     if _requires_human(state, "route_agent_output"):
         return Node.END
 
@@ -62,14 +63,17 @@ def route_agent_output(state: RealEstateAgentState) -> str:
     if ai_message is None:
         return Node.END
 
-    if not getattr(ai_message, "tool_calls", None):
+    if getattr(ai_message, "tool_calls", None):
+        for tool_call in ai_message.tool_calls:
+            if destination := TOOL_ROUTES.get(tool_call["name"]):
+                return destination
+        logger.warning("route_agent_unrecognised_tools", tools=ai_message.tool_calls)
         return Node.END
 
-    for tool_call in ai_message.tool_calls:
-        if destination := TOOL_ROUTES.get(tool_call["name"]):
-            return destination
+    intent = state.get(StateKeys.USER_INTENT, Intent.GENERAL)
+    if state.get(StateKeys.INTENT_COMPLETED) and intent in IntentConfig.SUMMARY_INTENTS:
+        return Node.SUMMARIZE
 
-    logger.warning("route_agent_unrecognised_tools", tools=ai_message.tool_calls)
     return Node.END
 
 

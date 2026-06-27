@@ -15,6 +15,7 @@ from app.agents.state import RealEstateAgentState, RetrievedDocs
 from app.core.constants import AppStateKeys, Node, StateKeys
 from app.schemas.property import SearchResult
 from app.agents.nodes._base import (
+    build_rag_query,
     last_human_message,
     resolve_app_service,
     slim_rows,
@@ -47,9 +48,10 @@ async def hybrid_search_node(state: RealEstateAgentState, config: RunnableConfig
         sql_task = sql_service.search_listings(question)
 
     property_id = (state.get("property_context") or {}).get("property_id")
+    rag_query = build_rag_query(question, state.get(StateKeys.CONVERSATION_SUMMARY))
     sql_outcome, vector_outcome = await asyncio.gather(
         sql_task,
-        rag_service.aretrieve(question, property_id=property_id),
+        rag_service.aretrieve(rag_query, property_id=property_id),
         return_exceptions=True,
     )
 

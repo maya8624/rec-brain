@@ -58,6 +58,7 @@ from app.agents.nodes.intent import intent_node
 from app.agents.nodes.listing import listing_search_node
 from app.agents.nodes.safety import safety_node
 from app.agents.nodes.suburb_summary import suburb_summary_node
+from app.agents.nodes.summarize import summarize_node
 from app.agents.nodes.vector import vector_search_node
 from app.agents.router import (
     route_intent_output,
@@ -98,6 +99,7 @@ def build_graph(checkpointer: BaseCheckpointSaver) -> CompiledStateGraph:
     graph.add_node(Node.TOOLS,           tool_node)
     graph.add_node(Node.CONTEXT_UPDATE,  context_update_node)
     graph.add_node(Node.SAFETY,          safety_node)
+    graph.add_node(Node.SUMMARIZE,       summarize_node)
 
     graph.set_entry_point(Node.INTENT)
 
@@ -156,10 +158,13 @@ def build_graph(checkpointer: BaseCheckpointSaver) -> CompiledStateGraph:
         source=Node.AGENT,
         path=route_agent_output,
         path_map={
-            Node.TOOLS: Node.TOOLS,
-            Node.END:   END,
+            Node.TOOLS:     Node.TOOLS,
+            Node.SUMMARIZE: Node.SUMMARIZE,
+            Node.END:       END,
         },
     )
+
+    graph.add_edge(Node.SUMMARIZE, END)
 
     # ------------------------
     # Action tools

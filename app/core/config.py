@@ -51,8 +51,12 @@ class Settings(BaseSettings):
 
     # pgvector
     SIMILARITY_THRESHOLD: float = Field(
-        0.5,
+        0.35,
         description="Minimum similarity score for RAG retrieval (0.0 - 1.0)",
+    ) 
+    SIMILARITY_TOP_K: int = Field(
+        3,
+        description="Number of top candidates to retrieve before similarity cutoff",
     )
 
     EMBEDDING_MODEL: str = Field(

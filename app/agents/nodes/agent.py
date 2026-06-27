@@ -35,7 +35,7 @@ async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
     llm = _get_tool_llm() if needs_tools else _get_plain_llm()
 
     intent = state.get(StateKeys.USER_INTENT, Intent.GENERAL)
-    history_limit = IntentConfig.HISTORY_BY_INTENT.get(intent, 6)
+    history_limit = IntentConfig.HISTORY_BY_INTENT.get(intent, IntentConfig.DEFAULT_HISTORY_LIMIT)
     history = list(state["messages"])[-history_limit:]
 
     if needs_tools:
@@ -114,6 +114,11 @@ def _build_prompt(
     else:
         system = REAL_ESTATE_AGENT_SYSTEM
 
+    summary = state.get(StateKeys.CONVERSATION_SUMMARY)
+    summary_msg = SystemMessage(
+        content=f"{PromptLabels.CONVERSATION_SUMMARY}\n{summary}"
+    ) if summary else None
+
     docs_msg = _get_retrieved_docs_msg(state.get(
         StateKeys.RETRIEVED_DOCS)) if intent in IntentConfig.DOC_INTENTS else None
 
@@ -125,6 +130,7 @@ def _build_prompt(
 
     blocks = [
         SystemMessage(content=system),
+        summary_msg,
         *history,
         docs_msg,
         search_msg,

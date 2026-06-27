@@ -2,7 +2,7 @@ import uuid
 
 import structlog
 from langchain_openai import ChatOpenAI
-from llama_index.core.ingestion import IngestionPipeline
+from llama_index.core.ingestion import DocstoreStrategy, IngestionPipeline
 from llama_index.core.node_parser import MarkdownNodeParser, SentenceSplitter
 
 from app.core.config import settings
@@ -74,6 +74,7 @@ class DocumentIngestionService:
                 embedding_service.model,
             ],
             vector_store=vector_store_service.create_vector_store(),
+            docstore_strategy=DocstoreStrategy.UPSERTS,
         )
 
     async def ingest(

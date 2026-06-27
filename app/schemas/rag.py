@@ -41,6 +41,7 @@ RAG_KEYWORD_MAP: dict[RagIntent, frozenset[str]] = {
         "water meter",
     ]),
     RagIntent.MAINTENANCE: frozenset([
+        "maintenance",
         "repair",
         "fix",
         "broken",
@@ -50,8 +51,6 @@ RAG_KEYWORD_MAP: dict[RagIntent, frozenset[str]] = {
         "damage",
         "damaged",
         "not working",
-        "maintenance request",
-        "maintenance issue",
         "tradesperson",
         "plumber",
         "electrician",

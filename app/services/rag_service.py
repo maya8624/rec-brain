@@ -5,6 +5,7 @@ from llama_index.core.schema import NodeWithScore
 from llama_index.core.vector_stores import MetadataFilter, MetadataFilters
 from llama_index.core.vector_stores.types import FilterCondition, VectorStoreQueryMode
 
+from app.core.config import settings
 from app.infrastructure.embedding import EmbeddingService
 from app.infrastructure.pgvector_store import PgVectorStoreService
 
@@ -22,8 +23,8 @@ class RagRetriever:
         self,
         vector_store_service: PgVectorStoreService,
         embedding_service: EmbeddingService,
-        similarity_top_k: int = 3,
-        similarity_cutoff: float = 0.5,
+        similarity_top_k: int = settings.SIMILARITY_TOP_K,
+        similarity_cutoff: float = settings.SIMILARITY_THRESHOLD,
     ) -> None:
         self._vector_store = vector_store_service.create_vector_store()
         self._embed_model = embedding_service.model
@@ -77,6 +78,7 @@ class RagRetriever:
 
         retriever = self._build_retriever(filters=filters)
         nodes = await retriever.aretrieve(query)
+        # logger.info("rag_scores", scores=[(n.node.metadata.get("file_name"), round(n.score, 3)) for n in nodes if n.score is not None])
         filtered = [node for node in nodes if node.score is not None and node.score >= self._similarity_cutoff]
         return filtered
 

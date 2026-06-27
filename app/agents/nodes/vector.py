@@ -16,7 +16,7 @@ from typing import Any
 
 from langchain_core.runnables import RunnableConfig
 
-from app.agents.nodes._base import extract_sources, last_human_message, resolve_app_service, vector_payload
+from app.agents.nodes._base import build_rag_query, extract_sources, last_human_message, resolve_app_service, vector_payload
 from app.agents.state import RealEstateAgentState, RetrievedDocs
 from app.agents.nodes.rag_intent import classify_rag_intent
 from app.core.constants import AppStateKeys, Node, StateKeys
@@ -47,7 +47,8 @@ async def vector_search_node(
         property_id = (state.get("property_context") or {}).get("property_id")
         rag_intent = await classify_rag_intent(question)
         doc_types = INTENT_DOC_TYPES.get(rag_intent)
-        nodes = await rag_service.aretrieve(query=question, doc_types=doc_types, property_id=property_id)
+        query = build_rag_query(question, state.get(StateKeys.CONVERSATION_SUMMARY))
+        nodes = await rag_service.aretrieve(query=query, doc_types=doc_types, property_id=property_id)
 
         payload = json.dumps(vector_payload(nodes))
         docs = (

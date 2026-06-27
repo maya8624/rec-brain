@@ -258,6 +258,34 @@ class TestAgentNode:
         # Only the REAL_ESTATE_AGENT_SYSTEM prompt + 1 HumanMessage
         assert len(call_messages) == 2
 
+    async def test_summary_injected_into_prompt_when_present(self, mock_get_llm, mock_llm):
+        """conversation_summary is injected as a SystemMessage before windowed history."""
+        mock_get_llm.return_value = mock_llm
+        state = {
+            "messages": [HumanMessage(content="what does it say about that?")],
+            "user_intent": "document_query",
+            "error_count": 0,
+            "conversation_summary": "Tenant asked about lease bond conditions for unit 4.",
+        }
+        await agent_node(state)
+        call_messages = mock_llm.ainvoke.call_args.args[0]
+        assert any(
+            isinstance(m, SystemMessage) and "Tenant asked about lease bond conditions" in m.content
+            for m in call_messages
+        )
+
+    async def test_summary_not_injected_when_absent(self, mock_get_llm, mock_llm, base_state):
+        """When conversation_summary is None, no extra SystemMessage is added."""
+        mock_get_llm.return_value = mock_llm
+        base_state["conversation_summary"] = None
+        await agent_node(base_state)
+        call_messages = mock_llm.ainvoke.call_args.args[0]
+        summary_msgs = [
+            m for m in call_messages
+            if isinstance(m, SystemMessage) and "[PREVIOUS CONVERSATION SUMMARY]" in m.content
+        ]
+        assert summary_msgs == []
+
     async def test_search_then_deposit_injects_property_search_results(self, mock_get_llm, mock_llm):
         mock_get_llm.return_value = mock_llm
         state = {

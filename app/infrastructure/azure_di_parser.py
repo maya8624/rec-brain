@@ -27,6 +27,7 @@ class AzureDocumentIntelligenceParser:
 
     async def parse(self, content: bytes, filename: str) -> list[Document]:
         suffix = Path(filename).suffix.lower()
+        logger.info("azure_di_parse_start", filename=filename, suffix=suffix, use_azure=suffix in SUPPORTED_EXTENSIONS)
 
         if suffix in SUPPORTED_EXTENSIONS:
             text = await asyncio.to_thread(self._analyze, content)
@@ -55,4 +56,6 @@ class AzureDocumentIntelligenceParser:
             output_content_format="markdown",
         )
         result = poller.result()
-        return result.content or ""
+        content = result.content or ""
+        logger.info("azure_di_extracted", content_length=len(content), pages=len(result.pages) if result.pages else 0)
+        return content
