@@ -20,7 +20,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 
 from app.agents.nodes._base import format_listings
 from app.agents.state import BookingContext, ConversationPhase, RealEstateAgentState, UserIntent
-from app.core.constants import Intent, IntentConfig, PromptLabels, StateKeys
+from app.core.constants import Intent, IntentConfig, Messages, PromptLabels, StateKeys
 from app.infrastructure.llm import get_llm
 from app.prompts.agent import REAL_ESTATE_AGENT_SYSTEM, SEARCH_RESULT_SYSTEM
 from app.prompts.rag import DOCUMENT_QUERY_PROMPT
@@ -54,6 +54,7 @@ async def agent_node(state: RealEstateAgentState) -> dict[str, Any]:
         raise
 
     state_keys = _update_state_keys(intent, state, response, needs_tools)
+    state_keys[StateKeys.NODE_ERROR] = None
     return state_keys
 
 
@@ -118,6 +119,16 @@ def _build_prompt(
     summary_msg = SystemMessage(
         content=f"{PromptLabels.CONVERSATION_SUMMARY}\n{summary}"
     ) if summary else None
+
+    node_error = state.get(StateKeys.NODE_ERROR)
+    if node_error:
+        error_msg = SystemMessage(
+            content=(
+                f"[SYSTEM ERROR] The search service is temporarily unavailable. "
+                f"Respond with: \"{Messages.SEARCH_ERROR}\""
+            )
+        )
+        return [SystemMessage(content=system), *history, error_msg]
 
     docs_msg = _get_retrieved_docs_msg(state.get(
         StateKeys.RETRIEVED_DOCS)) if intent in IntentConfig.DOC_INTENTS else None

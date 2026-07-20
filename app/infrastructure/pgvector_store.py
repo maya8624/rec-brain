@@ -1,6 +1,11 @@
+import structlog
+from urllib.parse import urlparse
+
 from llama_index.vector_stores.postgres import PGVectorStore
 
 from app.core.config import settings
+
+logger = structlog.get_logger(__name__)
 
 
 class PgVectorStoreService:
@@ -11,18 +16,26 @@ class PgVectorStoreService:
 
     def create_vector_store(self) -> PGVectorStore:
         conn_str = str(settings.POSTGRES_URL)
+        parsed = urlparse(conn_str)
+        db_host = f"{parsed.hostname}:{parsed.port or 5432}"
 
-        async_conn_str = (
-            conn_str
-            .replace("postgresql://", "postgresql+asyncpg://")
-            .replace("postgresql+psycopg2://", "postgresql+asyncpg://")
-            .replace("sslmode=require", "ssl=require")
-        )
+        try:
+            async_conn_str = (
+                conn_str
+                .replace("postgresql://", "postgresql+asyncpg://")
+                .replace("postgresql+psycopg2://", "postgresql+asyncpg://")
+                .replace("sslmode=require", "ssl=require")
+            )
 
-        return PGVectorStore.from_params(
-            table_name=settings.VECTOR_TABLE,
-            embed_dim=settings.EMBEDDING_DIM,
-            perform_setup=True,
-            connection_string=conn_str,
-            async_connection_string=async_conn_str,
-        )
+            store = PGVectorStore.from_params(
+                table_name=settings.VECTOR_TABLE,
+                embed_dim=settings.EMBEDDING_DIM,
+                perform_setup=True,
+                connection_string=conn_str,
+                async_connection_string=async_conn_str,
+            )
+            logger.info("pgvector_connected", host=db_host)
+            return store
+        except Exception as exc:
+            logger.exception("pgvector_connection_failed", host=db_host, error=str(exc))
+            raise

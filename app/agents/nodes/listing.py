@@ -48,8 +48,9 @@ async def listing_search_node(
             StateKeys.SEARCH_RESULTS: rows,
             StateKeys.RETRIEVED_DOCS: None,
             StateKeys.PHASE: ConversationPhase.SEARCH_RESULTS_SHOWN,
+            StateKeys.NODE_ERROR: None,
         }
 
     except Exception as exc:
         logger.exception("listing_search_failed", error=str(exc))
-        return {}
+        return {StateKeys.NODE_ERROR: "db_unavailable"}

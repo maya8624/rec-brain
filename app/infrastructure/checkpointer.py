@@ -3,6 +3,7 @@ PostgreSQL checkpointer service for LangGraph state persistence.
 Initialized once at app startup, closed on shutdown.
 """
 import structlog
+from urllib.parse import urlparse
 
 from psycopg_pool import AsyncConnectionPool
 from psycopg.rows import dict_row
@@ -26,6 +27,8 @@ class PostgresCheckpointer:
     @classmethod
     async def create(cls) -> "PostgresCheckpointer":
         """Initialize the checkpointer and its connection pool."""
+        parsed = urlparse(settings.POSTGRES_URL)
+        db_host = f"{parsed.hostname}:{parsed.port or 5432}"
         try:
             pool = AsyncConnectionPool(
                 conninfo=settings.POSTGRES_URL,
@@ -37,10 +40,10 @@ class PostgresCheckpointer:
             checkpointer = AsyncPostgresSaver(conn=pool)
             await checkpointer.setup()
 
-            logger.info("checkpointer_ready")
+            logger.info("checkpointer_ready", host=db_host)
             return cls(checkpointer, pool)
         except Exception as exc:
-            logger.critical("checkpointer_fallback_to_memory", error=str(exc))
+            logger.critical("checkpointer_fallback_to_memory", host=db_host, error=str(exc))
             return cls(InMemorySaver())
 
     async def close(self) -> None:

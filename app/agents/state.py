@@ -161,6 +161,7 @@ class RealEstateAgentState(TypedDict):
     requires_human: bool                # True → escalate to human agent
     error_count: int                    # consecutive tool failures this session
     intent_completed: bool              # True → last intent's tool flow finished
+    node_error: str | None              # set by search nodes on DB failure; cleared by agent_node
     phase: ConversationPhase
     conversation_summary: str | None    # rolling summary of turns beyond the history window
     summary_message_count: int          # how many messages are already covered by the summary
@@ -194,6 +195,7 @@ def initial_state() -> RealEstateAgentState:
         requires_human=False,
         error_count=0,
         intent_completed=False,
+        node_error=None,
         phase=ConversationPhase.IDLE,
         conversation_summary=None,
         summary_message_count=0,

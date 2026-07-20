@@ -84,3 +84,5 @@ jobs:
             OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
             BACKEND_API_KEY=${{ secrets.BACKEND_API_KEY }}
             BACKEND_BASE_URL=${{ secrets.BACKEND_BASE_URL }}
+            AZURE_DOC_INTEL_ENDPOINT=${{ secrets.AZURE_DOC_INTEL_ENDPOINT }}
+            AZURE_DOC_INTEL_KEY=${{ secrets.AZURE_DOC_INTEL_KEY }}

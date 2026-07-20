@@ -246,6 +246,7 @@ class StateKeys:
     """
     USER_INTENT = "user_intent"
     INTENT_COMPLETED = "intent_completed"
+    NODE_ERROR = "node_error"
     EARLY_RESPONSE = "early_response"
     SEARCH_CONTEXT = "search_context"
     SEARCH_RESULTS = "search_results"

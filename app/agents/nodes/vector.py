@@ -58,8 +58,7 @@ async def vector_search_node(
 
         sources = extract_sources(nodes)
         docs = RetrievedDocs(docs=docs, sources=sources)
-        result = {StateKeys.RETRIEVED_DOCS: docs}
-        return result
+        return {StateKeys.RETRIEVED_DOCS: docs, StateKeys.NODE_ERROR: None}
     except Exception as exc:
         logger.exception("vector_search_node_failed", error=str(exc))
-        return {}
+        return {StateKeys.NODE_ERROR: "db_unavailable"}
