@@ -8,6 +8,8 @@ from langchain_core.messages import HumanMessage
 from app.schemas.property import SearchResult
 from app.agents.nodes.listing import listing_search_node
 
+pytestmark = pytest.mark.unit
+
 
 class TestListingSearchSuccess:
     async def test_returns_search_results(self, make_sql_service, make_config):
@@ -147,6 +149,17 @@ class TestListingSearchSuccess:
         )
         assert result.get("retrieved_docs") is None
 
+    async def test_node_error_cleared_on_success(self, make_sql_service, make_config):
+        """A successful search always clears node_error, even if it was set on entry."""
+        result = await listing_search_node(
+            {
+                "messages": [HumanMessage(content="houses in Sydney")],
+                "node_error": "db_unavailable",
+            },
+            make_config(sql_service=make_sql_service()),
+        )
+        assert result["node_error"] is None
+
 
 class TestListingSearchGuards:
     async def test_no_human_message_returns_empty(self, make_sql_service, make_config):
@@ -159,23 +172,23 @@ class TestListingSearchGuards:
         assert result == {}
         svc.search_listings.assert_not_called()
 
-    async def test_missing_service_returns_empty(self, make_config):
+    async def test_missing_service_returns_node_error(self, make_config):
         result = await listing_search_node(
             {"messages": [HumanMessage(content="houses")]},
             make_config(sql_service=None),
         )
 
-        assert result == {}
+        assert result == {"node_error": "db_unavailable"}
 
-    async def test_missing_request_returns_empty(self):
+    async def test_missing_request_returns_node_error(self):
         result = await listing_search_node(
             {"messages": [HumanMessage(content="houses")]},
             {"configurable": {}},
         )
 
-        assert result == {}
+        assert result == {"node_error": "db_unavailable"}
 
-    async def test_service_exception_returns_empty(self, make_sql_service, make_config):
+    async def test_service_exception_returns_node_error(self, make_sql_service, make_config):
         svc = make_sql_service(
             raise_error=RuntimeError("DB connection dropped")
         )
@@ -185,4 +198,4 @@ class TestListingSearchGuards:
             make_config(sql_service=svc),
         )
 
-        assert result == {}
+        assert result == {"node_error": "db_unavailable"}

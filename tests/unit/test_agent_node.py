@@ -7,6 +7,9 @@ import pytest
 from langchain_core.messages import AIMessage, HumanMessage, RemoveMessage, SystemMessage, ToolMessage
 
 from app.agents.nodes.agent import agent_node, _needs_tools
+from app.core.constants import Messages
+
+pytestmark = pytest.mark.unit
 
 
 class TestNeedsTools:
@@ -285,6 +288,44 @@ class TestAgentNode:
             if isinstance(m, SystemMessage) and "[PREVIOUS CONVERSATION SUMMARY]" in m.content
         ]
         assert summary_msgs == []
+
+    async def test_node_error_short_circuits_prompt(self, mock_get_llm, mock_llm, base_state):
+        """When node_error is set, the prompt instructs the LLM to give the fixed apology."""
+        mock_get_llm.return_value = mock_llm
+        base_state["node_error"] = "db_unavailable"
+        await agent_node(base_state)
+        call_messages = mock_llm.ainvoke.call_args.args[0]
+        assert any(
+            isinstance(m, SystemMessage) and Messages.SEARCH_ERROR in m.content
+            for m in call_messages
+        )
+
+    async def test_node_error_skips_normal_context(self, mock_get_llm, mock_llm):
+        """node_error short-circuit skips search/docs/booking context injection entirely."""
+        mock_get_llm.return_value = mock_llm
+        state = {
+            "messages": [HumanMessage(content="find houses")],
+            "user_intent": "search",
+            "error_count": 0,
+            "node_error": "db_unavailable",
+            "search_results": [{"address": "1 Test St"}],
+        }
+        await agent_node(state)
+        call_messages = mock_llm.ainvoke.call_args.args[0]
+        assert not any("1 Test St" in m.content for m in call_messages)
+
+    async def test_node_error_cleared_in_result(self, mock_get_llm, mock_llm, base_state):
+        """agent_node always clears node_error after handling it, so it doesn't leak to the next turn."""
+        mock_get_llm.return_value = mock_llm
+        base_state["node_error"] = "db_unavailable"
+        result = await agent_node(base_state)
+        assert result["node_error"] is None
+
+    async def test_node_error_absent_still_cleared_in_result(self, mock_get_llm, mock_llm, base_state):
+        """node_error is explicitly set to None even on a normal turn where it was never set."""
+        mock_get_llm.return_value = mock_llm
+        result = await agent_node(base_state)
+        assert result["node_error"] is None
 
     async def test_search_then_deposit_injects_property_search_results(self, mock_get_llm, mock_llm):
         mock_get_llm.return_value = mock_llm

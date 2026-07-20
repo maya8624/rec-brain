@@ -6,11 +6,19 @@ All factories follow the "fixture-as-factory" pattern:
     with custom arguments while still getting pytest's dependency injection.
 """
 import json
+import sys
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 import pytest
 from langchain_core.messages import HumanMessage
 from app.schemas.property import SearchResult
+
+if sys.platform == "win32":
+    # structlog's colorized ConsoleRenderer emits characters the default
+    # Windows console codepage (cp1252) can't encode, which crashes any test
+    # that triggers logger.exception/error with a real exception.
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
 
 
 @pytest.fixture

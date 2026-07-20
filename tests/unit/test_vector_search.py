@@ -4,9 +4,12 @@ Uses make_rag_service and make_config fixtures from tests/conftest.py.
 """
 import json
 
+import pytest
 from langchain_core.messages import HumanMessage
 
 from app.agents.nodes.vector import vector_search_node
+
+pytestmark = pytest.mark.unit
 
 
 def _parse_docs(result: dict) -> dict:
@@ -74,6 +77,17 @@ class TestVectorSearchSuccess:
         assert item["metadata"]["property_id"] == "prop_42"
         assert item["metadata"]["doc_type"] == "strata"
 
+    async def test_node_error_cleared_on_success(self, make_rag_service, make_config):
+        """A successful retrieval always clears node_error, even if it was set on entry."""
+        result = await vector_search_node(
+            {
+                "messages": [HumanMessage(content="What is the bond?")],
+                "node_error": "db_unavailable",
+            },
+            make_config(rag_service=make_rag_service()),
+        )
+        assert result["node_error"] is None
+
     async def test_empty_results(self, make_rag_service, make_config):
         result = await vector_search_node(
             {"messages": [HumanMessage(content="Very obscure question")]},
@@ -131,25 +145,25 @@ class TestVectorSearchGuards:
         assert result == {}
         rag.aretrieve.assert_not_called()
 
-    async def test_missing_service_returns_empty(self, make_config):
+    async def test_missing_service_returns_node_error(self, make_config):
         result = await vector_search_node(
             {"messages": [HumanMessage(content="lease?")]},
             make_config(rag_service=None),
         )
-        assert result == {}
+        assert result == {"node_error": "db_unavailable"}
 
-    async def test_missing_request_returns_empty(self):
+    async def test_missing_request_returns_node_error(self):
         result = await vector_search_node(
             {"messages": [HumanMessage(content="lease?")]},
             {"configurable": {}},
         )
-        assert result == {}
+        assert result == {"node_error": "db_unavailable"}
 
-    async def test_retrieve_exception_returns_empty(self, make_rag_service, make_config):
+    async def test_retrieve_exception_returns_node_error(self, make_rag_service, make_config):
         rag = make_rag_service(
             raise_error=RuntimeError("pgvector connection lost"))
         result = await vector_search_node(
             {"messages": [HumanMessage(content="lease?")]},
             make_config(rag_service=rag),
         )
-        assert result == {}
+        assert result == {"node_error": "db_unavailable"}
